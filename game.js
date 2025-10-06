@@ -28,6 +28,7 @@ const DEFAULT_COLS = 16;
 let fallingPieces = [];
 let fogEnabled = false;
 let pendingMoveCounter = false;
+let teleportBlocks = [];
 
 // Board block types
 const CELL_TYPES = {
@@ -40,7 +41,8 @@ const CELL_TYPES = {
   TRANSFORMER: 6,      // Transformer block (changes piece type)
   OBJECTIVE: 7,        // Objective block (must be reached before goal)
   OBJECTIVE_COMPLETED: 8, // Completed objective block
-  COUNTER_GOAL: 9         // Goal but with counter
+  COUNTER_GOAL: 9,         // Goal but with counter
+  TELEPORT: 10  // Teleportation block
 };
 
 // Piece types
@@ -765,12 +767,22 @@ function movePlayer(playerIndex, newRow, newCol) {
   }
 
   // Check if destination is a transformer block BEFORE moving
+  const isTeleportBlock = board[newRow][newCol] === CELL_TYPES.TELEPORT;
   const isTransformerBlock = board[newRow][newCol] === CELL_TYPES.TRANSFORMER;
 
   board[player.row][player.col] = CELL_TYPES.EMPTY;
   player.row = newRow;
   player.col = newCol;
-  board[player.row][player.col] = CELL_TYPES.PLAYER;
+
+  if (isTeleportBlock) {
+    handleTeleport(player);
+    return; // stop rest of logic for this frame
+  }
+
+  // Only place player if it's not a teleport cell
+  if (board[player.row][player.col] !== CELL_TYPES.TELEPORT) {
+    board[player.row][player.col] = CELL_TYPES.PLAYER;
+  }
 
   // Check if player moved onto a transformer block
   if (isTransformerBlock) {
@@ -809,6 +821,41 @@ function movePlayer(playerIndex, newRow, newCol) {
     decrementCounterAfterMove();
   }
 }
+
+function handleTeleport(player) {
+  // Get all teleport blocks
+  const teleports = [];
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      if (board[r][c] === CELL_TYPES.TELEPORT) {
+        teleports.push({ row: r, col: c });
+      }
+    }
+  }
+
+  if (teleports.length < 2) return;
+
+  // Find which teleporter the player is on
+  const currentIndex = teleports.findIndex(tp => tp.row === player.row && tp.col === player.col);
+  if (currentIndex === -1) return;
+
+  // Teleport to the next one (wrap-around)
+  const destination = teleports[(currentIndex + 1) % teleports.length];
+
+  // ✅ Leave teleport intact at origin
+  board[player.row][player.col] = CELL_TYPES.TELEPORT;
+
+  // ✅ Move player position
+  player.row = destination.row;
+  player.col = destination.col;
+
+  // ✅ Leave teleport intact at destination too!
+  // (Do NOT overwrite with PLAYER — let drawBoard() render player visually)
+  updateStatus("✨ Teleported!");
+  checkObjectiveCompletion();
+  if (gravityEnabled) applyGravity();
+}
+
 
 // Find which player was clicked
 function getPlayerAt(row, col) {
@@ -1395,6 +1442,21 @@ function drawBoard() {
           ctx.fill();
         }
       }
+
+      // Draw teleport block (purple circle)
+      if (board[r][c] === CELL_TYPES.TELEPORT) {
+        if (!fogEnabled || visible[r][c]) {
+          ctx.fillStyle = "rgba(155, 89, 182, 0.8)"; // soft purple
+          ctx.beginPath();
+          ctx.arc(x + TILE_SIZE / 2, y + TILE_SIZE / 2, TILE_SIZE / 3, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Optional inner glow
+          ctx.strokeStyle = "rgba(255, 255, 255, 0.6)";
+          ctx.lineWidth = 2;
+          ctx.stroke();
+        }
+      }
       
       // Draw completed objective block (green diamond) - adjust size
       if (board[r][c] === CELL_TYPES.OBJECTIVE_COMPLETED) {
@@ -1425,6 +1487,28 @@ function drawBoard() {
         if (!fogEnabled || visible[r][c]) {
           const player = players.find(p => p.row === r && p.col === c);
           if (player) {
+            // Check if this cell is also a teleport
+            let teleportHere = false;
+            for (let tr = 0; tr < ROWS; tr++) {
+              for (let tc = 0; tc < COLS; tc++) {
+                if (board[tr][tc] === CELL_TYPES.TELEPORT && tr === r && tc === c) {
+                  teleportHere = true;
+                  break;
+                }
+              }
+            }
+
+            // 🟣 Draw teleport underneath the piece if present
+            if (teleportHere) {
+              ctx.fillStyle = "rgba(155, 89, 182, 0.8)";
+              ctx.beginPath();
+              ctx.arc(x + TILE_SIZE / 2, y + TILE_SIZE / 2, TILE_SIZE / 3, 0, Math.PI * 2);
+              ctx.fill();
+              ctx.strokeStyle = "rgba(255, 255, 255, 0.6)";
+              ctx.lineWidth = 2;
+              ctx.stroke();
+            }
+            
             ctx.drawImage(pieceImages[player.pieceType], x+8, y+8, TILE_SIZE-16, TILE_SIZE-16);
           }
         }
@@ -1786,6 +1870,10 @@ function handleMove(e) {
     } else if (editMode === "transformer") {
       board[row][col] = CELL_TYPES.TRANSFORMER;
       updateStatus(`Transformer block placed at (${row}, ${col})`);
+    } else if (editMode === "teleport") {
+        board[row][col] = CELL_TYPES.TELEPORT;
+        teleportBlocks.push({ row, col });
+        updateStatus(`Teleport block placed at (${row}, ${col})`);
     } else if (editMode === "objective") {
       // Check if there's already an objective here
       const existingObjective = objectives.find(obj => obj.row === row && obj.col === col);
