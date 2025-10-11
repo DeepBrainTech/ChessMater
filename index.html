@@ -164,6 +164,10 @@
       z-index: 1000;
     }
 
+    #modeToggle {
+      display: none !important;
+    }
+
     /* Confetti animations */
     @keyframes confetti-fall {
       0% {
@@ -267,13 +271,55 @@
     .developer-mode .level-selector {
       display: none;
     }
+
+    .start-screen {
+      position: fixed;
+      inset: 0;
+      background: linear-gradient(120deg, #1e3c72, #2a5298, #e52d27, #ff6e00);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+      color: #fff;
+    }
+
+    .start-screen h1 {
+      font-size: 3rem;
+      margin-bottom: 20px;
+      text-shadow: 2px 2px 5px #000;
+    }
+
+    #startButton {
+      padding: 12px 24px;
+      font-size: 1.2rem;
+      font-weight: bold;
+      background-color: #1da1f2;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      box-shadow: 2px 2px 10px rgba(0,0,0,0.3);
+    }
+
+    #startButton:hover {
+      background-color: #0d8ddb;
+    }
+
+
+
   </style>
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
 </head>
-<body>
+<body class="consumer-mode">
   <button class="mode-toggle" id="modeToggle">Switch to Consumer Mode</button>
+
+  <div id="startScreen" class="start-screen">
+    <h1>Multi-Player Chess Puzzle</h1>
+    <button id="startButton">Start Game</button>
+  </div>
   
-  <div class="container developer-mode" id="mainContainer">
+  <div class="container consumer-mode" id="mainContainer">
     <h1>Multi-Player Chess Puzzle with Gravity</h1>
     
     <div class="game-area">
@@ -303,8 +349,11 @@
             <option value="phase_block">Phase Block</option>
             <option value="transformer">Transformer Block</option>
             <option value="objective">Objective Block</option>
+            <option value="teleport_purple">Purple Teleporter</option>
+            <option value="teleport_green">Green Teleporter</option>
+            <option value="teleport_blue">Blue Teleporter</option>
+            <option value="teleport_orange">Orange Teleporter</option>
             <option value="erase">Erase</option>
-            <option value="teleport">Teleport Block</option>
           </select>
         </div>
 
@@ -457,9 +506,37 @@
       drawBoard();
     }
     
-    // Initialize levels when the page loads
-    window.addEventListener('DOMContentLoaded', () => {
-      loadLevels();
+    document.addEventListener("DOMContentLoaded", () => {
+    // Load level buttons
+    loadLevels();
+
+    // Set to Play Mode
+    const modeSelect = document.getElementById("modeSelect");
+    if (modeSelect) {
+        modeSelect.value = "play";
+        modeSelect.dispatchEvent(new Event("change"));
+    }
+
+    // Start Game Button Logic
+    const startButton = document.getElementById("startButton");
+    if (startButton) {
+        startButton.addEventListener("click", () => {
+        const startScreen = document.getElementById("startScreen");
+        if (startScreen) {
+            startScreen.style.display = "none";
+        }
+
+        // Load Level 1 and force play mode
+        if (typeof LEVELS !== 'undefined' && LEVELS.length > 0) {
+            loadPuzzle(LEVELS[0]);
+
+            // Just to be sure everything initializes:
+            if (typeof enablePlayerControls === "function") {
+            enablePlayerControls();
+            }
+        }
+        });
+    }
     });
   </script>
   
