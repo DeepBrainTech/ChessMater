@@ -432,6 +432,38 @@
   </div>
 
   <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const bgMusic = document.getElementById("bgMusic");
+      const musicToggle = document.getElementById("musicToggle");
+      const startButton = document.getElementById("startButton");
+      let musicPlaying = false;
+
+      // 🎮 Start the music when the Start button is clicked
+      if (startButton) {
+        startButton.addEventListener("click", () => {
+          if (!musicPlaying) {
+            bgMusic.volume = 0.5; // Optional: softer background
+            bgMusic.play().catch(err => console.warn("Autoplay blocked:", err));
+            musicPlaying = true;
+            musicToggle.textContent = "🔊 Music";
+          }
+        });
+      }
+
+      // 🎚️ Toggle music on/off
+      musicToggle.addEventListener("click", () => {
+        if (bgMusic.paused) {
+          bgMusic.play();
+          musicToggle.textContent = "🔊 Music";
+          musicPlaying = true;
+        } else {
+          bgMusic.pause();
+          musicToggle.textContent = "🔇 Muted";
+          musicPlaying = false;
+        }
+      });
+    });
+
     // Mode management
     let isDeveloperMode = true;
     
@@ -543,5 +575,24 @@
   <!-- Link to external JS -->
   <script src="game.js"></script>
   <script src="levels.js"></script>
+
+  <audio id="bgMusic" loop preload="auto">
+    <source src="background1.mp3" type="audio/mpeg">
+  </audio>
+
+  <button id="musicToggle" style="
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    padding: 10px 16px;
+    border: none;
+    border-radius: 8px;
+    background: #3498db;
+    color: white;
+    font-weight: bold;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    z-index: 9999;
+  ">🔊 Music</button>
 </body>
 </html>
