@@ -709,11 +709,17 @@ function isValidMove(playerIndex, newRow, newCol) {
   const movingDown = newRow > r;
   const fromDirection = movingDown ? "above" : "below";
   
-  // Only check for blocking if it's not a transformer block
+  // Prevent moving directly onto a phase block
+  if (board[newRow][newCol] === CELL_TYPES.PHASE_BLOCK) {
+    return false;
+  }
+
+  // Block if the cell is otherwise invalid (except transformer)
   if (board[newRow][newCol] !== CELL_TYPES.TRANSFORMER && 
       isCellBlocked(newRow, newCol, player, fromDirection)) {
     return false;
   }
+
 
   // Use the player's specific piece type
   switch (player.pieceType) {
