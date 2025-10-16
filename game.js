@@ -1628,7 +1628,7 @@ function drawBoard() {
 // --- Confetti Celebration ---
 function triggerConfetti() {
   //const Winsound = new Audio("woo-hoo-82843.mp3");
-  const Winsound = new Audio("yay-6326.mp3");
+  const Winsound = new Audio("completion.mp3");
   Winsound.currentTime = 0;
   Winsound.volume = 0.7;
   Winsound.play().catch(err => console.log("Audio err", err));
