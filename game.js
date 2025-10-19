@@ -826,7 +826,7 @@ function movePlayer(playerIndex, newRow, newCol) {
     // Gravity off → decrement now (after checking for immediate win above)
     decrementCounterAfterMove();
   }
-  
+
   const moveSound = document.getElementById("moveSound");
   if (moveSound) {
     moveSound.currentTime = 0; // reset to start for rapid reuse
