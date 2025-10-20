@@ -29,6 +29,8 @@ let fallingPieces = [];
 let fogEnabled = false;
 let pendingMoveCounter = false;
 let teleportBlocks = [];
+let playerTeleportCooldowns = new Map();
+const TELEPORT_COOLDOWN = 300;
 
 // Board block types
 const CELL_TYPES = {
@@ -42,8 +44,18 @@ const CELL_TYPES = {
   OBJECTIVE: 7,        // Objective block (must be reached before goal)
   OBJECTIVE_COMPLETED: 8, // Completed objective block
   COUNTER_GOAL: 9,         // Goal but with counter
-  TELEPORT: 10,  // Teleportation block
-  BOMB: 11    // bomb block
+  TELEPORT_PURPLE: 10, // Purple teleporter (pair 1)
+  TELEPORT_GREEN: 11,  // Green teleporter (pair 2)
+  TELEPORT_BLUE: 12,   // Blue teleporter (pair 3)
+  TELEPORT_ORANGE: 13,  // Orange teleporter (pair 4)
+  BOMB: 14    // bomb block
+};
+
+const TELEPORT_COLORS = {
+  [CELL_TYPES.TELEPORT_PURPLE]: { fill: "rgba(155, 89, 182, 0.8)", stroke: "rgba(255, 255, 255, 0.6)" },
+  [CELL_TYPES.TELEPORT_GREEN]: { fill: "rgba(46, 204, 113, 0.8)", stroke: "rgba(255, 255, 255, 0.6)" },
+  [CELL_TYPES.TELEPORT_BLUE]: { fill: "rgba(52, 152, 219, 0.8)", stroke: "rgba(255, 255, 255, 0.6)" },
+  [CELL_TYPES.TELEPORT_ORANGE]: { fill: "rgba(243, 156, 18, 0.8)", stroke: "rgba(255, 255, 255, 0.6)" }
 };
 
 // Piece types
@@ -84,6 +96,7 @@ let editMode = "player_rook"; // tool in edit mode
 let gravityEnabled = true;
 let gameWon = false;
 let selectedPlayerIndex = -1; // Track which player is selected
+teleportBlocks = []; // ✅ Clear teleport blocks
 
 // Transformer block variables
 let showTransformerMenu = false;
@@ -422,6 +435,20 @@ function loadPuzzle(puzzleData) {
       totalObjectives = objectives.length;
       objectivesCompleted = objectives.filter(obj => obj.completed).length;
     }
+
+    teleportBlocks = [];
+    for (let r = 0; r < loadedRows; r++) {
+      for (let c = 0; c < loadedCols; c++) {
+        if ([
+          CELL_TYPES.TELEPORT_PURPLE,
+          CELL_TYPES.TELEPORT_GREEN,
+          CELL_TYPES.TELEPORT_BLUE,
+          CELL_TYPES.TELEPORT_ORANGE
+        ].includes(board[r][c])) {
+          teleportBlocks.push({ row: r, col: c, type: board[r][c] });
+        }
+      }
+    }
     
     updatePlayerCount();
     updateObjectiveCount();
@@ -548,13 +575,23 @@ function applyGravity() {
     const newRow = findFallPosition(player.row, player.col);
 
     if (newRow !== player.row) {
+      const landingCellType = board[newRow][player.col];
+      const isTeleportBlock = [
+        CELL_TYPES.TELEPORT_PURPLE,
+        CELL_TYPES.TELEPORT_GREEN,
+        CELL_TYPES.TELEPORT_BLUE,
+        CELL_TYPES.TELEPORT_ORANGE
+      ].includes(landingCellType);
+
       fallingPieces.push({
         playerIndex: i,
         startRow: player.row,
         targetRow: newRow,
         col: player.col,
         y: player.row * TILE_SIZE,
-        pieceType: player.pieceType
+        pieceType: player.pieceType,
+        isTeleport: isTeleportBlock,
+        teleportType: isTeleportBlock ? landingCellType : null
       });
 
       // Clear board spot early so ghost rendering is manual
@@ -580,68 +617,182 @@ function applyGravity() {
 }
 
 function updateFallingPieces() {
-  const fallSpeed = 5;     //fall speed of gravity
+  const fallSpeed = 5;
 
   for (let i = fallingPieces.length - 1; i >= 0; i--) {
     const piece = fallingPieces[i];
     const targetY = piece.targetRow * TILE_SIZE;
+    const prevY = piece.y;
 
-    if (piece.y < targetY) {
-      piece.y += fallSpeed;
-      if (piece.y >= targetY) {
-        // Snap to final row
-        piece.y = targetY;
+    // Move piece down
+    piece.y += fallSpeed;
 
-        if (piece.playerIndex === "goal") {
-          goal.row = piece.targetRow;
-          board[goal.row][piece.col] = CELL_TYPES.GOAL;
-        } else {
+    // --- 💡 NEW: Check if we've passed through a teleport block mid-fall
+    const prevRow = Math.floor(prevY / TILE_SIZE);
+    const currentRow = Math.floor(piece.y / TILE_SIZE);
+
+    if (currentRow !== prevRow) {
+      for (let r = prevRow + 1; r <= currentRow; r++) {
+        const cellType = board[r][piece.col];
+        if ([CELL_TYPES.TELEPORT_PURPLE, CELL_TYPES.TELEPORT_GREEN, CELL_TYPES.TELEPORT_BLUE, CELL_TYPES.TELEPORT_ORANGE].includes(cellType)) {
+          // ⏩ Teleport immediately!
           const player = players[piece.playerIndex];
-          player.row = piece.targetRow;
-          board[player.row][piece.col] = CELL_TYPES.PLAYER;
-        }
 
-        fallingPieces.splice(i, 1); // remove finished
-        
-        checkObjectiveCompletion();
-        checkWinCondition(); // Check win condition FIRST
-        
-        // 🔧 DECREMENT COUNTER AFTER checking win condition (only if game not won)
-        // if (!gameWon && goal && goal.type === "counter" && goal.counter > 0) {
-        //   goal.counter--;
-        //   updateStatus(`Counter goal: ${goal.counter} moves remaining`);
-        //   if (goal.counter <= 0) {
-        //     updateStatus("Counter goal locked!");
-        //   }
-        // }
+          // Set position before teleporting
+          player.row = r;
+          player.col = piece.col;
+
+          // Clean up fall piece
+          fallingPieces.splice(i, 1);
+
+          // Trigger teleport
+          handleGravityTeleport(player, cellType);
+
+          return; // Skip rest of loop for this frame
+        }
+      }
+    }
+
+    // --- Usual landing logic
+    if (piece.y >= targetY) {
+      piece.y = targetY;
+
+      if (piece.playerIndex === "goal") {
+        goal.row = piece.targetRow;
+        board[goal.row][piece.col] = CELL_TYPES.GOAL;
+      } else {
+        const player = players[piece.playerIndex];
+
+        // Check if landing on a teleport block
+        const landingCellType = board[piece.targetRow][piece.col];
+        const isTeleportBlock = [
+          CELL_TYPES.TELEPORT_PURPLE,
+          CELL_TYPES.TELEPORT_GREEN,
+          CELL_TYPES.TELEPORT_BLUE,
+          CELL_TYPES.TELEPORT_ORANGE
+        ].includes(landingCellType);
+
+        if (isTeleportBlock) {
+          // Don't place player on board - let teleport logic handle it
+          player.row = piece.targetRow;
+          player.col = piece.col;
+          handleGravityTeleport(player, landingCellType);
+        } else {
+          // Normal landing
+          player.row = piece.targetRow;
+          player.col = piece.col;
+          board[player.row][player.col] = CELL_TYPES.PLAYER;
+          playerTeleportCooldowns.delete(player);
+          checkObjectiveCompletion();
+          checkWinCondition();
+        }
+      }
+
+      fallingPieces.splice(i, 1);
+
+      // Decrement counter if nothing else is falling
+      if (fallingPieces.length === 0 && pendingMoveCounter) {
+        decrementCounterAfterMove();
+        pendingMoveCounter = false;
       }
     }
   }
-  if (fallingPieces.length === 0 && pendingMoveCounter) {
-    decrementCounterAfterMove();
-    pendingMoveCounter = false;
+}
+
+function handleGravityTeleport(player, teleportType) {
+  // Get all teleport blocks of the same color
+  const sameColorTeleports = teleportBlocks.filter(tp => tp.type === teleportType);
+  
+  if (sameColorTeleports.length !== 2) {
+    board[player.row][player.col] = CELL_TYPES.PLAYER;
+    updateStatus("Need exactly 2 teleporters of the same color!");
+    return;
+  }
+
+  // Find the other teleporter in the pair
+  const otherTeleporter = sameColorTeleports.find(tp => 
+    !(tp.row === player.row && tp.col === player.col)
+  );
+  
+  if (!otherTeleporter) {
+    board[player.row][player.col] = CELL_TYPES.PLAYER;
+    return;
+  }
+
+  // ✅ Simply move the player to the other teleporter
+  player.row = otherTeleporter.row;
+  player.col = otherTeleporter.col;
+
+  const colorNames = {
+    [CELL_TYPES.TELEPORT_PURPLE]: "Purple",
+    [CELL_TYPES.TELEPORT_GREEN]: "Green",
+    [CELL_TYPES.TELEPORT_BLUE]: "Blue",
+    [CELL_TYPES.TELEPORT_ORANGE]: "Orange"
+  };
+  
+  updateStatus(`✨ ${colorNames[teleportType]} Teleport from gravity!`);
+
+  // ✅ CRITICAL FIX: Clear the player from the board temporarily to reset teleport state
+  board[player.row][player.col] = CELL_TYPES.EMPTY;
+
+  // Check objectives after teleporting
+  checkObjectiveCompletion();
+  checkWinCondition();
+  
+  // Apply gravity again after teleporting
+  if (gravityEnabled) {
+    setTimeout(() => {
+      applyGravity();
+    }, 150);
+  } else {
+    // If gravity is disabled, still place the player on the board after teleport
+    setTimeout(() => {
+      board[player.row][player.col] = CELL_TYPES.PLAYER;
+    }, 50);
   }
 }
 
 // Find where a piece should fall to
 function findFallPosition(startRow, col) {
   let row = startRow;
-  
+
   // Keep falling until we hit the bottom or a blocking cell
   while (row < ROWS - 1) {
     const nextRow = row + 1;
-    
+
     // Check if the next cell is blocked when coming from above
     if (isCellBlocked(nextRow, col, null, "above")) {
-      // We hit something we can't fall through from above
       break;
-    } else {
-      // We can fall to the next cell
-      row = nextRow;
+    }
+
+    // Move down
+    row = nextRow;
+  }
+
+  return row;
+}
+
+function checkGravityTeleportation() {
+  for (let i = 0; i < players.length; i++) {
+    const player = players[i];
+    const cellType = board[player.row][player.col];
+    
+    const isTeleportBlock = [
+      CELL_TYPES.TELEPORT_PURPLE,
+      CELL_TYPES.TELEPORT_GREEN,
+      CELL_TYPES.TELEPORT_BLUE,
+      CELL_TYPES.TELEPORT_ORANGE
+    ].includes(cellType);
+    
+    if (isTeleportBlock) {
+      // Small delay to ensure the piece has settled
+      setTimeout(() => {
+        if (players[i] && players[i].row === player.row && players[i].col === player.col) {
+          handleTeleport(players[i]);
+        }
+      }, 50);
     }
   }
-  
-  return row;
 }
 
 // Check if any player has reached the goal
@@ -776,8 +927,15 @@ function movePlayer(playerIndex, newRow, newCol) {
     return;
   }
 
+  // Check if destination is ANY teleport block type BEFORE moving
+  const isTeleportBlock = [
+    CELL_TYPES.TELEPORT_PURPLE,
+    CELL_TYPES.TELEPORT_GREEN,
+    CELL_TYPES.TELEPORT_BLUE,
+    CELL_TYPES.TELEPORT_ORANGE
+  ].includes(board[newRow][newCol]);
+
   // Check if destination is a transformer block BEFORE moving
-  const isTeleportBlock = board[newRow][newCol] === CELL_TYPES.TELEPORT;
   const isTransformerBlock = board[newRow][newCol] === CELL_TYPES.TRANSFORMER;
 
   board[player.row][player.col] = CELL_TYPES.EMPTY;
@@ -790,7 +948,7 @@ function movePlayer(playerIndex, newRow, newCol) {
   }
 
   // Only place player if it's not a teleport cell
-  if (board[player.row][player.col] !== CELL_TYPES.TELEPORT) {
+  if (!isTeleportBlock) {
     board[player.row][player.col] = CELL_TYPES.PLAYER;
   }
 
@@ -840,37 +998,88 @@ function movePlayer(playerIndex, newRow, newCol) {
 }
 
 function handleTeleport(player) {
-  // Get all teleport blocks
-  const teleports = [];
-  for (let r = 0; r < ROWS; r++) {
-    for (let c = 0; c < COLS; c++) {
-      if (board[r][c] === CELL_TYPES.TELEPORT) {
-        teleports.push({ row: r, col: c });
-      }
-    }
+  // Get the teleporter type the player is standing on
+  const currentTeleportType = board[player.row][player.col];
+  
+  // Check if it's actually a teleporter type
+  const teleportTypes = [
+    CELL_TYPES.TELEPORT_PURPLE,
+    CELL_TYPES.TELEPORT_GREEN, 
+    CELL_TYPES.TELEPORT_BLUE,
+    CELL_TYPES.TELEPORT_ORANGE
+  ];
+  
+  if (!teleportTypes.includes(currentTeleportType)) {
+    return;
   }
 
-  if (teleports.length < 2) return;
+  // Get all teleport blocks of the same color
+  const sameColorTeleports = teleportBlocks.filter(tp => tp.type === currentTeleportType);
+  
+  if (sameColorTeleports.length !== 2) {
+    updateStatus("Need exactly 2 teleporters of the same color!");
+    return;
+  }
 
-  // Find which teleporter the player is on
-  const currentIndex = teleports.findIndex(tp => tp.row === player.row && tp.col === player.col);
-  if (currentIndex === -1) return;
+  // Find the other teleporter in the pair
+  const otherTeleporter = sameColorTeleports.find(tp => 
+    !(tp.row === player.row && tp.col === player.col)
+  );
+  
+  if (!otherTeleporter) return;
 
-  // Teleport to the next one (wrap-around)
-  const destination = teleports[(currentIndex + 1) % teleports.length];
+  // ✅ TEMPORARILY DISABLE BOTH TELEPORTERS
+  const sourcePos = `${player.row},${player.col}`;
+  const destPos = `${otherTeleporter.row},${otherTeleporter.col}`;
+  
+  // Store original types
+  const sourceType = board[player.row][player.col];
+  const destType = board[otherTeleporter.row][otherTeleporter.col];
+  
+  // Change to inactive state (use a visual indicator)
+  board[player.row][player.col] = CELL_TYPES.EMPTY;
+  board[otherTeleporter.row][otherTeleporter.col] = CELL_TYPES.EMPTY;
 
-  // ✅ Leave teleport intact at origin
-  board[player.row][player.col] = CELL_TYPES.TELEPORT;
+  // ✅ Move player to destination
+  player.row = otherTeleporter.row;
+  player.col = otherTeleporter.col;
 
-  // ✅ Move player position
-  player.row = destination.row;
-  player.col = destination.col;
+  const colorNames = {
+    [CELL_TYPES.TELEPORT_PURPLE]: "Purple",
+    [CELL_TYPES.TELEPORT_GREEN]: "Green",
+    [CELL_TYPES.TELEPORT_BLUE]: "Blue",
+    [CELL_TYPES.TELEPORT_ORANGE]: "Orange"
+  };
+  
+  updateStatus(`✨ ${colorNames[currentTeleportType]} Teleport! Teleporters resetting...`);
+  
+  // ✅ RESTORE TELEPORTERS AFTER COOLDOWN
+  setTimeout(() => {
+    board[player.row][player.col] = destType; // Player's current position
+    // Find and restore the source teleporter
+    const sourceTeleporter = sameColorTeleports.find(tp => 
+      tp.row === parseInt(sourcePos.split(',')[0]) && tp.col === parseInt(sourcePos.split(',')[1])
+    );
+    if (sourceTeleporter) {
+      board[sourceTeleporter.row][sourceTeleporter.col] = sourceType;
+    }
+    updateStatus(`${colorNames[currentTeleportType]} Teleporters ready!`);
+  }, TELEPORT_COOLDOWN);
 
-  // ✅ Leave teleport intact at destination too!
-  // (Do NOT overwrite with PLAYER — let drawBoard() render player visually)
-  updateStatus("✨ Teleported!");
   checkObjectiveCompletion();
-  if (gravityEnabled) applyGravity();
+  
+  // Apply gravity after teleporting
+  if (gravityEnabled) {
+    setTimeout(() => {
+      applyGravity();
+    }, 150);
+  } else {
+    // If gravity is disabled, place the player on the board
+    setTimeout(() => {
+      board[player.row][player.col] = CELL_TYPES.PLAYER;
+      checkWinCondition();
+    }, 50);
+  }
 }
 
 
@@ -1460,19 +1669,25 @@ function drawBoard() {
         }
       }
 
-      // Draw teleport block (purple circle)
-      if (board[r][c] === CELL_TYPES.TELEPORT) {
-        if (!fogEnabled || visible[r][c]) {
-          ctx.fillStyle = "rgba(155, 89, 182, 0.8)"; // soft purple
-          ctx.beginPath();
-          ctx.arc(x + TILE_SIZE / 2, y + TILE_SIZE / 2, TILE_SIZE / 3, 0, Math.PI * 2);
-          ctx.fill();
-
-          // Optional inner glow
-          ctx.strokeStyle = "rgba(255, 255, 255, 0.6)";
-          ctx.lineWidth = 2;
-          ctx.stroke();
-        }
+      // Draw teleport blocks with their respective colors
+      if ([
+          CELL_TYPES.TELEPORT_PURPLE,
+          CELL_TYPES.TELEPORT_GREEN,
+          CELL_TYPES.TELEPORT_BLUE,
+          CELL_TYPES.TELEPORT_ORANGE
+      ].includes(board[r][c])) {
+          if (!fogEnabled || visible[r][c]) {
+              const color = TELEPORT_COLORS[board[r][c]];
+              if (color) {
+                  ctx.fillStyle = color.fill;
+                  ctx.beginPath();
+                  ctx.arc(x + TILE_SIZE / 2, y + TILE_SIZE / 2, TILE_SIZE / 3, 0, Math.PI * 2);
+                  ctx.fill();
+                  ctx.strokeStyle = color.stroke;
+                  ctx.lineWidth = 2;
+                  ctx.stroke();
+              }
+          }
       }
       
       // Draw completed objective block (green diamond) - adjust size
@@ -1504,30 +1719,37 @@ function drawBoard() {
         if (!fogEnabled || visible[r][c]) {
           const player = players.find(p => p.row === r && p.col === c);
           if (player) {
-            // Check if this cell is also a teleport
-            let teleportHere = false;
-            for (let tr = 0; tr < ROWS; tr++) {
-              for (let tc = 0; tc < COLS; tc++) {
-                if (board[tr][tc] === CELL_TYPES.TELEPORT && tr === r && tc === c) {
-                  teleportHere = true;
-                  break;
+            // Check if there's a teleport block at this position
+            const teleportBlock = teleportBlocks.find(tp => tp.row === r && tp.col === c);
+            if (teleportBlock) {
+                const color = TELEPORT_COLORS[teleportBlock.type];
+                if (color) {
+                    // Draw teleport block underneath
+                    ctx.fillStyle = color.fill;
+                    ctx.beginPath();
+                    ctx.arc(x + TILE_SIZE / 2, y + TILE_SIZE / 2, TILE_SIZE / 3, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.strokeStyle = color.stroke;
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
                 }
-              }
-            }
-
-            // 🟣 Draw teleport underneath the piece if present
-            if (teleportHere) {
-              ctx.fillStyle = "rgba(155, 89, 182, 0.8)";
-              ctx.beginPath();
-              ctx.arc(x + TILE_SIZE / 2, y + TILE_SIZE / 2, TILE_SIZE / 3, 0, Math.PI * 2);
-              ctx.fill();
-              ctx.strokeStyle = "rgba(255, 255, 255, 0.6)";
-              ctx.lineWidth = 2;
-              ctx.stroke();
             }
             
+            // Draw the player piece on top
             ctx.drawImage(pieceImages[player.pieceType], x+8, y+8, TILE_SIZE-16, TILE_SIZE-16);
           }
+        }
+      }
+
+      if (teleportBlocks.some(tp => tp.row === r && tp.col === c) && board[r][c] !== CELL_TYPES.PLAYER) {
+        if (!fogEnabled || visible[r][c]) {
+            ctx.fillStyle = "rgba(155, 89, 182, 0.8)";
+            ctx.beginPath();
+            ctx.arc(x + TILE_SIZE / 2, y + TILE_SIZE / 2, TILE_SIZE / 3, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.6)";
+            ctx.lineWidth = 2;
+            ctx.stroke();
         }
       }
 
@@ -1972,9 +2194,12 @@ function handleMove(e) {
       board[row][col] = CELL_TYPES.TRANSFORMER;
       updateStatus(`Transformer block placed at (${row}, ${col})`);
     } else if (editMode === "teleport") {
-        board[row][col] = CELL_TYPES.TELEPORT;
+      board[row][col] = CELL_TYPES.TELEPORT;
+      // Add to teleportBlocks array if not already there
+      if (!teleportBlocks.some(tp => tp.row === row && tp.col === col)) {
         teleportBlocks.push({ row, col });
-        updateStatus(`Teleport block placed at (${row}, ${col})`);
+      }
+      updateStatus(`Teleport block placed at (${row}, ${col})`);
     } else if (editMode === "objective") {
       // Check if there's already an objective here
       const existingObjective = objectives.find(obj => obj.row === row && obj.col === col);
@@ -1989,6 +2214,12 @@ function handleMove(e) {
       }
     } else if (editMode === "erase") {
       board[row][col] = CELL_TYPES.EMPTY;
+
+      // Remove from teleportBlocks if it was a teleport block
+      const teleportIndex = teleportBlocks.findIndex(tp => tp.row === row && tp.col === col);
+      if (teleportIndex !== -1) {
+        teleportBlocks.splice(teleportIndex, 1);
+      }
       
       // Remove player if one was at this position
       const playerIndex = getPlayerAt(row, col);
@@ -2025,6 +2256,23 @@ function handleMove(e) {
       // Apply gravity after placing
       if (gravityEnabled) {
         applyGravity();
+      }
+    } else if (editMode.startsWith("teleport_")) {
+      const color = editMode.split("_")[1]; // "purple", "green", etc.
+      const teleportType = {
+        purple: CELL_TYPES.TELEPORT_PURPLE,
+        green: CELL_TYPES.TELEPORT_GREEN,
+        blue: CELL_TYPES.TELEPORT_BLUE,
+        orange: CELL_TYPES.TELEPORT_ORANGE
+      }[color];
+      
+      if (teleportType) {
+        board[row][col] = teleportType;
+        // Add to teleportBlocks array if not already there
+        if (!teleportBlocks.some(tp => tp.row === row && tp.col === col)) {
+          teleportBlocks.push({ row, col, type: teleportType });
+        }
+        updateStatus(`${color.charAt(0).toUpperCase() + color.slice(1)} teleporter placed at (${row}, ${col})`);
       }
     } else if (editMode === "goal") {
       if (goal) board[goal.row][goal.col] = CELL_TYPES.EMPTY;
