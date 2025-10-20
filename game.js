@@ -42,7 +42,8 @@ const CELL_TYPES = {
   OBJECTIVE: 7,        // Objective block (must be reached before goal)
   OBJECTIVE_COMPLETED: 8, // Completed objective block
   COUNTER_GOAL: 9,         // Goal but with counter
-  TELEPORT: 10  // Teleportation block
+  TELEPORT: 10,  // Teleportation block
+  BOMB: 11    // bomb block
 };
 
 // Piece types
@@ -56,7 +57,8 @@ const pieceImages = {
   knight: new Image(),
   king: new Image(),
   pawn: new Image(),
-  target: new Image()
+  target: new Image(),
+  bomb: new Image()
 };
 pieceImages.rook.src   = "https://upload.wikimedia.org/wikipedia/commons/7/72/Chess_rlt45.svg";
 pieceImages.bishop.src = "https://upload.wikimedia.org/wikipedia/commons/b/b1/Chess_blt45.svg";
@@ -65,6 +67,7 @@ pieceImages.knight.src = "https://upload.wikimedia.org/wikipedia/commons/7/70/Ch
 pieceImages.king.src   = "https://upload.wikimedia.org/wikipedia/commons/4/42/Chess_klt45.svg";
 pieceImages.pawn.src   = "https://upload.wikimedia.org/wikipedia/commons/4/45/Chess_plt45.svg";
 pieceImages.target.src = "https://upload.wikimedia.org/wikipedia/commons/f/f0/Chess_kdt45.svg";
+pieceImages.bomb.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='40' fill='black'/%3E%3Ccircle cx='35' cy='40' r='5' fill='white'/%3E%3Ccircle cx='45' cy='35' r='3' fill='white'/%3E%3Cpath d='M60,30 L75,25 L70,40 Z' fill='red'/%3E%3C/svg%3E";
 
 // tracker for players, goals, and objectives
 let board = Array.from({ length: ROWS }, () => Array(COLS).fill(CELL_TYPES.EMPTY));
@@ -74,6 +77,7 @@ let objectives = []; // Array of { row, col, completed }
 let objectivesCompleted = 0;
 let totalObjectives = 0;
 let phaseBlockStates = {}; // Track which phase blocks have been activated
+let bombs = []; // {row, col, direction}
 
 let mode = "edit";     // edit or play
 let editMode = "player_rook"; // tool in edit mode
@@ -1527,6 +1531,13 @@ function drawBoard() {
         }
       }
 
+      // Draw bomb block
+      if (board[r][c] === CELL_TYPES.BOMB) {
+        if (!fogEnabled || visible[r][c]) {
+          ctx.drawImage(pieceImages.bomb, x+8, y+8, TILE_SIZE-16, TILE_SIZE-16);
+        }
+      }
+
       // Draw goal (red king) - adjust size and position
       if (board[r][c] === CELL_TYPES.GOAL && goal) {
         if (!fogEnabled || visible[r][c]) {
@@ -1808,6 +1819,83 @@ function addStreamers(container, canvasRect, centerX, startY) {
   }
 }
 
+//moving bomb function
+function moveBombs() {
+  for (let i = bombs.length - 1; i >= 0; i--) {
+    let bomb = bombs[i];
+    // Clear current position
+    board[bomb.row][bomb.col] = CELL_TYPES.EMPTY;
+
+    // Move bomb in its direction
+    let nextCol = bomb.col + bomb.direction;
+
+    // Remove bomb if out of bounds
+    if (nextCol < 0 || nextCol >= COLS) {
+      bombs.splice(i, 1);
+      continue;
+    }
+
+    // Check collision with player
+    const hitPlayerIndex = players.findIndex(p => p.row === bomb.row && p.col === nextCol);
+    if (hitPlayerIndex !== -1) {
+      // Remove player
+      players.splice(hitPlayerIndex, 1);
+      updateStatus("💥 A player was hit by a bomb!");
+      updatePlayerCount();
+    }
+
+    // Place bomb in new location
+    bomb.col = nextCol;
+    board[bomb.row][bomb.col] = CELL_TYPES.BOMB;
+  }
+}
+
+function updateBombs() {
+  for (let i = bombs.length - 1; i >= 0; i--) {
+    const bomb = bombs[i];
+    const nextCol = bomb.col + bomb.direction;
+
+    // Check bounds - bounce if hitting the edge
+    if (nextCol < 0 || nextCol >= COLS) {
+      bomb.direction *= -1; // Reverse direction
+      continue;
+    }
+
+    // Check for collision with player
+    const hitPlayerIndex = players.findIndex(p => p.row === bomb.row && p.col === nextCol);
+    if (hitPlayerIndex !== -1) {
+      // Remove the player that got hit
+      players.splice(hitPlayerIndex, 1);
+      updateStatus("💣 A player was blown up!");
+      updatePlayerCount();
+      
+      // Check if all players are gone
+      if (players.length === 0) {
+        updateStatus("Game Over! All players destroyed!");
+      }
+      
+      // Move the bomb to the player's position and continue
+      board[bomb.row][bomb.col] = CELL_TYPES.EMPTY;
+      bomb.col = nextCol;
+      board[bomb.row][bomb.col] = CELL_TYPES.BOMB;
+      continue; // Skip the rest of the logic for this bomb this frame
+    }
+
+    // Only move if the next position is empty
+    if (board[bomb.row][nextCol] === CELL_TYPES.EMPTY) {
+      // Clear current position
+      board[bomb.row][bomb.col] = CELL_TYPES.EMPTY;
+      
+      // Move bomb
+      bomb.col = nextCol;
+      board[bomb.row][bomb.col] = CELL_TYPES.BOMB;
+    } else {
+      // If the next position is blocked by something else, bounce
+      bomb.direction *= -1;
+    }
+  }
+}
+
 // Create initial burst effect
 function createInitialBurst(container, canvasRect, centerX, startY) {
   const burstColors = ['#ff6b6b', '#f9ca24', '#6c5ce7', '#00b894', '#ffffff'];
@@ -1957,6 +2045,15 @@ function handleMove(e) {
       goal = { row, col, type: "counter", counter: moves };
 
       updateStatus(`Counter Goal placed at (${row}, ${col}) with ${goal.counter} moves`);
+    } else if (editMode === "bomb") {
+      // Only place bomb on empty cells
+      if (board[row][col] === CELL_TYPES.EMPTY) {
+        board[row][col] = CELL_TYPES.BOMB;
+        bombs.push({ row, col, direction: 1 }); // Default moving right
+        updateStatus(`Bomb placed at (${row}, ${col})`);
+      } else {
+        updateStatus("Cannot place bomb on occupied cell");
+      }
     }
   } else if (mode === "play") {
     if (players.length === 0) {
@@ -2002,10 +2099,19 @@ function initializeCanvas() {
   resizeCanvas();
 }
 
+
+let frameCount = 0;
 // --- Game Loop ---
 function gameLoop() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   updateFallingPieces();
+
+  frameCount++;
+  if (frameCount % 50 === 0) {
+    updateBombs();
+  }
+
+
   drawBoard();
   
   if (mode === "play") {
