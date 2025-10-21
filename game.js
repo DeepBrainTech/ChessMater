@@ -31,6 +31,10 @@ let pendingMoveCounter = false;
 let teleportBlocks = [];
 let playerTeleportCooldowns = new Map();
 const TELEPORT_COOLDOWN = 300;
+let shakeAmount = 0;
+let shakeDecay = 0.8;
+let shakeX = 0;
+let shakeY = 0;
 
 // Board block types
 const CELL_TYPES = {
@@ -90,7 +94,7 @@ let objectivesCompleted = 0;
 let totalObjectives = 0;
 let phaseBlockStates = {}; // Track which phase blocks have been activated
 let bombs = []; // {row, col, direction}
-
+let explodingPlayers = []; // { x, y, rotation, velocityY, img }
 let mode = "edit";     // edit or play
 let editMode = "player_rook"; // tool in edit mode
 let gravityEnabled = true;
@@ -346,6 +350,7 @@ function saveLevelToFolder() {
     players: players,
     goal: goal, // This should include type and counter if it's a counter goal
     objectives: objectives,
+    bombs: bombs, // ✅ Add bombs to saved data
     createdAt: new Date().toISOString()
   };
   
@@ -370,7 +375,6 @@ function saveLevelToFolder() {
   updateStatus(`Puzzle "${puzzleName}" saved to levels folder!`);
 }
 
-// --- Load puzzle from JSON file ---
 // --- Load puzzle from JSON file ---
 function loadPuzzle(puzzleData) {
   try {
@@ -432,6 +436,24 @@ function loadPuzzle(puzzleData) {
           col: obj.col,
           completed: obj.completed || false
         }));
+
+      // 💣 Recreate bombs from saved data
+      bombs = [];
+      if (Array.isArray(puzzleData.bombs)) {
+        bombs = puzzleData.bombs
+          .filter(b => b.row < loadedRows && b.col < loadedCols)
+          .map(b => ({
+            row: b.row,
+            col: b.col,
+            direction: b.direction || 1 // Default to moving right if direction not specified
+          }));
+        
+        // Update board with bomb positions
+        for (const b of bombs) {
+          board[b.row][b.col] = CELL_TYPES.BOMB;
+        }
+      }
+
       totalObjectives = objectives.length;
       objectivesCompleted = objectives.filter(obj => obj.completed).length;
     }
@@ -869,8 +891,9 @@ function isValidMove(playerIndex, newRow, newCol) {
     return false;
   }
 
-  // Block if the cell is otherwise invalid (except transformer)
+  // Block if the cell is otherwise invalid (except transformer and bomb)
   if (board[newRow][newCol] !== CELL_TYPES.TRANSFORMER && 
+      board[newRow][newCol] !== CELL_TYPES.BOMB &&
       isCellBlocked(newRow, newCol, player, fromDirection)) {
     return false;
   }
@@ -927,6 +950,9 @@ function movePlayer(playerIndex, newRow, newCol) {
     return;
   }
 
+  // ✅ NEW: Check if moving into a bomb BEFORE moving
+  const isBombBlock = board[newRow][newCol] === CELL_TYPES.BOMB;
+
   // Check if destination is ANY teleport block type BEFORE moving
   const isTeleportBlock = [
     CELL_TYPES.TELEPORT_PURPLE,
@@ -937,6 +963,12 @@ function movePlayer(playerIndex, newRow, newCol) {
 
   // Check if destination is a transformer block BEFORE moving
   const isTransformerBlock = board[newRow][newCol] === CELL_TYPES.TRANSFORMER;
+
+  // ✅ NEW: Handle bomb collision immediately BEFORE any movement
+  if (isBombBlock) {
+    handleBombCollision(player, playerIndex, newRow, newCol);
+    return; // Stop further processing
+  }
 
   board[player.row][player.col] = CELL_TYPES.EMPTY;
   player.row = newRow;
@@ -958,7 +990,7 @@ function movePlayer(playerIndex, newRow, newCol) {
     return; // Stop here to show the menu before applying gravity
   }
 
-  // Check for objective completion after moving
+  // Rest of the function remains the same...
   checkObjectiveCompletion();
 
   // Check if player moved through a phase block from below and activate it
@@ -994,7 +1026,6 @@ function movePlayer(playerIndex, newRow, newCol) {
     moveSound.currentTime = 0; // reset to start for rapid reuse
     moveSound.play().catch(err => console.warn("Sound play blocked:", err));
   }
-
 }
 
 function handleTeleport(player) {
@@ -1802,6 +1833,24 @@ function drawBoard() {
     ctx.drawImage(pieceImages[piece.pieceType], x+8, piece.y+8, TILE_SIZE-16, TILE_SIZE-16);
   });
 
+  // Draw exploding players with rotation effect
+  for (const p of explodingPlayers) {
+    const img = pieceImages[p.pieceType];
+    if (!img.complete) continue;
+
+    ctx.save();
+    ctx.translate(p.x + TILE_SIZE / 2, p.y + TILE_SIZE / 2);
+    ctx.rotate(p.rotation);
+    
+    // Add a slight scale effect for more drama
+    const scale = 1 + Math.sin(p.rotation) * 0.1;
+    ctx.scale(scale, scale);
+    
+    // Draw the piece centered
+    ctx.drawImage(img, -TILE_SIZE / 2, -TILE_SIZE / 2, TILE_SIZE, TILE_SIZE);
+    ctx.restore();
+  }
+
   // draw normal (non-falling) players
   players.forEach((player, i) => {
     const isFalling = fallingPieces.find(fp => fp.playerIndex === i);
@@ -1811,6 +1860,7 @@ function drawBoard() {
       ctx.drawImage(pieceImages[player.pieceType], x+8, y+8, TILE_SIZE-16, TILE_SIZE-16);
     }
   });
+
 
   // Draw goal or counter goal
   if (goal) {
@@ -2041,6 +2091,20 @@ function addStreamers(container, canvasRect, centerX, startY) {
   }
 }
 
+function createExplosionParticles(x, y) {
+  for (let i = 0; i < 8; i++) {
+    explodingPlayers.push({
+      x: x,
+      y: y,
+      velocityY: Math.random() * -6 - 2,
+      velocityX: (Math.random() - 0.5) * 8,
+      rotation: Math.random() * Math.PI * 2,
+      rotationSpeed: (Math.random() - 0.5) * 0.5,
+      pieceType: "pawn" // Use pawn as small particle, or create custom particle images
+    });
+  }
+}
+
 //moving bomb function
 function moveBombs() {
   for (let i = bombs.length - 1; i >= 0; i--) {
@@ -2060,10 +2124,30 @@ function moveBombs() {
     // Check collision with player
     const hitPlayerIndex = players.findIndex(p => p.row === bomb.row && p.col === nextCol);
     if (hitPlayerIndex !== -1) {
-      // Remove player
+      const player = players[hitPlayerIndex];
+
+      // 💥 Play explosion sound
+      const explosionSound = document.getElementById("explosionSound");
+      if (explosionSound) {
+          explosionSound.currentTime = 0; // Reset to start
+          explosionSound.play().catch(err => console.warn("Explosion sound play blocked:", err));
+      }
+
+      // Save explosion animation details
+      explodingPlayers.push({
+        x: player.col * TILE_SIZE,
+        y: player.row * TILE_SIZE,
+        velocityY: -8,  // Initial jump velocity
+        rotation: 0,
+        rotationSpeed: (Math.random() < 0.5 ? -1 : 1) * 0.3,
+        pieceType: player.pieceType
+      });
+
+      createExplosionParticles(player.col * TILE_SIZE, player.row * TILE_SIZE);
+
       players.splice(hitPlayerIndex, 1);
-      updateStatus("💥 A player was hit by a bomb!");
       updatePlayerCount();
+      updateStatus("💣 A player was blown up!");
     }
 
     // Place bomb in new location
@@ -2086,10 +2170,23 @@ function updateBombs() {
     // Check for collision with player
     const hitPlayerIndex = players.findIndex(p => p.row === bomb.row && p.col === nextCol);
     if (hitPlayerIndex !== -1) {
+      const player = players[hitPlayerIndex];
+      
+      // Create explosion animation
+      explodingPlayers.push({
+        x: player.col * TILE_SIZE,
+        y: player.row * TILE_SIZE,
+        velocityY: -8,  // Initial upward velocity
+        rotation: 0,
+        rotationSpeed: (Math.random() < 0.5 ? -1 : 1) * 0.3, // Random rotation direction
+        pieceType: player.pieceType
+      });
+
       // Remove the player that got hit
       players.splice(hitPlayerIndex, 1);
       updateStatus("💣 A player was blown up!");
       updatePlayerCount();
+      shakeAmount = 30; // shake intensity
       
       // Check if all players are gone
       if (players.length === 0) {
@@ -2116,6 +2213,73 @@ function updateBombs() {
       bomb.direction *= -1;
     }
   }
+}
+
+function updateExplodingPlayers() {
+  for (let i = explodingPlayers.length - 1; i >= 0; i--) {
+    const p = explodingPlayers[i];
+    
+    // Apply gravity
+    p.velocityY += 0.5;
+    p.y += p.velocityY;
+    
+    // Apply rotation
+    p.rotation += p.rotationSpeed;
+    
+    // Add some horizontal movement for more dynamic effect
+    if (Math.abs(p.rotationSpeed) > 0.1) {
+      p.x += p.rotationSpeed * 2; // Move horizontally based on rotation direction
+    }
+
+    // Remove if off screen or after a certain time
+    if (p.y > canvas.height + TILE_SIZE || p.x < -TILE_SIZE || p.x > canvas.width + TILE_SIZE) {
+      explodingPlayers.splice(i, 1);
+    }
+  }
+}
+
+function handleBombCollision(player, playerIndex, bombRow, bombCol) {
+  // 💥 Play explosion sound
+  const explosionSound = document.getElementById("explosionSound");
+  if (explosionSound) {
+    explosionSound.currentTime = 0; // Reset to start
+    explosionSound.play().catch(err => console.warn("Explosion sound play blocked:", err));
+  }
+
+  // Create explosion animation at the bomb's position
+  explodingPlayers.push({
+    x: bombCol * TILE_SIZE,
+    y: bombRow * TILE_SIZE,
+    velocityY: -8,  // Initial upward velocity
+    rotation: 0,
+    rotationSpeed: (Math.random() < 0.5 ? -1 : 1) * 0.3, // Random rotation direction
+    pieceType: player.pieceType
+  });
+
+  createExplosionParticles(bombCol * TILE_SIZE, bombRow * TILE_SIZE);
+
+  // Remove the bomb from the bombs array
+  const bombIndex = bombs.findIndex(b => b.row === bombRow && b.col === bombCol);
+  if (bombIndex !== -1) {
+    bombs.splice(bombIndex, 1);
+  }
+
+  // Remove the player
+  players.splice(playerIndex, 1);
+  updateStatus("💣 A player was blown up by moving into a bomb!");
+  updatePlayerCount();
+  shakeAmount = 30; // shake intensity
+
+  // Clear both the bomb and player from the board
+  board[bombRow][bombCol] = CELL_TYPES.EMPTY;
+
+  // Check if all players are gone
+  if (players.length === 0) {
+    updateStatus("Game Over! All players destroyed!");
+  }
+
+  // Clear selection since this player is gone
+  selectedPlayerIndex = -1;
 }
 
 // Create initial burst effect
@@ -2351,8 +2515,19 @@ function initializeCanvas() {
 let frameCount = 0;
 // --- Game Loop ---
 function gameLoop() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (shakeAmount > 0.5) {
+    shakeX = (Math.random() - 0.5) * shakeAmount;
+    shakeY = (Math.random() - 0.5) * shakeAmount;
+    shakeAmount *= shakeDecay;
+  } else {
+    shakeX = 0;
+    shakeY = 0;
+  }
+
+  ctx.setTransform(1, 0, 0, 1, shakeX, shakeY);
+  ctx.clearRect(-shakeX, -shakeY, canvas.width, canvas.height);
   updateFallingPieces();
+  updateExplodingPlayers(); // 💣 Animate dead players
 
   frameCount++;
   if (frameCount % 50 === 0) {
