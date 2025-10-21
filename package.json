@@ -1,0 +1,13 @@
+{
+  "name": "chessmater",
+  "version": "1.0.0",
+  "description": "ChessMater static site served on Railway or Vercel",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.0"
+  }
+}
