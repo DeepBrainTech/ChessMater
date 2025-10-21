@@ -649,27 +649,26 @@ function updateFallingPieces() {
     // Move piece down
     piece.y += fallSpeed;
 
-    // --- 💡 NEW: Check if we've passed through a teleport block mid-fall
+    // Check if we've passed through a bomb mid-fall
     const prevRow = Math.floor(prevY / TILE_SIZE);
     const currentRow = Math.floor(piece.y / TILE_SIZE);
 
     if (currentRow !== prevRow) {
       for (let r = prevRow + 1; r <= currentRow; r++) {
-        const cellType = board[r][piece.col];
-        if ([CELL_TYPES.TELEPORT_PURPLE, CELL_TYPES.TELEPORT_GREEN, CELL_TYPES.TELEPORT_BLUE, CELL_TYPES.TELEPORT_ORANGE].includes(cellType)) {
-          // ⏩ Teleport immediately!
-          const player = players[piece.playerIndex];
-
-          // Set position before teleporting
-          player.row = r;
-          player.col = piece.col;
-
-          // Clean up fall piece
-          fallingPieces.splice(i, 1);
-
-          // Trigger teleport
-          handleGravityTeleport(player, cellType);
-
+        // Check if landing on a bomb during fall
+        if (board[r][piece.col] === CELL_TYPES.BOMB) {
+          // Handle bomb collision for falling piece
+          if (piece.playerIndex === "goal") {
+            // Goal hit a bomb - remove goal
+            fallingPieces.splice(i, 1);
+            goal = null;
+            updateStatus("💣 Goal destroyed by bomb!");
+          } else {
+            // Player hit a bomb
+            const player = players[piece.playerIndex];
+            handleBombCollision(player, piece.playerIndex, r, piece.col);
+            fallingPieces.splice(i, 1);
+          }
           return; // Skip rest of loop for this frame
         }
       }
@@ -678,6 +677,22 @@ function updateFallingPieces() {
     // --- Usual landing logic
     if (piece.y >= targetY) {
       piece.y = targetY;
+
+      // Check if landing on a bomb
+      if (board[piece.targetRow][piece.col] === CELL_TYPES.BOMB) {
+        if (piece.playerIndex === "goal") {
+          // Goal hit a bomb
+          fallingPieces.splice(i, 1);
+          goal = null;
+          updateStatus("💣 Goal destroyed by bomb!");
+        } else {
+          // Player hit a bomb
+          const player = players[piece.playerIndex];
+          handleBombCollision(player, piece.playerIndex, piece.targetRow, piece.col);
+          fallingPieces.splice(i, 1);
+        }
+        continue;
+      }
 
       if (piece.playerIndex === "goal") {
         goal.row = piece.targetRow;
@@ -945,7 +960,7 @@ function movePlayer(playerIndex, newRow, newCol) {
     if (board[newRow][newCol] === CELL_TYPES.GOAL && !areAllObjectivesCompleted()) {
       updateStatus("Complete all objectives first! " + objectivesCompleted + "/" + totalObjectives);
     } else {
-      updateStatus("Invalid move for " + player.pieceType);
+      updateStatus("Invalid move for selected piece");
     }
     return;
   }
@@ -2167,7 +2182,7 @@ function updateBombs() {
       continue;
     }
 
-    // Check for collision with player
+    // Check for collision with ANY player (regardless of selection state)
     const hitPlayerIndex = players.findIndex(p => p.row === bomb.row && p.col === nextCol);
     if (hitPlayerIndex !== -1) {
       const player = players[hitPlayerIndex];
@@ -2182,11 +2197,19 @@ function updateBombs() {
         pieceType: player.pieceType
       });
 
-      // Remove the player that got hit
+      // Remove the player that got hit (regardless of selection state)
       players.splice(hitPlayerIndex, 1);
       updateStatus("💣 A player was blown up!");
       updatePlayerCount();
       shakeAmount = 30; // shake intensity
+      
+      // Clear selection if the selected player was blown up
+      if (selectedPlayerIndex === hitPlayerIndex) {
+        selectedPlayerIndex = -1;
+      } else if (selectedPlayerIndex > hitPlayerIndex) {
+        // Adjust selected index if a player before it was removed
+        selectedPlayerIndex--;
+      }
       
       // Check if all players are gone
       if (players.length === 0) {
