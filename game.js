@@ -2186,6 +2186,13 @@ function updateBombs() {
     const hitPlayerIndex = players.findIndex(p => p.row === bomb.row && p.col === nextCol);
     if (hitPlayerIndex !== -1) {
       const player = players[hitPlayerIndex];
+
+      // 💥 Play explosion sound
+      const explosionSound = document.getElementById("explosionSound");
+      if (explosionSound) {
+        explosionSound.currentTime = 0; // Reset to start
+        explosionSound.play().catch(err => console.warn("Explosion sound play blocked:", err));
+      }
       
       // Create explosion animation
       explodingPlayers.push({
