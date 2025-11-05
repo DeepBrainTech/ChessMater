@@ -35,6 +35,8 @@ let shakeAmount = 0;
 let shakeDecay = 0.8;
 let shakeX = 0;
 let shakeY = 0;
+const visitedSquares = Array.from({ length: ROWS }, () => Array(COLS).fill(false));
+
 
 // Board block types
 const CELL_TYPES = {
@@ -101,6 +103,12 @@ let gravityEnabled = true;
 let gameWon = false;
 let selectedPlayerIndex = -1; // Track which player is selected
 teleportBlocks = []; // ✅ Clear teleport blocks
+let currentPuzzleData = null;
+let antigravityEnabled = false;
+let risingPieces = [];
+let lastRiseTime = 0;
+const RISE_SPEED = 700; // pixels per second
+
 
 // Transformer block variables
 let showTransformerMenu = false;
@@ -319,7 +327,7 @@ function eraseBoard() {
   showTransformerMenu = false;
   transformerPosition = null;
   transformerPlayerIndex = -1;
-  
+  visitedSquares.forEach(row => row.fill(false));
   updatePlayerCount();
   updateObjectiveCount();
   updateStatus(`Board cleared! Size: ${ROWS}x${COLS}`);
@@ -377,6 +385,7 @@ function saveLevelToFolder() {
 
 // --- Load puzzle from JSON file ---
 function loadPuzzle(puzzleData) {
+  currentPuzzleData = JSON.parse(JSON.stringify(puzzleData)); // Deep copy
   try {
     // Use saved dimensions or default to current
     const loadedRows = puzzleData.rows || ROWS;
@@ -407,6 +416,9 @@ function loadPuzzle(puzzleData) {
           col: player.col, 
           pieceType: player.pieceType || "rook"
         }));
+    }
+    for (const p of players) {
+      visitedSquares[p.row][p.col] = true;
     }
     
     // Recreate goal (only if it fits) - FIXED: Preserve counter goal data
@@ -478,11 +490,10 @@ function loadPuzzle(puzzleData) {
     // ✅ Reset state so pieces can move again
     mode = "play";
     gameWon = false;
-
+    visitedSquares.forEach(row => row.fill(false)); // Reset fog on load
     if (typeof enablePlayerControls === "function") {
         enablePlayerControls();
     }
-
     drawBoard();
   } catch (error) {
     updateStatus("Error loading puzzle: " + error.message);
@@ -639,7 +650,7 @@ function applyGravity() {
 }
 
 function updateFallingPieces() {
-  const fallSpeed = 5;
+  const fallSpeed = 3;
 
   for (let i = fallingPieces.length - 1; i >= 0; i--) {
     const piece = fallingPieces[i];
@@ -735,6 +746,7 @@ function updateFallingPieces() {
     }
   }
 }
+
 
 function handleGravityTeleport(player, teleportType) {
   // Get all teleport blocks of the same color
@@ -988,6 +1000,7 @@ function movePlayer(playerIndex, newRow, newCol) {
   board[player.row][player.col] = CELL_TYPES.EMPTY;
   player.row = newRow;
   player.col = newCol;
+  visitedSquares[newRow][newCol] = true;
 
   if (isTeleportBlock) {
     handleTeleport(player);
@@ -1018,8 +1031,8 @@ function movePlayer(playerIndex, newRow, newCol) {
   }
   checkWinCondition();
 
-  // Apply gravity after moving
-  if (gravityEnabled) {
+  // Apply gravity or antigravity after moving
+  if (gravityEnabled && !antigravityEnabled) {
     const before = fallingPieces.length;
     applyGravity();                              // may enqueue falls
     const after = fallingPieces.length;
@@ -1029,6 +1042,19 @@ function movePlayer(playerIndex, newRow, newCol) {
       pendingMoveCounter = true;
     } else {
       // Nothing will fall → decrement now
+      decrementCounterAfterMove();
+    }
+  } else if (antigravityEnabled) {
+    // Apply antigravity after moving
+    const before = risingPieces.length;
+    applyAntigravity();                          // may enqueue rises
+    const after = risingPieces.length;
+
+    if (after > before) {
+      // Something (maybe this piece) will rise → wait to decrement until rises finish
+      pendingMoveCounter = true;
+    } else {
+      // Nothing will rise → decrement now
       decrementCounterAfterMove();
     }
   } else {
@@ -1381,13 +1407,10 @@ function drawPieceSelectionMenu() {
 function getVisibleSquares() {
   const visible = Array.from({ length: ROWS }, () => Array(COLS).fill(false));
 
-  if (!fogEnabled) {
-    for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) visible[r][c] = true;
-    return visible;
-  }
-
-  if (mode === "edit") {
-    for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) visible[r][c] = true;
+  if (!fogEnabled || mode === "edit") {
+    for (let r = 0; r < ROWS; r++)
+      for (let c = 0; c < COLS; c++)
+        visible[r][c] = true;
     return visible;
   }
 
@@ -1395,27 +1418,19 @@ function getVisibleSquares() {
     const p = players[selectedPlayerIndex];
     visible[p.row][p.col] = true;
 
-    // get vision directions based on piece type
-    let directions = [];
-    if (p.pieceType === "queen") {
-      directions = [
-        [-1,0],[1,0],[0,-1],[0,1], // rook-like
-        [-1,-1],[-1,1],[1,-1],[1,1] // bishop-like
-      ];
+    // Show all valid move targets in fog
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        if (isValidMove(selectedPlayerIndex, r, c) || visitedSquares[r][c]) {
+          visible[r][c] = true;
+        }
+      }
     }
-    // you could add rook/bishop/knight rules here too
-
-    // extend vision along each direction
-    for (const [dr, dc] of directions) {
-      let r = p.row + dr, c = p.col + dc;
-      while (r >= 0 && r < ROWS && c >= 0 && c < COLS) {
+  }
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      if (visitedSquares[r][c]) {
         visible[r][c] = true;
-
-        // stop if something is blocking (solid block, piece, etc.)
-        if (board[r][c] !== CELL_TYPES.EMPTY) break;
-
-        r += dr;
-        c += dc;
       }
     }
   }
@@ -1627,7 +1642,7 @@ function drawBoard() {
       let y = r * TILE_SIZE;
 
       // Draw checkerboard pattern
-      ctx.fillStyle = (r + c) % 2 === 0 ? "#EEE" : "#CCC";
+      ctx.fillStyle = (r + c) % 2 === 0 ? "#b6cce0ff" : "#ffffffff";  // light pink and sky blue
       ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
 
       // If fog is off, draw everything normally
@@ -1869,9 +1884,29 @@ function drawBoard() {
   // draw normal (non-falling) players
   players.forEach((player, i) => {
     const isFalling = fallingPieces.find(fp => fp.playerIndex === i);
-    if (!isFalling) {
+    const isRising = risingPieces.find(rp => rp.playerIndex === i);
+    
+    if (!isFalling && !isRising) {
       const x = player.col * TILE_SIZE;
       const y = player.row * TILE_SIZE;
+      
+      // Check if there's a teleport block at this position
+      const teleportBlock = teleportBlocks.find(tp => tp.row === player.row && tp.col === player.col);
+      if (teleportBlock) {
+        const color = TELEPORT_COLORS[teleportBlock.type];
+        if (color) {
+          // Draw teleport block underneath
+          ctx.fillStyle = color.fill;
+          ctx.beginPath();
+          ctx.arc(x + TILE_SIZE / 2, y + TILE_SIZE / 2, TILE_SIZE / 3, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = color.stroke;
+          ctx.lineWidth = 2;
+          ctx.stroke();
+        }
+      }
+      
+      // Draw the player piece on top
       ctx.drawImage(pieceImages[player.pieceType], x+8, y+8, TILE_SIZE-16, TILE_SIZE-16);
     }
   });
@@ -2525,6 +2560,149 @@ function handleMove(e) {
     }
   }
 };
+
+function applyAntigravity() {
+  risingPieces = [];
+  
+  // First, collect all pieces that need to rise
+  for (let i = 0; i < players.length; i++) {
+    const player = players[i];
+    let targetRow = player.row;
+    
+    // Find how high this piece can rise
+    while (targetRow > 0 && board[targetRow - 1][player.col] === CELL_TYPES.EMPTY) {
+      targetRow--;
+    }
+    
+    if (targetRow !== player.row) {
+      // Set up animation info
+      risingPieces.push({
+        playerIndex: i,
+        startRow: player.row,
+        targetRow: targetRow,
+        col: player.col,
+        startY: player.row * TILE_SIZE,
+        targetY: targetRow * TILE_SIZE,
+        currentY: player.row * TILE_SIZE,
+        pieceType: player.pieceType
+      });
+      
+      // Remove from board (we'll animate it)
+      board[player.row][player.col] = CELL_TYPES.EMPTY;
+    }
+  }
+  
+  // Start the animation loop if we have pieces to rise
+  if (risingPieces.length > 0) {
+    lastRiseTime = performance.now();
+    requestAnimationFrame(updateRisingPieces);
+    return true; // Return true if pieces will rise
+  }
+  return false; // Return false if no pieces will rise
+}
+
+function updateRisingPieces(timestamp) {
+  if (risingPieces.length === 0) return;
+  
+  const deltaTime = timestamp - lastRiseTime;
+  lastRiseTime = timestamp;
+  
+  const distanceToMove = (RISE_SPEED * deltaTime) / 1000; // Convert to pixels per frame
+  
+  for (let i = risingPieces.length - 1; i >= 0; i--) {
+    const piece = risingPieces[i];
+    
+    // Move piece up
+    piece.currentY -= distanceToMove;
+    
+    // Check if we've reached or passed the target
+    if (piece.currentY <= piece.targetY) {
+      piece.currentY = piece.targetY;
+      
+      const player = players[piece.playerIndex];
+      player.row = piece.targetRow;
+      player.col = piece.col;
+      
+      // Check if landing on a bomb
+      if (board[player.row][player.col] === CELL_TYPES.BOMB) {
+        handleBombCollision(player, piece.playerIndex, player.row, player.col);
+      } else {
+        board[player.row][player.col] = CELL_TYPES.PLAYER;
+        checkObjectiveCompletion();
+        checkWinCondition();
+      }
+      
+      risingPieces.splice(i, 1);
+    } else {
+      // Check for mid-rise bomb collisions
+      const currentRow = Math.floor(piece.currentY / TILE_SIZE);
+      const prevRow = Math.floor((piece.currentY + distanceToMove) / TILE_SIZE);
+      
+      if (currentRow !== prevRow) {
+        for (let r = prevRow; r >= currentRow; r--) {
+          if (board[r][piece.col] === CELL_TYPES.BOMB) {
+            const player = players[piece.playerIndex];
+            handleBombCollision(player, piece.playerIndex, r, piece.col);
+            risingPieces.splice(i, 1);
+            break;
+          }
+        }
+      }
+    }
+  }
+  
+  // Force redraw to show animation
+  drawBoard();
+  
+  // Draw the rising pieces on top
+  ctx.save();
+  for (const piece of risingPieces) {
+    const x = piece.col * TILE_SIZE;
+    ctx.drawImage(pieceImages[piece.pieceType], x + 8, piece.currentY + 8, TILE_SIZE - 16, TILE_SIZE - 16);
+  }
+  ctx.restore();
+  
+  // Continue animation if there are still pieces rising
+  if (risingPieces.length > 0) {
+    requestAnimationFrame(updateRisingPieces);
+  } else {
+    // Final draw to ensure everything is in place
+    drawBoard();
+
+    // ✅ ADD THIS PART - Decrement counter if nothing else is rising and we were waiting
+    if (pendingMoveCounter) {
+      decrementCounterAfterMove();
+      pendingMoveCounter = false;
+    }
+  }
+}
+
+function toggleAntigravity() {
+  antigravityEnabled = !antigravityEnabled;
+  
+  if (antigravityEnabled) {
+    updateStatus("🔼 Antigravity enabled - pieces rise upward!");
+    
+    // Clear any existing falling pieces first
+    fallingPieces = [];
+    
+    // Small delay to ensure gravity is fully off
+    setTimeout(() => {
+      applyAntigravity();
+    }, 100);
+  } else {
+    updateStatus("🔽 Gravity enabled - pieces fall downward!");
+    applyGravity();
+  }
+}
+
+function restartLevel() {
+  if (!currentPuzzleData) {
+    updateStatus("No level is currently loaded.");
+    return;
+  }
+  loadPuzzle(currentPuzzleData);
+}
 
 canvas.addEventListener("click", handleMove);
 

@@ -465,6 +465,20 @@
       });
     });
 
+    document.addEventListener("DOMContentLoaded", () => {
+      const restartBtn = document.getElementById("restartLevelBtn");
+
+      if (restartBtn) {
+        restartBtn.addEventListener("click", () => {
+          if (typeof restartLevel === "function") {
+            restartLevel();
+          } else {
+            console.error("restartLevel() not found");
+          }
+        });
+      }
+    });
+
     // Mode management
     let isDeveloperMode = true;
     
@@ -620,6 +634,22 @@
     box-shadow: 0 2px 8px rgba(0,0,0,0.3);
     z-index: 9999;
   ">🔊 Music</button>
+
+  <button onclick="toggleAntigravity()" style="
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    z-index: 1000;
+    padding: 10px 15px;
+    font-weight: bold;
+    background-color: #e67e22;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    box-shadow: 2px 2px 10px rgba(0,0,0,0.3);
+    cursor: pointer;
+  ">
+    ⬆️ Antigravity</button>
 
 </body>
 </html>
