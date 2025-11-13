@@ -729,7 +729,19 @@ function updateFallingPieces() {
           // Normal landing
           player.row = piece.targetRow;
           player.col = piece.col;
-          board[player.row][player.col] = CELL_TYPES.PLAYER;
+
+          const cellType = board[player.row][player.col];
+
+          if (cellType === CELL_TYPES.TRANSFORMER) {
+            // ✅ Activate transformer behavior
+            transformerPlayerIndex = piece.playerIndex;
+            transformerPosition = { row: player.row, col: player.col };
+            showTransformerMenu = true;
+            updateStatus("Transformer activated! Choose a new piece type.");
+            // Do not overwrite the transformer cell
+          } else {
+            board[player.row][player.col] = CELL_TYPES.PLAYER;
+          }
           playerTeleportCooldowns.delete(player);
           checkObjectiveCompletion();
           checkWinCondition();
