@@ -108,6 +108,7 @@ let antigravityEnabled = false;
 let risingPieces = [];
 let lastRiseTime = 0;
 const RISE_SPEED = 700; // pixels per second
+let currentLevelIndex = 0;
 
 
 // Transformer block variables
@@ -184,6 +185,14 @@ document.getElementById("editMode").addEventListener("change", (e) => {
   // Show counter input only for counter goal
   document.getElementById("counterGoalSettings").style.display =
     editMode === "counter_goal" ? "block" : "none";
+});
+
+document.getElementById("nextLevelBtn").addEventListener("click", () => {
+  if (currentLevelIndex < LEVELS.length - 1) {
+    currentLevelIndex++;
+    loadPuzzle(LEVELS[currentLevelIndex]);
+    document.getElementById("nextLevelBtn").style.display = "none";
+  }
 });
 
 // gravityBtn.addEventListener("click", () => {
@@ -759,6 +768,15 @@ function updateFallingPieces() {
   }
 }
 
+function showNextLevelButton() {
+  const nextBtn = document.getElementById("nextLevelBtn");
+  if (currentLevelIndex < LEVELS.length - 1) {
+    nextBtn.style.display = "inline-block";
+  } else {
+    nextBtn.style.display = "none";
+  }
+}
+
 
 function handleGravityTeleport(player, teleportType) {
   // Get all teleport blocks of the same color
@@ -873,6 +891,7 @@ function checkWinCondition() {
       gameWon = true;
       updateStatus("🎉 Puzzle solved! All objectives completed and goal reached!");
       triggerConfetti();
+      showNextLevelButton();
       break;
     }
   }
