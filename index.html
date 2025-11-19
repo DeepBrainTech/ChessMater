@@ -329,16 +329,6 @@
         // Save user + token for the game
         localStorage.setItem("cm_user", JSON.stringify(user));
         localStorage.setItem("cm_token", token);
-        // Setup per-user progress storage
-        const progressKey = `cm_progress_${user.id || user.username}`;
-
-        // Load or initialize progress
-        let progress = JSON.parse(localStorage.getItem(progressKey)) || {
-            highestLevel: 1
-        };
-
-        // Save it if first time
-        localStorage.setItem(progressKey, JSON.stringify(progress));
       } catch (err) {
         console.error("Invalid JWT token:", err);
       }
@@ -355,7 +345,22 @@
     <h1>ChessMater</h1>
     
     <div class="game-area">
-      <canvas id="gameCanvas" width="1280" height="800"></canvas>
+      <div style="display: flex; gap: 20px;">
+        <canvas id="gameCanvas" width="1280" height="800"></canvas>
+        
+        <div id="blockDescriptionBox" style="
+          width: 300px;
+          background: #fefefe;
+          border: 2px solid #3498db;
+          padding: 15px;
+          border-radius: 10px;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+          font-size: 14px;
+        ">
+          <h3>Block Tip</h3>
+          <p id="blockDescription">Welcome! Start the first level to learn about blocks.</p>
+        </div>
+      </div>
       
       <div id="controls">
         <div class="control-group developer-only">
@@ -409,6 +414,10 @@
           </select>
         </div>
 
+        <div style="margin-top: 20px; text-align: center;">
+          <button id="nextLevelBtn" style="display: none;">Next Level ➡️</button>
+        </div>
+
         <div id="customSizeInputs" class="developer-only" style="display: none; margin-top: 10px;">
           <input type="number" id="customRows" placeholder="Rows" min="4" max="20" value="10">
           <span>x</span>
@@ -433,6 +442,10 @@
       <div class="danger-zone developer-only">
         <button id="eraseBoardBtn">Erase Entire Board</button>
         <p>Warning: This will clear everything from the board!</p>
+      </div>
+
+      <div style="margin-top: 20px; text-align: center;">
+        <button id="nextLevelBtn" style="display: none;">Next Level ➡️</button>
       </div>
       
       <div class="level-selector">
@@ -562,12 +575,33 @@
 
       LEVELS.forEach((level, index) => {
         const button = document.createElement("button");
+
+        // Check progress from localStorage
+        const maxUnlocked = parseInt(localStorage.getItem("cm_maxUnlocked") || "1");
+
+        // Determine lock state
+        const isLocked = index + 1 > maxUnlocked;
+
         button.className = "level-button";
         button.textContent = level.name || `Level ${index + 1}`;
 
-        button.addEventListener("click", () => {
-          loadPuzzle(level);  // 🔑 uses your game.js loader
-        });
+        if (isLocked) {
+            button.style.background = "#777";
+            button.style.cursor = "not-allowed";
+            button.style.opacity = "0.5";
+            button.textContent += " 🔒";
+
+            // Prevent clicking locked levels
+            button.addEventListener("click", () => {
+                updateStatus("This level is locked. Complete earlier levels first!");
+            });
+        } else {
+            // Level is playable
+            button.addEventListener("click", () => {
+                currentLevelIndex = index;
+                loadPuzzle(level);
+            });
+        }
 
         levelGrid.appendChild(button);
       });
@@ -684,4 +718,4 @@
     ⬆️ Antigravity</button>
 
 </body>
-</html>w  
+</html>

@@ -108,6 +108,7 @@ let antigravityEnabled = false;
 let risingPieces = [];
 let lastRiseTime = 0;
 const RISE_SPEED = 700; // pixels per second
+let currentLevelIndex = 0;
 
 
 // Transformer block variables
@@ -184,6 +185,14 @@ document.getElementById("editMode").addEventListener("change", (e) => {
   // Show counter input only for counter goal
   document.getElementById("counterGoalSettings").style.display =
     editMode === "counter_goal" ? "block" : "none";
+});
+
+document.getElementById("nextLevelBtn").addEventListener("click", () => {
+  if (currentLevelIndex < LEVELS.length - 1) {
+    currentLevelIndex++;
+    loadPuzzle(LEVELS[currentLevelIndex]);
+    document.getElementById("nextLevelBtn").style.display = "none";
+  }
 });
 
 // gravityBtn.addEventListener("click", () => {
@@ -494,6 +503,31 @@ function loadPuzzle(puzzleData) {
     if (typeof enablePlayerControls === "function") {
         enablePlayerControls();
     }
+    // --- Show block tip only for first 7 levels ---
+    const descBox = document.getElementById("blockDescriptionBox");
+    const descText = document.getElementById("blockDescription");
+
+    // Determine which level was loaded
+    currentLevelIndex = LEVELS.findIndex(lvl => lvl.name === puzzleData.name);
+
+    const LEVEL_BLOCK_DESCRIPTIONS = [
+      "Level 1: Introduction to basic movement and green solid blocks.",
+      "Level 2: Knights move differently—plan your jumps!",
+      "Level 3: Blue Phase Blocks can be passed from below only.",
+      "Level 4: Transformer blocks change your chess piece type!",
+      "Level 5: Objective blocks must be stepped on before the goal.",
+      "Level 6: Counter Goals lock after X moves—reach them in time!",
+      "Level 7: Beware of bombs! They move and explode."
+    ];
+
+    if (descBox && descText) {
+      if (currentLevelIndex >= 0 && currentLevelIndex < 7) {
+        descBox.style.display = "block";
+        descText.textContent = LEVEL_BLOCK_DESCRIPTIONS[currentLevelIndex];
+      } else {
+        descBox.style.display = "none";
+      }
+    }
     drawBoard();
   } catch (error) {
     updateStatus("Error loading puzzle: " + error.message);
@@ -759,6 +793,15 @@ function updateFallingPieces() {
   }
 }
 
+function showNextLevelButton() {
+  const nextBtn = document.getElementById("nextLevelBtn");
+  if (currentLevelIndex < LEVELS.length - 1) {
+    nextBtn.style.display = "inline-block";
+  } else {
+    nextBtn.style.display = "none";
+  }
+}
+
 
 function handleGravityTeleport(player, teleportType) {
   // Get all teleport blocks of the same color
@@ -858,6 +901,19 @@ function checkGravityTeleportation() {
 
 // Check if any player has reached the goal
 function checkWinCondition() {
+  if (gameWon) {
+    // Unlock next level
+    const maxUnlocked = parseInt(localStorage.getItem("cm_maxUnlocked") || "1");
+    const nextLevel = currentLevelIndex + 2;
+
+    if (nextLevel > maxUnlocked) {
+        localStorage.setItem("cm_maxUnlocked", nextLevel);
+    }
+
+    loadLevels();
+
+    showNextLevelButton();
+  }
   if (gameWon || !goal) return;
 
   // Counter goal locked?
@@ -873,6 +929,7 @@ function checkWinCondition() {
       gameWon = true;
       updateStatus("🎉 Puzzle solved! All objectives completed and goal reached!");
       triggerConfetti();
+      showNextLevelButton();
       break;
     }
   }
