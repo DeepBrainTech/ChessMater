@@ -312,6 +312,38 @@
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
 </head>
 <body class="consumer-mode">
+  <script>
+    // Read token from URL hash
+    const hash = window.location.hash;
+    const token = hash.startsWith("#token=")
+      ? hash.replace("#token=", "")
+      : null;
+
+    // Decode JWT
+    let user = null;
+    if (token) {
+      try {
+        user = JSON.parse(atob(token.split(".")[1]));
+        console.log("ChessMater user:", user);
+
+        // Save user + token for the game
+        localStorage.setItem("cm_user", JSON.stringify(user));
+        localStorage.setItem("cm_token", token);
+        // Setup per-user progress storage
+        const progressKey = `cm_progress_${user.id || user.username}`;
+
+        // Load or initialize progress
+        let progress = JSON.parse(localStorage.getItem(progressKey)) || {
+            highestLevel: 1
+        };
+
+        // Save it if first time
+        localStorage.setItem(progressKey, JSON.stringify(progress));
+      } catch (err) {
+        console.error("Invalid JWT token:", err);
+      }
+    }
+  </script>
   <button class="mode-toggle" id="modeToggle">Switch to Consumer Mode</button>
 
   <div id="startScreen" class="start-screen">
