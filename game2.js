@@ -367,7 +367,7 @@ function saveLevelToFolder() {
     goal: goal, // This should include type and counter if it's a counter goal
     objectives: objectives,
     bombs: bombs, // ✅ Add bombs to saved data
-    fog: fogEnabled,
+    fog: document.getElementById("levelFogToggle") ? document.getElementById("levelFogToggle").checked : false,
     createdAt: new Date().toISOString()
   };
   

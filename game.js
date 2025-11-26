@@ -141,10 +141,14 @@ document.getElementById("boardSize").addEventListener("change", (e) => {
   }
 });
 
-document.getElementById("visibilityMode").addEventListener("change", (e) => {
-  fogEnabled = (e.target.value === "fog");
-  updateStatus(`Mode switched to ${fogEnabled ? "Fog of War" : "Classic"}`);
-});
+const fogToggle = document.getElementById("levelFogToggle");
+if (fogToggle) {
+  fogToggle.addEventListener("change", (e) => {
+    fogEnabled = e.target.checked;
+    updateStatus(`Fog of War ${fogEnabled ? "Enabled" : "Disabled"} for this level`);
+    drawBoard(); // Redraw immediately to show/hide fog
+  });
+}
 
 document.getElementById("applyCustomSize").addEventListener("click", () => {
   const customRows = parseInt(document.getElementById("customRows").value) || DEFAULT_ROWS;
@@ -331,6 +335,9 @@ function eraseBoard() {
   objectivesCompleted = 0;
   totalObjectives = 0;
   gameWon = false;
+  fogEnabled = false;
+  const fogToggleBtn = document.getElementById("levelFogToggle");
+  if (fogToggleBtn) fogToggleBtn.checked = false;
   selectedPlayerIndex = -1;
   resetPhaseBlocks();
   showTransformerMenu = false;
@@ -368,6 +375,7 @@ function saveLevelToFolder() {
     goal: goal, // This should include type and counter if it's a counter goal
     objectives: objectives,
     bombs: bombs, // ✅ Add bombs to saved data
+    fog: fogEnabled,
     createdAt: new Date().toISOString()
   };
   
@@ -399,6 +407,12 @@ function loadPuzzle(puzzleData) {
     // Use saved dimensions or default to current
     const loadedRows = puzzleData.rows || ROWS;
     const loadedCols = puzzleData.cols || COLS;
+
+    fogEnabled = !!puzzleData.fog; // Default to false if property is missing
+    const fogToggleBtn = document.getElementById("levelFogToggle");
+    if (fogToggleBtn) {
+      fogToggleBtn.checked = fogEnabled;
+    }
     
     // Resize board first
     resizeBoard(loadedRows, loadedCols);
@@ -517,7 +531,8 @@ function loadPuzzle(puzzleData) {
       "Level 4: Transformer blocks change your chess piece type!",
       "Level 5: Objective blocks must be stepped on before the goal.",
       "Level 6: Counter Goals lock after X moves—reach them in time!",
-      "Level 7: Beware of bombs! They move and explode."
+      "Level 7: Beware of bombs! They move and explode.",
+      "Level 31: ⚔️ Welcome to Fog of War! In this level, the board is shrouded in mystery — you can only see tiles your pieces can reach. Plan your moves carefully and explore the unknown. What lies beyond could be danger... or your path to victory. 🎯 Tip: Use long-range pieces like the Queen or Bishop to reveal more of the board quickly."
     ];
 
     if (descBox && descText) {
