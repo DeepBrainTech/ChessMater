@@ -523,6 +523,17 @@ function loadPuzzle(puzzleData) {
 
     // Determine which level was loaded
     currentLevelIndex = LEVELS.findIndex(lvl => lvl.name === puzzleData.name);
+    if (descBox && descText) {
+    if (currentLevelIndex >= 0 && currentLevelIndex < 7) {
+      descBox.style.display = "block";
+      descText.textContent = LEVEL_BLOCK_DESCRIPTIONS[currentLevelIndex];
+    } else if (currentLevelIndex === 30) {
+      descBox.style.display = "block";
+      descText.textContent = "Level 31: ⚔️ Welcome to Fog of War! In this level, the board is shrouded in mystery — you can only see tiles your pieces can reach. Plan your moves carefully and explore the unknown. What lies beyond could be danger... or your path to victory. 🎯 Tip: Use long-range pieces like the Queen or Bishop to reveal more of the board quickly.";
+    } else {
+      descBox.style.display = "none";
+    }
+  }
 
     const LEVEL_BLOCK_DESCRIPTIONS = [
       "Level 1: Introduction to basic movement and green solid blocks.",
@@ -531,18 +542,8 @@ function loadPuzzle(puzzleData) {
       "Level 4: Transformer blocks change your chess piece type!",
       "Level 5: Objective blocks must be stepped on before the goal.",
       "Level 6: Counter Goals lock after X moves—reach them in time!",
-      "Level 7: Beware of bombs! They move and explode.",
-      "Level 31: ⚔️ Welcome to Fog of War! In this level, the board is shrouded in mystery — you can only see tiles your pieces can reach. Plan your moves carefully and explore the unknown. What lies beyond could be danger... or your path to victory. 🎯 Tip: Use long-range pieces like the Queen or Bishop to reveal more of the board quickly."
+      "Level 7: Beware of bombs! They move and explode."
     ];
-
-    if (descBox && descText) {
-      if (currentLevelIndex >= 0 && currentLevelIndex < 7) {
-        descBox.style.display = "block";
-        descText.textContent = LEVEL_BLOCK_DESCRIPTIONS[currentLevelIndex];
-      } else {
-        descBox.style.display = "none";
-      }
-    }
     drawBoard();
   } catch (error) {
     updateStatus("Error loading puzzle: " + error.message);

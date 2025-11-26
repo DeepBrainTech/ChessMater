@@ -1429,6 +1429,7 @@ const LEVELS = [
           "direction": -1
         }
       ],
+      "fog": false,
       "createdAt": "2025-10-21T21:16:26.994Z"
     },
     {
@@ -1631,6 +1632,7 @@ const LEVELS = [
       },
       "objectives": [],
       "bombs": [],
+      "fog": false,
       "createdAt": "2025-11-12T10:30:00.622Z"
     },
     {
@@ -1849,6 +1851,7 @@ const LEVELS = [
         }
       ],
       "bombs": [],
+      "fog": false,
       "createdAt": "2025-11-11T23:03:18.600Z"
     },
     {
@@ -2068,6 +2071,7 @@ const LEVELS = [
           "direction": -1
         }
       ],
+      "fog": false,
       "createdAt": "2025-11-12T10:12:30.956Z"
     },
     {
@@ -2270,6 +2274,7 @@ const LEVELS = [
       },
       "objectives": [],
       "bombs": [],
+      "fog": false,
       "createdAt": "2025-11-11T23:47:26.515Z"
     },
     {
@@ -2477,6 +2482,7 @@ const LEVELS = [
       },
       "objectives": [],
       "bombs": [],
+      "fog": false,
       "createdAt": "2025-11-12T00:34:57.097Z"
     },
     {
@@ -2689,6 +2695,7 @@ const LEVELS = [
       },
       "objectives": [],
       "bombs": [],
+      "fog": false,
       "createdAt": "2025-11-13T22:48:52.623Z"
     },
     {
@@ -2891,6 +2898,7 @@ const LEVELS = [
       },
       "objectives": [],
       "bombs": [],
+      "fog": false,
       "createdAt": "2025-11-11T22:27:30.232Z"
     },
     {
@@ -3114,6 +3122,7 @@ const LEVELS = [
           "direction": -1
         }
       ],
+      "fog": false,
       "createdAt": "2025-11-11T23:19:12.150Z"
     },
     {
@@ -3341,6 +3350,7 @@ const LEVELS = [
       },
       "objectives": [],
       "bombs": [],
+      "fog": false,
       "createdAt": "2025-11-12T23:00:07.716Z"
     },
     {
@@ -3556,6 +3566,7 @@ const LEVELS = [
           "direction": -1
         }
       ],
+      "fog": false,
       "createdAt": "2025-11-12T23:40:39.719Z"
     },
     {
@@ -3768,6 +3779,7 @@ const LEVELS = [
       },
       "objectives": [],
       "bombs": [],
+      "fog": false,
       "createdAt": "2025-11-13T00:07:01.530Z"
     },
     {
@@ -4005,6 +4017,7 @@ const LEVELS = [
       },
       "objectives": [],
       "bombs": [],
+      "fog": false,
       "createdAt": "2025-11-13T01:57:18.430Z"
     },
     {
@@ -4222,6 +4235,7 @@ const LEVELS = [
       },
       "objectives": [],
       "bombs": [],
+      "fog": false,
       "createdAt": "2025-11-13T08:15:34.450Z"
     },
     {
@@ -4434,6 +4448,7 @@ const LEVELS = [
       },
       "objectives": [],
       "bombs": [],
+      "fog": false,
       "createdAt": "2025-11-13T23:03:18.540Z"
     },
     {
@@ -4663,6 +4678,7 @@ const LEVELS = [
           "direction": -1
         }
       ],
+      "fog": false,
       "createdAt": "2025-11-13T21:21:26.290Z"
     },
     {
@@ -4912,6 +4928,7 @@ const LEVELS = [
           "direction": -1
         }
       ],
+      "fog": false,
       "createdAt": "2025-11-12T02:55:58.723Z"
     },
     {
@@ -5125,6 +5142,7 @@ const LEVELS = [
         }
       ],
       "bombs": [],
+      "fog": false,
       "createdAt": "2025-11-12T10:58:00.461Z"
     },
     {
@@ -5343,6 +5361,7 @@ const LEVELS = [
         }
       ],
       "bombs": [],
+      "fog": false,
       "createdAt": "2025-11-13T21:28:56.461Z"
     },
     {
@@ -5557,6 +5576,7 @@ const LEVELS = [
       },
       "objectives": [],
       "bombs": [],
+      "fog": false,
       "createdAt": "2025-11-13T22:52:31.514Z"
     },
     {
@@ -5771,6 +5791,7 @@ const LEVELS = [
       },
       "objectives": [],
       "bombs": [],
+      "fog": false,
       "createdAt": "2025-11-13T23:06:49.108Z"
     },
     {
@@ -6002,6 +6023,7 @@ const LEVELS = [
           "direction": -1
         }
       ],
+      "fog": false,
       "createdAt": "2025-11-13T23:08:31.144Z"
     },
     {
@@ -6217,6 +6239,7 @@ const LEVELS = [
         }
       ],
       "bombs": [],
+      "fog": false,
       "createdAt": "2025-11-13T23:24:33.609Z"
     },
     {
@@ -6442,11 +6465,215 @@ const LEVELS = [
           "direction": -1
         }
       ],
+      "fog": false,
       "createdAt": "2025-11-13T23:18:07.946Z"
     },
     {
       "version": "1.3",
       "name": "Puzzle 31",
+      "rows": 10,
+      "cols": 16,
+      "board": [
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          3,
+          1,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          1,
+          1,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          2,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
+        ]
+      ],
+      "players": [
+        {
+          "row": 7,
+          "col": 1,
+          "pieceType": "bishop"
+        }
+      ],
+      "goal": {
+        "row": 3,
+        "col": 12
+      },
+      "objectives": [],
+      "bombs": [],
+      "fog": true,
+      "createdAt": "2025-11-26T10:36:03.117Z"
+    },
+    {
+      "version": "1.3",
+      "name": "Puzzle 32",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -6649,7 +6876,7 @@ const LEVELS = [
     },
     {
       "version": "1.3",
-      "name": "Puzzle 32",
+      "name": "Puzzle 33",
       "rows": 10,
       "cols": 16,
       "board": [
