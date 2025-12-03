@@ -918,25 +918,15 @@ function checkGravityTeleportation() {
 // Check if any player has reached the goal
 function checkWinCondition() {
   if (gameWon) {
+    // Unlock next level
+    const maxUnlocked = parseInt(localStorage.getItem("cm_maxUnlocked") || "1");
     const nextLevel = currentLevelIndex + 2;
 
-    fetch("/api/games/chessmater/progress", {
-        method: "POST",
-        headers: {
-            "Authorization": "Bearer " + jwtToken,
-            "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ maxUnlocked: nextLevel })
-    })
-    .then(res => res.json())
-    .then(data => {
-        console.log("Progress updated:", data);
-        if (data.success) {
-            MAX_UNLOCKED = nextLevel;
-            loadLevels(); // reload with updated levels
-        }
-    })
-    .catch(err => console.error("Error updating progress:", err));
+    if (nextLevel > maxUnlocked) {
+        localStorage.setItem("cm_maxUnlocked", nextLevel);
+    }
+
+    loadLevels();
 
     showNextLevelButton();
   }
