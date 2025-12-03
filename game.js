@@ -1012,7 +1012,8 @@ async function checkWinCondition() {
       const maxUnlocked = await loadProgressFromServer();
       const nextLevel = currentLevelIndex + 2;
       if (nextLevel > maxUnlocked) {
-        localStorage.setItem("cm_maxUnlocked", nextLevel);
+        await saveProgress(nextLevel);
+        await loadLevels();
       }
 
       // ✅ SAVE PROGRESS TO BACKEND
