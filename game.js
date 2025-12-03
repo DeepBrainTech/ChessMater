@@ -68,21 +68,24 @@ async function fetchUserProgress() {
 
 async function saveProgress(level) {
   const token = localStorage.getItem("game_token");
-  if (!token) return;
+  if (!token) {
+    console.warn("No game token found for saving progress.");
+    return;
+  }
 
-  try {
-    await fetch("https://YOUR_API_DOMAIN/api/games/chessmater/progress", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`
-      },
-      body: JSON.stringify({ level })
-    });
+  const response = await fetch("/api/games/chessmater/progress", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify({ level })
+  });
 
-    console.log("💾 Progress saved for level", level);
-  } catch (err) {
-    console.error("❌ Failed to save progress:", err);
+  if (!response.ok) {
+    console.error("Failed to save progress to server");
+  } else {
+    console.log("✅ Progress saved to level", level);
   }
 }
 
@@ -992,13 +995,8 @@ function checkGravityTeleportation() {
 async function checkWinCondition() {
   if (gameWon) return;
 
-  // Counter goal locked?
   if (goal.type === "counter" && goal.counter <= 0) return;
-
-  // Check if all objectives are completed first
-  if (!areAllObjectivesCompleted()) {
-    return;
-  }
+  if (!areAllObjectivesCompleted()) return;
 
   for (const player of players) {
     if (player.row === goal.row && player.col === goal.col) {
@@ -1008,16 +1006,13 @@ async function checkWinCondition() {
       triggerConfetti();
       showNextLevelButton();
 
-      // Unlock next level locally
       const maxUnlocked = await loadProgressFromServer();
       const nextLevel = currentLevelIndex + 2;
-      if (nextLevel > maxUnlocked) {
-        await saveProgress(nextLevel);
-        await loadLevels();
-      }
 
-      // ✅ SAVE PROGRESS TO BACKEND
-      saveProgress(currentLevelIndex + 1);  // 🔥 Here's the line you add
+      if (nextLevel > maxUnlocked) {
+        await saveProgress(nextLevel); // ✅ Save to backend
+        await loadLevels(); // 🔄 Refresh UI
+      }
 
       break;
     }
