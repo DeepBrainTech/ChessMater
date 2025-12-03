@@ -313,26 +313,70 @@
 </head>
 <body class="consumer-mode">
   <script>
-    // Read token from URL hash
-    const hash = window.location.hash;
-    const token = hash.startsWith("#token=")
-      ? hash.replace("#token=", "")
-      : null;
+    const jwtToken = localStorage.getItem("chessmater_token");
+
+    if (!jwtToken) {
+        alert("No ChessMater token found — please log in again.");
+    }
+
+    let MAX_UNLOCKED = 1;
 
     // Decode JWT
-    let user = null;
-    if (token) {
-      try {
-        user = JSON.parse(atob(token.split(".")[1]));
-        console.log("ChessMater user:", user);
-
-        // Save user + token for the game
-        localStorage.setItem("cm_user", JSON.stringify(user));
-        localStorage.setItem("cm_token", token);
-      } catch (err) {
-        console.error("Invalid JWT token:", err);
-      }
+    function decodeJwt(token) {
+        try {
+            const payload = token.split('.')[1];
+            const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
+            const json = decodeURIComponent(
+                atob(base64)
+                    .split('')
+                    .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+                    .join('')
+            );
+            return JSON.parse(json);
+        } catch (err) {
+            console.error("Error decoding JWT:", err);
+            return null;
+        }
     }
+
+    const userData = decodeJwt(jwtToken);
+    let USER_ID = userData?.user_id || null;
+    let USERNAME = userData?.username || "Player";
+
+    console.log("ChessMater logged-in user:", USER_ID, USERNAME);
+
+    async function fetchProgress() {
+        try {
+            const res = await fetch("/api/games/chessmater/progress", {
+                method: "GET",
+                headers: {
+                    "Authorization": "Bearer " + jwtToken,
+                    "Content-Type": "application/json"
+                }
+            });
+
+            const result = await res.json();
+
+            if (result.success && result.data.progress) {
+                MAX_UNLOCKED = result.data.progress.maxUnlocked || 1;
+            } else {
+                MAX_UNLOCKED = 1;
+            }
+
+            console.log("Loaded backend progress:", MAX_UNLOCKED);
+
+            loadLevels();  // Load levels AFTER getting backend data
+        } catch (err) {
+            console.error("Error loading progress:", err);
+            MAX_UNLOCKED = 1;
+            loadLevels();
+        }
+    }
+
+    // RUN fetchProgress ONLY after the page loads
+    window.addEventListener("DOMContentLoaded", () => {
+        fetchProgress();
+    });
   </script>
   <button class="mode-toggle" id="modeToggle">Switch to Consumer Mode</button>
 
@@ -573,7 +617,7 @@
         const button = document.createElement("button");
 
         // Check progress from localStorage
-        const maxUnlocked = parseInt(localStorage.getItem("cm_maxUnlocked") || "1");
+        const maxUnlocked = MAX_UNLOCKED || 1;
 
         // Determine lock state
         const isLocked = index + 1 > maxUnlocked;
