@@ -1012,8 +1012,8 @@ async function checkWinCondition() {
       if (nextLevel > savedLevel) {
         await saveProgress(nextLevel);
         localStorage.setItem("cm_maxUnlocked", nextLevel); // 🔒 Ensure it's updated
-        await loadLevels(); // 🔁 Refresh UI
       }
+      await loadLevels(); // 🔁 Refresh UI
 
       break;
     }
