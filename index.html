@@ -322,6 +322,7 @@
         console.log("✅ Secure token received:", gameToken);
 
         localStorage.setItem("game_token", gameToken);
+        fetchUserProgress();
         // Now your game can use the token for fetching user data
       }
     });
