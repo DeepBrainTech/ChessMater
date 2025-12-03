@@ -1006,12 +1006,13 @@ async function checkWinCondition() {
       triggerConfetti();
       showNextLevelButton();
 
-      const maxUnlocked = await loadProgressFromServer();
       const nextLevel = currentLevelIndex + 2;
+      const savedLevel = parseInt(localStorage.getItem("cm_maxUnlocked") || "1");
 
-      if (nextLevel > maxUnlocked) {
-        await saveProgress(nextLevel); // ✅ Save to backend
-        await loadLevels(); // 🔄 Refresh UI
+      if (nextLevel > savedLevel) {
+        await saveProgress(nextLevel);
+        localStorage.setItem("cm_maxUnlocked", nextLevel); // 🔒 Ensure it's updated
+        await loadLevels(); // 🔁 Refresh UI
       }
 
       break;
