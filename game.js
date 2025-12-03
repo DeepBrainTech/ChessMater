@@ -86,6 +86,29 @@ async function saveProgress(level) {
   }
 }
 
+async function loadProgressFromServer() {
+  try {
+    const response = await fetch("/api/games/chessmater/progress", {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("game_token")}`,
+      },
+    });
+
+    if (!response.ok) throw new Error("Failed to fetch progress");
+
+    const data = await response.json();
+    const level = parseInt(data.level || "1");
+
+    // Save into localStorage (to match existing code expectations)
+    localStorage.setItem("cm_maxUnlocked", level);
+    return level;
+
+  } catch (err) {
+    console.error("Error loading progress:", err);
+    return 1; // default level if error
+  }
+}
+
 
 // Board block types
 const CELL_TYPES = {
@@ -966,7 +989,7 @@ function checkGravityTeleportation() {
 }
 
 // Check if any player has reached the goal
-function checkWinCondition() {
+async function checkWinCondition() {
   if (gameWon) return;
 
   // Counter goal locked?
@@ -986,7 +1009,7 @@ function checkWinCondition() {
       showNextLevelButton();
 
       // Unlock next level locally
-      const maxUnlocked = parseInt(localStorage.getItem("cm_maxUnlocked") || "1");
+      const maxUnlocked = await loadProgressFromServer();
       const nextLevel = currentLevelIndex + 2;
       if (nextLevel > maxUnlocked) {
         localStorage.setItem("cm_maxUnlocked", nextLevel);
