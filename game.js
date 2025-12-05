@@ -70,7 +70,7 @@ async function saveProgress(level) {
   const token = localStorage.getItem("game_token");
   if (!token) {
     console.warn("No game token found for saving progress.");
-    return;
+    return false;
   }
 
   const response = await fetch("/api/games/chessmater/progress", {
@@ -84,8 +84,10 @@ async function saveProgress(level) {
 
   if (!response.ok) {
     console.error("Failed to save progress to server");
+    return false;
   } else {
     console.log("✅ Progress saved to level", level);
+    return true;
   }
 }
 
@@ -1006,13 +1008,18 @@ async function checkWinCondition() {
       triggerConfetti();
       showNextLevelButton();
 
-      const nextLevel = currentLevelIndex + 2;
+      const nextLevelNumber = currentLevelIndex + 2;
       const savedLevel = parseInt(localStorage.getItem("cm_maxUnlocked") || "1");
 
-      if (nextLevel > savedLevel) {
-        await saveProgress(nextLevel);
-        localStorage.setItem("cm_maxUnlocked", nextLevel); // 🔒 Ensure it's updated
+      if (nextLevelNumber > savedLevel) {
+        const success = await saveProgress(nextLevelNumber);
+        if (success) {
+          localStorage.setItem("cm_maxUnlocked", nextLevelNumber);
+        } else{
+          updateStatus("⚠️ Progress Save Failed. Check network connection.", true);
+        }
       }
+      await loadProgressFromServer();
       await loadLevels(); // 🔁 Refresh UI
 
       break;
