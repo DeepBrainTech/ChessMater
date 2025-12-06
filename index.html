@@ -519,14 +519,15 @@
       const levelGrid = document.getElementById("levelGrid");
       levelGrid.innerHTML = "";
 
-      const maxUnlocked = await loadProgressFromServer(); // ✅ call once outside the loop
+      const maxUnlocked = parseInt(localStorage.getItem("cm_maxUnlocked") || "1");
 
       for (let index = 0; index < LEVELS.length; index++) {
         const level = LEVELS[index];
+        const levelNumber = index + 1; // 1-based level number
         const button = document.createElement("button");
 
         // Determine lock state
-        const isLocked = index + 1 > maxUnlocked;
+        const isLocked = levelNumber > maxUnlocked;
 
         button.className = "level-button";
         button.textContent = level.name || `Level ${index + 1}`;
