@@ -42,6 +42,7 @@ async function fetchUserProgress() {
 
   if (!token) {
     console.warn("No game token found — starting at level 1.");
+    localStorage.setItem("cm_maxUnlocked", "2");
     loadPuzzle(LEVELS[0]);
     return;
   }
@@ -54,14 +55,17 @@ async function fetchUserProgress() {
     });
 
     const data = await res.json();
-    const level = data.level || 1;
+    const level = data.level || 2;
 
     console.log("🎯 Starting user at level:", level);
+
+    localStorage.setItem("cm_maxUnlocked", level.toString());
 
     // Load that level
     loadPuzzle(LEVELS[level - 1]);
   } catch (err) {
     console.error("Failed to load progress:", err);
+    localStorage.setItem("cm_maxUnlocked", "2");
     loadPuzzle(LEVELS[0]); // default fallback
   }
 }
@@ -2950,3 +2954,13 @@ updatePlayerCount();
 updateObjectiveCount();
 setupFileUpload(); // Set up file upload functionality
 gameLoop();
+
+async function initGame() {
+  console.log("Starting game initialization...");
+  await fetchUserProgress();
+  await loadLevels();
+  gameLoop();
+  console.log("Game initialized successfully.");
+
+}
+window.onload = initGame;
