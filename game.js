@@ -2954,13 +2954,3 @@ updatePlayerCount();
 updateObjectiveCount();
 setupFileUpload(); // Set up file upload functionality
 gameLoop();
-
-async function initGame() {
-  console.log("Starting game initialization...");
-  await fetchUserProgress();
-  await loadLevels();
-  gameLoop();
-  console.log("Game initialized successfully.");
-
-}
-window.onload = initGame;
