@@ -37,87 +37,6 @@ let shakeX = 0;
 let shakeY = 0;
 const visitedSquares = Array.from({ length: ROWS }, () => Array(COLS).fill(false));
 
-async function fetchUserProgress() {
-  const token = localStorage.getItem("game_token");
-
-  if (!token) {
-    console.warn("No game token found — starting at level 1.");
-    localStorage.setItem("cm_maxUnlocked", "2");
-    loadPuzzle(LEVELS[0]);
-    return;
-  }
-
-  try {
-    const res = await fetch("https://YOUR_API_DOMAIN/api/games/chessmater/progress", {
-      headers: {
-        Authorization: `Bearer ${token}`
-      }
-    });
-
-    const data = await res.json();
-    const level = data.level || 2;
-
-    console.log("🎯 Starting user at level:", level);
-
-    localStorage.setItem("cm_maxUnlocked", level.toString());
-
-    // Load that level
-    loadPuzzle(LEVELS[level - 1]);
-  } catch (err) {
-    console.error("Failed to load progress:", err);
-    localStorage.setItem("cm_maxUnlocked", "2");
-    loadPuzzle(LEVELS[0]); // default fallback
-  }
-}
-
-async function saveProgress(level) {
-  const token = localStorage.getItem("game_token");
-  if (!token) {
-    console.warn("No game token found for saving progress.");
-    return false;
-  }
-
-  const response = await fetch("/api/games/chessmater/progress", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`
-    },
-    body: JSON.stringify({ level })
-  });
-
-  if (!response.ok) {
-    console.error("Failed to save progress to server");
-    return false;
-  } else {
-    console.log("✅ Progress saved to level", level);
-    return true;
-  }
-}
-
-async function loadProgressFromServer() {
-  try {
-    const response = await fetch("/api/games/chessmater/progress", {
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem("game_token")}`,
-      },
-    });
-
-    if (!response.ok) throw new Error("Failed to fetch progress");
-
-    const data = await response.json();
-    const level = parseInt(data.level || "1");
-
-    // Save into localStorage (to match existing code expectations)
-    localStorage.setItem("cm_maxUnlocked", level);
-    return level;
-
-  } catch (err) {
-    console.error("Error loading progress:", err);
-    return 1; // default level if error
-  }
-}
-
 
 // Board block types
 const CELL_TYPES = {
@@ -137,7 +56,6 @@ const CELL_TYPES = {
   TELEPORT_ORANGE: 13,  // Orange teleporter (pair 4)
   BOMB: 14    // bomb block
 };
-
 
 const TELEPORT_COLORS = {
   [CELL_TYPES.TELEPORT_PURPLE]: { fill: "rgba(155, 89, 182, 0.8)", stroke: "rgba(255, 255, 255, 0.6)" },
@@ -998,39 +916,40 @@ function checkGravityTeleportation() {
 }
 
 // Check if any player has reached the goal
-async function checkWinCondition() {
-  if (gameWon) return;
+function checkWinCondition() {
+  if (gameWon) {
+    // Unlock next level
+    const maxUnlocked = parseInt(localStorage.getItem("cm_maxUnlocked") || "1");
+    const nextLevel = currentLevelIndex + 2;
 
+    if (nextLevel > maxUnlocked) {
+        localStorage.setItem("cm_maxUnlocked", nextLevel);
+    }
+
+    loadLevels();
+
+    showNextLevelButton();
+  }
+  if (gameWon || !goal) return;
+
+  // Counter goal locked?
   if (goal.type === "counter" && goal.counter <= 0) return;
-  if (!areAllObjectivesCompleted()) return;
-
+  
+  // Check if all objectives are completed first
+  if (!areAllObjectivesCompleted()) {
+    return;
+  }
+  
   for (const player of players) {
     if (player.row === goal.row && player.col === goal.col) {
       gameWon = true;
-
       updateStatus("🎉 Puzzle solved! All objectives completed and goal reached!");
       triggerConfetti();
       showNextLevelButton();
-
-      const nextLevelNumber = currentLevelIndex + 2;
-      const savedLevel = parseInt(localStorage.getItem("cm_maxUnlocked") || "1");
-
-      if (nextLevelNumber > savedLevel) {
-        const success = await saveProgress(nextLevelNumber);
-        if (success) {
-          localStorage.setItem("cm_maxUnlocked", nextLevelNumber);
-        } else{
-          updateStatus("⚠️ Progress Save Failed. Check network connection.", true);
-        }
-      }
-      await loadProgressFromServer();
-      await loadLevels(); // 🔁 Refresh UI
-
       break;
     }
   }
 }
-
 
 // --- Fixed Path checking (rook/bishop/queen) ---
 function isPathClear(r1, c1, r2, c2, movingPlayer = null) {
