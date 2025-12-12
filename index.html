@@ -313,19 +313,26 @@
 </head>
 <body class="consumer-mode">
   <script>
-    window.opener?.postMessage("ready_for_token", "https://chessmater.pages.dev");
-    // Listen for the secure token
-    window.addEventListener("message", (event) => {
-      if (event.origin !== "https://chessmater.pages.dev") return;
-      if (event.data?.type === "init_token" && event.data.token) {
-        const gameToken = event.data.token;
-        console.log("✅ Secure token received:", gameToken);
+    // Read token from URL hash
+    const hash = window.location.hash;
+    const token = hash.startsWith("#token=")
+      ? hash.replace("#token=", "")
+      : null;
 
-        localStorage.setItem("game_token", gameToken);
-        fetchUserProgress();
-        // Now your game can use the token for fetching user data
+    // Decode JWT
+    let user = null;
+    if (token) {
+      try {
+        user = JSON.parse(atob(token.split(".")[1]));
+        console.log("ChessMater user:", user);
+
+        // Save user + token for the game
+        localStorage.setItem("cm_user", JSON.stringify(user));
+        localStorage.setItem("cm_token", token);
+      } catch (err) {
+        console.error("Invalid JWT token:", err);
       }
-    });
+    }
   </script>
   <button class="mode-toggle" id="modeToggle">Switch to Consumer Mode</button>
 
@@ -465,24 +472,8 @@
       Source: <a href="https://commons.wikimedia.org/wiki/Category:SVG_chess_pieces">Wikimedia Commons</a>.
     </footer>
   </div>
+
   <script>
-    async function loadProgressFromServer() {
-      const token = localStorage.getItem("game_token");
-      const response = await fetch("/api/games/chessmater/progress", {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
-
-      if (!response.ok) {
-        console.error("Failed to fetch progress from server");
-        return 1; // Default to level 1 on error
-      }
-
-      const data = await response.json();
-      return data.level || 1;
-    }
-    
     document.addEventListener("DOMContentLoaded", () => {
       const bgMusic = document.getElementById("bgMusic");
       const musicToggle = document.getElementById("musicToggle");
@@ -514,42 +505,6 @@
         }
       });
     });
-
-    async function loadLevels() {
-      const levelGrid = document.getElementById("levelGrid");
-      levelGrid.innerHTML = "";
-
-      const maxUnlocked = parseInt(localStorage.getItem("cm_maxUnlocked") || "1");
-
-      for (let index = 0; index < LEVELS.length; index++) {
-        const level = LEVELS[index];
-        const levelNumber = index + 1; // 1-based level number
-        const button = document.createElement("button");
-
-        // Determine lock state
-        const isLocked = levelNumber > maxUnlocked;
-
-        button.className = "level-button";
-        button.textContent = level.name || `Level ${index + 1}`;
-
-        if (isLocked) {
-          button.style.background = "#777";
-          button.style.cursor = "not-allowed";
-          button.style.opacity = "0.5";
-          button.textContent += " 🔒";
-          button.addEventListener("click", () => {
-            updateStatus("This level is locked. Complete earlier levels first!");
-          });
-        } else {
-          button.addEventListener("click", () => {
-            currentLevelIndex = index;
-            loadPuzzle(level);
-          });
-        }
-
-        levelGrid.appendChild(button);
-      }
-    }
 
     document.addEventListener("DOMContentLoaded", () => {
       const restartBtn = document.getElementById("restartLevelBtn");
@@ -583,7 +538,7 @@
     ];
     
     // Toggle between developer and consumer mode
-    document.getElementById('modeToggle').addEventListener('click', async function() {
+    document.getElementById('modeToggle').addEventListener('click', function() {
       isDeveloperMode = !isDeveloperMode;
       const container = document.getElementById('mainContainer');
       const toggleButton = document.getElementById('modeToggle');
@@ -604,49 +559,49 @@
         updateStatus('Consumer Mode: Level selection enabled');
 
         // 🟢 Load levels from levels.js when entering consumer mode
-        await loadLevels();
+        loadLevels();
       }
     });
 
     
     // Load and display levels
-    // async function loadLevels() {
-    //   const levelGrid = document.getElementById("levelGrid");
-    //   levelGrid.innerHTML = "";
+    function loadLevels() {
+      const levelGrid = document.getElementById("levelGrid");
+      levelGrid.innerHTML = "";
 
-    //   LEVELS.forEach((level, index) => {
-    //     const button = document.createElement("button");
+      LEVELS.forEach((level, index) => {
+        const button = document.createElement("button");
 
-    //     // Check progress from localStorage
-    //     const maxUnlocked = await loadProgressFromServer();
+        // Check progress from localStorage
+        const maxUnlocked = parseInt(localStorage.getItem("cm_maxUnlocked") || "1");
 
-    //     // Determine lock state
-    //     const isLocked = index + 1 > maxUnlocked;
+        // Determine lock state
+        const isLocked = index + 1 > maxUnlocked;
 
-    //     button.className = "level-button";
-    //     button.textContent = level.name || `Level ${index + 1}`;
+        button.className = "level-button";
+        button.textContent = level.name || `Level ${index + 1}`;
 
-    //     if (isLocked) {
-    //         button.style.background = "#777";
-    //         button.style.cursor = "not-allowed";
-    //         button.style.opacity = "0.5";
-    //         button.textContent += " 🔒";
+        if (isLocked) {
+            button.style.background = "#777";
+            button.style.cursor = "not-allowed";
+            button.style.opacity = "0.5";
+            button.textContent += " 🔒";
 
-    //         // Prevent clicking locked levels
-    //         button.addEventListener("click", () => {
-    //             updateStatus("This level is locked. Complete earlier levels first!");
-    //         });
-    //     } else {
-    //         // Level is playable
-    //         button.addEventListener("click", () => {
-    //             currentLevelIndex = index;
-    //             loadPuzzle(level);
-    //         });
-    //     }
+            // Prevent clicking locked levels
+            button.addEventListener("click", () => {
+                updateStatus("This level is locked. Complete earlier levels first!");
+            });
+        } else {
+            // Level is playable
+            button.addEventListener("click", () => {
+                currentLevelIndex = index;
+                loadPuzzle(level);
+            });
+        }
 
-    //     levelGrid.appendChild(button);
-    //   });
-    // }
+        levelGrid.appendChild(button);
+      });
+    }
 
 
     
