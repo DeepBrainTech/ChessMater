@@ -261,8 +261,11 @@ function resizeBoard(newRows, newCols) {
 function resizeCanvas() {
   canvas.width = COLS * TILE_SIZE;
   canvas.height = ROWS * TILE_SIZE;
-  canvas.style.width = `${COLS * TILE_SIZE}px`;
-  canvas.style.height = `${ROWS * TILE_SIZE}px`;
+
+  // Scale canvas responsively
+  const scaleFactor = Math.min(window.innerWidth / canvas.width, 1);
+  canvas.style.width = canvas.width * scaleFactor + "px";
+  canvas.style.height = canvas.height * scaleFactor + "px";
 }
 
 function updateStatus(message) {
@@ -2865,6 +2868,7 @@ confettiStyle.textContent = `
   }
 `;
 document.head.appendChild(confettiStyle);
+window.addEventListener('resize', resizeCanvas);
 
 // Initialize the game
 initializeCanvas();
