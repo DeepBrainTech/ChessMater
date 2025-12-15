@@ -2867,6 +2867,15 @@ confettiStyle.textContent = `
     }
   }
 `;
+document.addEventListener('DOMContentLoaded', () => {
+  const blockBox = document.getElementById('blockDescriptionBox');
+  
+  if (blockBox) {
+    blockBox.addEventListener('click', () => {
+      blockBox.classList.toggle('expanded');
+    });
+  }
+});
 document.head.appendChild(confettiStyle);
 window.addEventListener('resize', resizeCanvas);
 

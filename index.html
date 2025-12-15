@@ -318,6 +318,38 @@
       max-width: 100%;
     }
 
+    #rotateNotice {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      background: #e74c3c;
+      color: white;
+      width: 100%;
+      padding: 12px;
+      text-align: center;
+      font-weight: bold;
+      z-index: 10000;
+    }
+
+    /* Show only when portrait on small screens */
+    @media only screen and (max-width: 768px) and (orientation: portrait) {
+      #rotateNotice {
+        display: block;
+      }
+    }
+
+    #blockDescriptionBox {
+      max-height: 40px;
+      overflow: hidden;
+      cursor: pointer;
+      transition: max-height 0.3s ease;
+    }
+
+    #blockDescriptionBox.expanded {
+      max-height: 300px; /* Enough to show full content */
+    }
+
 
 
   </style>
@@ -325,6 +357,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 <body class="consumer-mode">
+  <div id="rotateNotice">
+    🔄 Please rotate your device to landscape for the best experience!
+  </div>
   <script>
     // Read token from URL hash
     const hash = window.location.hash;
