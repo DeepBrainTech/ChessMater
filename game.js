@@ -262,7 +262,7 @@ function resizeCanvas() {
   canvas.width = COLS * TILE_SIZE;
   canvas.height = ROWS * TILE_SIZE;
 
-  // Scale canvas responsively
+  // Responsively scale canvas to screen width (mobile-safe)
   const scaleFactor = Math.min(window.innerWidth / canvas.width, 1);
   canvas.style.width = canvas.width * scaleFactor + "px";
   canvas.style.height = canvas.height * scaleFactor + "px";
@@ -2796,12 +2796,17 @@ canvas.addEventListener("click", handleMove);
 
 // Touch support
 canvas.addEventListener("touchstart", (e) => {
-  e.preventDefault(); // ⬅️ VERY IMPORTANT for touch to work properly!
+  e.preventDefault();
 
   const touch = e.touches[0];
   const rect = canvas.getBoundingClientRect();
-  const x = touch.clientX - rect.left;
-  const y = touch.clientY - rect.top;
+
+  // Adjust for scaling
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+
+  const x = (touch.clientX - rect.left) * scaleX;
+  const y = (touch.clientY - rect.top) * scaleY;
 
   const simulatedEvent = {
     clientX: x + rect.left,
@@ -2809,7 +2814,7 @@ canvas.addEventListener("touchstart", (e) => {
   };
 
   handleMove(simulatedEvent);
-}, { passive: false }); // ⬅️ Also critical
+}, { passive: false });
 
 // --- Add keyboard controls for deselection ---
 document.addEventListener("keydown", (e) => {
@@ -2898,6 +2903,7 @@ window.addEventListener('resize', resizeCanvas);
 
 // Initialize the game
 initializeCanvas();
+resizeCanvas();
 updateStatus("Welcome to Multi-Player Chess Puzzle with Gravity! Start by placing your player pieces.");
 updatePlayerCount();
 updateObjectiveCount();
