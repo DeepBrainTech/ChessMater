@@ -351,17 +351,23 @@
       max-height: 300px; /* Enough to show full content */
     }
 
-    #blockTipToggle {
+    .floating-buttons {
       position: fixed;
       bottom: 20px;
       left: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      z-index: 9999;
+    }
+
+    #blockTipToggle {
       background-color: #3498db;
       color: white;
       padding: 8px 14px;
       border-radius: 20px;
       font-weight: bold;
       cursor: pointer;
-      z-index: 9999;
       box-shadow: 0 2px 10px rgba(0,0,0,0.3);
     }
 
@@ -430,11 +436,7 @@
         <div class="canvas-container">
           <canvas id="gameCanvas" width="1280" height="800"></canvas>
         </div>
-        
-        <div id="blockTipToggle">
-          💡 Tip
-        </div>
-
+      
         <div id="blockDescriptionBox" class="hidden">
           <h3>Block Tip</h3>
           <p id="blockDescription">Welcome! Start the first level to learn about blocks.</p>
