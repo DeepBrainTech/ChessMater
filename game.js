@@ -2794,6 +2794,22 @@ function restartLevel() {
 
 canvas.addEventListener("click", handleMove);
 
+// Touch support
+canvas.addEventListener("touchstart", (e) => {
+  const touch = e.touches[0];
+  const rect = canvas.getBoundingClientRect();
+  const x = touch.clientX - rect.left;
+  const y = touch.clientY - rect.top;
+
+  // Build an event-like object to pass into handleMove()
+  const simulatedEvent = {
+    clientX: x + rect.left,
+    clientY: y + rect.top
+  };
+
+  handleMove(simulatedEvent);
+});
+
 // --- Add keyboard controls for deselection ---
 document.addEventListener("keydown", (e) => {
   if (mode === "play" && e.key === "Escape") {
