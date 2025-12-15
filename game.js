@@ -213,6 +213,15 @@ eraseBoardBtn.addEventListener("click", () => {
   }
 });
 
+document.addEventListener('DOMContentLoaded', () => {
+  const tipToggle = document.getElementById('blockTipToggle');
+  const tipBox = document.getElementById('blockDescriptionBox');
+
+  tipToggle.addEventListener('click', () => {
+    tipBox.classList.toggle('hidden');
+  });
+});
+
 // Function to resize the board
 function resizeBoard(newRows, newCols) {
   if (newRows === ROWS && newCols === COLS) return;
