@@ -647,6 +647,7 @@
     async function fetchProgress() {
       try {
         const res = await fetch("https://chessmater-production.up.railway.app/progress", {
+          credentials: 'include', // <== add this line
           headers: {
             Authorization: `Bearer ${localStorage.getItem("cm_token")}`,
           },

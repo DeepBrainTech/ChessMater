@@ -932,6 +932,7 @@ async function checkWinCondition() {
   if (gameWon) {
     // Unlock next level
     const res = await fetch("https://chessmater-production.up.railway.app/progress", {
+      credentials: 'include',
       headers: {
         Authorization: `Bearer ${localStorage.getItem("cm_token")}`
       }
@@ -944,6 +945,7 @@ async function checkWinCondition() {
       try {
         const res = await fetch("https://chessmater-production.up.railway.app/progress", {
           method: "POST",
+          credentials: 'include',
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${localStorage.getItem("cm_token")}`,
