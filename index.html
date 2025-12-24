@@ -644,6 +644,21 @@
       }
     });
 
+    async function fetchProgress() {
+      try {
+        const res = await fetch("https://chessmater-production.up.railway.app/progress", {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("cm_token")}`
+          }
+        });
+        const data = await res.json();
+        return parseInt(data.maxUnlocked || "1");
+      } catch (err) {
+        console.error("Failed to fetch progress", err);
+        return 1;
+      }
+    }
+
     
     // Load and display levels
     async function loadLevels() {
@@ -655,22 +670,6 @@
 
       LEVELS.forEach((level, index) => {
         const button = document.createElement("button");
-
-        // Check progress from localStorage
-        async function fetchProgress() {
-          try {
-            const res = await fetch("https://chessmater-production.up.railway.app/progress", {
-              headers: {
-                Authorization: `Bearer ${localStorage.getItem("cm_token")}`
-              }
-            });
-            const data = await res.json();
-            return parseInt(data.maxUnlocked || "1");
-          } catch (err) {
-            console.error("Failed to fetch progress", err);
-            return 1;
-          }
-        }
 
         // Determine lock state
         const isLocked = index + 1 > maxUnlocked;
