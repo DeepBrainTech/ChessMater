@@ -948,8 +948,11 @@ async function checkWinCondition() {
             "Content-Type": "application/json",
             Authorization: `Bearer ${localStorage.getItem("cm_token")}`,
           },
-          body: JSON.stringify({ max_unlocked: nextLevel })
+          body: JSON.stringify({ maxUnlocked: nextLevel })
         });
+
+        const data = await res.json();
+        console.log("🔐 Progress updated:", data);
     
         if (!res.ok) {
           const errorText = await res.text();
