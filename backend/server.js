@@ -9,6 +9,11 @@ app.use(cors({
     origin: "https://chessmater.pages.dev",
     credentials: true,
   }));
+
+app.options('*', cors({
+  origin: "https://chessmater.pages.dev",
+  credentials: true,
+}));
 app.use(express.json());
 
 function authenticate(req, res, next) {
