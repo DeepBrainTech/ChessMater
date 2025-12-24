@@ -941,16 +941,28 @@ async function checkWinCondition() {
     const nextLevel = currentLevelIndex + 2;
 
     if (nextLevel > maxUnlocked) {
-      await fetch("https://chessmater-production.up.railway.app/progress", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("cm_token")}`
-        },
-        body: JSON.stringify({ maxUnlocked: nextLevel })
-      });
-
-      localStorage.setItem("cm_maxUnlocked", nextLevel.toString());
+      try {
+        const res = await fetch("https://chessmater-production.up.railway.app/progress", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${localStorage.getItem("cm_token")}`,
+          },
+          body: JSON.stringify({ max_unlocked: nextLevel })
+        });
+    
+        if (!res.ok) {
+          const errorText = await res.text();
+          console.error("❌ Failed to update progress:", res.status, errorText);
+        } else {
+          console.log("✅ Progress updated to level", nextLevel);
+        }
+    
+        localStorage.setItem("cm_maxUnlocked", nextLevel.toString());
+    
+      } catch (err) {
+        console.error("❌ Error sending POST /progress:", err);
+      }
     }
 
     loadLevels();

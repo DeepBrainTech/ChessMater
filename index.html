@@ -648,13 +648,22 @@
       try {
         const res = await fetch("https://chessmater-production.up.railway.app/progress", {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("cm_token")}`
-          }
+            Authorization: `Bearer ${localStorage.getItem("cm_token")}`,
+          },
         });
+
+        if (!res.ok) {
+          const errorText = await res.text();
+          console.error("❌ Failed to fetch progress:", res.status, errorText);
+          return 1;
+        }
+
         const data = await res.json();
+        console.log("✅ Fetched maxUnlocked:", data.maxUnlocked);
         return parseInt(data.maxUnlocked || "1");
+
       } catch (err) {
-        console.error("Failed to fetch progress", err);
+        console.error("❌ Error in fetchProgress:", err);
         return 1;
       }
     }

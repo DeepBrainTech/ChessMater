@@ -47,18 +47,26 @@ app.get('/progress', authenticate, async (req, res) => {
 });
 
 app.post('/progress', authenticate, async (req, res) => {
-  const { maxUnlocked } = req.body;
-  await pool.query(
-    `
-    INSERT INTO user_progress (user_id, max_unlocked)
-    VALUES ($1, $2)
-    ON CONFLICT (user_id)
-    DO UPDATE SET max_unlocked = EXCLUDED.max_unlocked
-    `,
-    [req.user.id, maxUnlocked]
-  );
-  res.json({ success: true });
-});
+    const { maxUnlocked } = req.body;
+  
+    console.log("📥 Received progress update from user", req.user.id, "with maxUnlocked:", maxUnlocked);
+  
+    try {
+      await pool.query(
+        `
+        INSERT INTO user_progress (user_id, max_unlocked)
+        VALUES ($1, $2)
+        ON CONFLICT (user_id)
+        DO UPDATE SET max_unlocked = EXCLUDED.max_unlocked
+        `,
+        [req.user.id, maxUnlocked]
+      );
+      res.json({ success: true });
+    } catch (err) {
+      console.error("❌ Error saving progress:", err);
+      res.status(500).json({ error: "Failed to save progress" });
+    }
+  });
 
 app.post('/saveLevel', authenticate, async (req, res) => {
   const { levelName, levelData } = req.body;
