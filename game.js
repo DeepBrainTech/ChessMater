@@ -950,7 +950,7 @@ async function checkWinCondition() {
         body: JSON.stringify({ level: nextLevel })
       });
 
-      loadLevels();
+      localStorage.setItem("cm_maxUnlocked", nextLevel.toString());
     }
 
     loadLevels();
