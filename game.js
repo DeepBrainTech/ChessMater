@@ -928,14 +928,27 @@ function checkGravityTeleportation() {
 }
 
 // Check if any player has reached the goal
-function checkWinCondition() {
+async function checkWinCondition() {
   if (gameWon) {
     // Unlock next level
-    const maxUnlocked = parseInt(localStorage.getItem("cm_maxUnlocked") || "1");
+    const res = await fetch("https://chessmater-production.up.railway.app/progress", {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("cm_token")}`
+      }
+    });
+    const data = await res.json();
+    const maxUnlocked = parseInt(data.maxUnlocked || "1");
     const nextLevel = currentLevelIndex + 2;
 
     if (nextLevel > maxUnlocked) {
-        localStorage.setItem("cm_maxUnlocked", nextLevel);
+      await fetch("https://chessmater-production.up.railway.app/progress", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("cm_token")}`
+        },
+        body: JSON.stringify({ level: nextLevel })
+      });
     }
 
     loadLevels();
