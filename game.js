@@ -947,7 +947,7 @@ async function checkWinCondition() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${localStorage.getItem("cm_token")}`
         },
-        body: JSON.stringify({ level: nextLevel })
+        body: JSON.stringify({ maxUnlocked: nextLevel })
       });
 
       localStorage.setItem("cm_maxUnlocked", nextLevel.toString());
