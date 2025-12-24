@@ -5,7 +5,10 @@ const jwt = require('jsonwebtoken');
 const pool = require('./db');
 
 const app = express();
-app.use(cors());
+app.use(cors({
+    origin: "https://chessmater.pages.dev",
+    credentials: true,
+  }));
 app.use(express.json());
 
 function authenticate(req, res, next) {
