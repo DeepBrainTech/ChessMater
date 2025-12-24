@@ -6,7 +6,17 @@ const pool = require('./db');
 
 const app = express();
 const corsOptions = {
-  origin: "https://chessmater.pages.dev",
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    // Check if the origin is your frontend
+    if (origin === 'https://chessmater.pages.dev' || origin === 'http://localhost:5173') {
+      return callback(null, true);
+    } else {
+      return callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
   methods: ["GET", "POST", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
