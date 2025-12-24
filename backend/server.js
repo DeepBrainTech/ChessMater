@@ -11,7 +11,11 @@ const corsOptions = {
     if (!origin) return callback(null, true);
     
     // Check if the origin is your frontend
-    if (origin === 'https://chessmater.pages.dev' || origin === 'http://localhost:5173') {
+    if (
+        origin === 'https://chessmater.pages.dev' ||
+        origin === 'http://localhost:5173' ||
+        origin === 'https://chessmater-production.up.railway.app'
+    ) {
       return callback(null, true);
     } else {
       return callback(new Error('Not allowed by CORS'));
