@@ -203,15 +203,19 @@ document.getElementById("nextLevelBtn").addEventListener("click", () => {
 //   applyGravity();
 // });
 
-downloadBtn.addEventListener("click", () => {
-  saveLevelToFolder();
-});
+if (downloadBtn) {
+  downloadBtn.addEventListener("click", () => {
+    saveLevelToFolder();
+  });
+}
 
-eraseBoardBtn.addEventListener("click", () => {
-  if (confirm("Are you sure you want to erase the entire board? This cannot be undone.")) {
-    eraseBoard();
-  }
-});
+if (eraseBoardBtn) {
+  eraseBoardBtn.addEventListener("click", () => {
+    if (confirm("Are you sure you want to erase the entire board? This cannot be undone.")) {
+      eraseBoard();
+    }
+  });
+}
 
 document.addEventListener('DOMContentLoaded', () => {
   const tipToggle = document.getElementById('blockTipToggle');
