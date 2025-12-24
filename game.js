@@ -949,6 +949,8 @@ async function checkWinCondition() {
         },
         body: JSON.stringify({ level: nextLevel })
       });
+
+      loadLevels();
     }
 
     loadLevels();
