@@ -961,8 +961,8 @@ async function checkWinCondition() {
         console.log("🔐 Progress updated:", data);
     
         if (!res.ok) {
-          const errorText = await res.text();
-          console.error("❌ Failed to update progress:", res.status, errorText);
+          // Use 'data' because you already read the error message into it
+          console.error("❌ Failed to update progress:", res.status, data);
         } else {
           console.log("✅ Progress updated to level", nextLevel);
         }

@@ -62,7 +62,7 @@ app.get('/init', async (req, res) => {
 app.get('/progress', authenticate, async (req, res) => {
   const result = await pool.query(
     'SELECT max_unlocked FROM user_progress WHERE user_id = $1',
-    [req.user.id]
+    [req.user.user_id]
   );
   res.json({ maxUnlocked: result.rows[0]?.max_unlocked || 1 });
 });
@@ -80,7 +80,7 @@ app.post('/progress', authenticate, async (req, res) => {
         ON CONFLICT (user_id)
         DO UPDATE SET max_unlocked = EXCLUDED.max_unlocked
         `,
-        [req.user.id, maxUnlocked]
+        [req.user.user_id, maxUnlocked]
       );
       res.json({ success: true });
     } catch (err) {
