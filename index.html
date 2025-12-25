@@ -403,8 +403,8 @@
     // Read token from URL hash
     const hash = window.location.hash;
     const token = hash.startsWith("#token=")
-      ? hash.replace("#token=", "")
-      : null;
+    ? hash.replace("#token=", "").split("&")[0] // <--- Add .split("&")[0]
+    : null;
 
     // Decode JWT
     let user = null;

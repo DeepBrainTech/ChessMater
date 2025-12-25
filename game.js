@@ -188,14 +188,6 @@ if (modeSelect) {
   }
 })};
 
-document.getElementById("editMode").addEventListener("change", (e) => {
-  editMode = e.target.value;
-  updateStatus(`Tool: ${editMode.replace('player_', '')}`);
-
-  // Show counter input only for counter goal
-  document.getElementById("counterGoalSettings").style.display =
-    editMode === "counter_goal" ? "block" : "none";
-});
 
 const editModeBtn = document.getElementById("editMode");
 if (editModeBtn) {
