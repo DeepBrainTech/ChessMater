@@ -116,7 +116,9 @@ let showTransformerMenu = false;
 let transformerPosition = null;
 let transformerPlayerIndex = -1;
 
-document.getElementById("boardSize").addEventListener("change", (e) => {
+const boardSizeBtn = document.getElementById("boardSize");
+if (boardSizeBtn) {
+  boardSizeBtn.addEventListener("change", (e) => {
   const size = e.target.value;
   
   if (size === "custom") {
@@ -139,7 +141,7 @@ document.getElementById("boardSize").addEventListener("change", (e) => {
         break;
     }
   }
-});
+})};
 
 const fogToggle = document.getElementById("levelFogToggle");
 if (fogToggle) {
@@ -150,7 +152,9 @@ if (fogToggle) {
   });
 }
 
-document.getElementById("applyCustomSize").addEventListener("click", () => {
+const applyBtn = document.getElementById("applyCustomSize");
+if (applyBtn) {
+   applyBtn.addEventListener("click", () => {
   const customRows = parseInt(document.getElementById("customRows").value) || DEFAULT_ROWS;
   const customCols = parseInt(document.getElementById("customCols").value) || DEFAULT_COLS;
   
@@ -159,9 +163,11 @@ document.getElementById("applyCustomSize").addEventListener("click", () => {
   const validCols = Math.min(Math.max(customCols, 4), 30);
   
   resizeBoard(validRows, validCols);
-});
+})};
 
-document.getElementById("modeSelect").addEventListener("change", (e) => {
+const modeSelect = document.getElementById("modeSelect");
+if (modeSelect) {
+   modeSelect.addEventListener("change", (e) => {
   mode = e.target.value;
   selectedPlayerIndex = -1; // Deselect when switching modes
   updateStatus(`Mode: ${mode === 'edit' ? 'Edit Mode' : 'Play Mode'}`);
@@ -180,7 +186,7 @@ document.getElementById("modeSelect").addEventListener("change", (e) => {
   if (mode === "play" && gravityEnabled && !gameWon) {
     applyGravity();
   }
-});
+})};
 
 document.getElementById("editMode").addEventListener("change", (e) => {
   editMode = e.target.value;
@@ -191,13 +197,15 @@ document.getElementById("editMode").addEventListener("change", (e) => {
     editMode === "counter_goal" ? "block" : "none";
 });
 
-document.getElementById("nextLevelBtn").addEventListener("click", () => {
+const editModeBtn = document.getElementById("editMode");
+if (editModeBtn) {
+   editModeBtn.addEventListener("change", (e) => {
   if (currentLevelIndex < LEVELS.length - 1) {
     currentLevelIndex++;
     loadPuzzle(LEVELS[currentLevelIndex]);
     document.getElementById("nextLevelBtn").style.display = "none";
   }
-});
+})};
 
 // gravityBtn.addEventListener("click", () => {
 //   applyGravity();
@@ -2934,6 +2942,7 @@ confettiStyle.textContent = `
     }
   }
 `;
+
 document.addEventListener('DOMContentLoaded', () => {
   const blockBox = document.getElementById('blockDescriptionBox');
   
