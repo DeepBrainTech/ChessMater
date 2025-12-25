@@ -6,29 +6,26 @@ const pool = require('./db');
 
 const app = express();
 const corsOptions = {
-  origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-    
-    // Check if the origin is your frontend
-    if (
+    origin: function (origin, callback) {
+      if (!origin) return callback(null, true);
+      if (
         origin === 'https://chessmater.pages.dev' ||
         origin === 'http://localhost:5173' ||
         origin === 'https://chessmater-production.up.railway.app'
-    ) {
-      return callback(null, true);
-    } else {
-      return callback(new Error('Not allowed by CORS'));
-    }
-  },
-  credentials: true,
-  methods: ["GET", "POST", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
-};
-
-app.use(cors(corsOptions));
-app.options('*', cors(corsOptions));
-app.use(express.json());
+      ) {
+        return callback(null, true);
+      } else {
+        return callback(new Error('Not allowed by CORS'));
+      }
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  };
+  
+  app.use(cors(corsOptions));
+  //app.options('*', cors(corsOptions)); // ✅ This line is correct
+  app.use(express.json());
 
 function authenticate(req, res, next) {
   const token = req.headers.authorization?.split(' ')[1];
