@@ -189,15 +189,19 @@ if (modeSelect) {
 })};
 
 
-const editModeBtn = document.getElementById("editMode");
-if (editModeBtn) {
-   editModeBtn.addEventListener("change", (e) => {
-  if (currentLevelIndex < LEVELS.length - 1) {
-    currentLevelIndex++;
-    loadPuzzle(LEVELS[currentLevelIndex]);
-    document.getElementById("nextLevelBtn").style.display = "none";
-  }
-})};
+const nextLevelBtn = document.getElementById("nextLevelBtn");
+if (nextLevelBtn) {
+  nextLevelBtn.addEventListener("click", () => {
+    if (currentLevelIndex < LEVELS.length - 1) {
+      currentLevelIndex++;
+      loadPuzzle(LEVELS[currentLevelIndex]);
+      nextLevelBtn.style.display = "none";
+      updateStatus(`Starting Level ${currentLevelIndex + 1}`);
+    } else {
+      updateStatus("You have beaten all levels! 🎉");
+    }
+  });
+}
 
 // gravityBtn.addEventListener("click", () => {
 //   applyGravity();
