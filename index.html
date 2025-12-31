@@ -335,80 +335,80 @@
 
     /* --- MOBILE LAYOUT --- */
     @media screen and (max-width: 900px) {
-      /* 1. Maximize screen usage */
-      body {
-        padding: 0;
-        margin: 0;
-        /* Prevent "pull to refresh" on mobile */
-        overscroll-behavior: none; 
-        background: #1a2a6c; /* Simplified background for performance */
-      }
-
-      /* 2. Remove the white box container look to save space */
-      .container {
-        padding: 5px;
-        margin: 0;
-        width: 100%;
-        max-width: 100%;
-        border-radius: 0;
-        box-shadow: none;
-        background: transparent;
-      }
-
-      /* 3. Smaller Title */
-      h1 {
-        font-size: 1.5rem;
-        margin: 10px 0;
-        color: white; /* Make text readable on dark background */
-        text-shadow: 1px 1px 2px black;
-      }
-
-      /* 4. Canvas should fill the width */
-      .canvas-container {
-        width: 100%;
-        display: flex;
-        justify-content: center;
-        overflow: hidden; /* Prevent scrolling if canvas fits */
-      }
-
-      /* 5. Make controls touch-friendly */
-      #controls {
-        flex-direction: column; /* Stack controls vertically if needed, or... */
-        display: grid; 
-        grid-template-columns: 1fr 1fr; /* ...grid them for easier tapping */
-        gap: 10px;
-        padding: 10px;
-        width: 95%;
-      }
-
-      /* 6. Bigger buttons for thumbs */
-      button, select {
-        min-height: 44px; /* Minimum touch target size */
-        font-size: 1rem;
-        width: 100%;
-      }
-
-      /* 7. Hide non-essential stuff on mobile to save space */
-      footer {
-        display: none;
-      }
-      
-      .instructions {
-        display: none; /* Hide instructions on mobile once they know how to play */
-      }
-
-      /* 8. Adjust floating buttons (Antigravity/Music) positions */
-      #restartLevelBtn, #musicToggle, button[onclick="toggleAntigravity()"] {
-        bottom: 10px !important; /* Move them lower */
-        padding: 8px 12px !important;
-        font-size: 0.9rem !important;
-        opacity: 0.9;
-      }
-      
-      /* Stack floating buttons if screen is very short (landscape) */
-      #musicToggle { right: 10px !important; }
-      #restartLevelBtn { right: 100px !important; bottom: 10px !important; }
+    /* 1. Force Vertical Layout (Stack Canvas & Tip Box) */
+    .game-area > div[style*="display: flex"] {
+      flex-direction: column !important;
+      align-items: center !important;
+      gap: 10px !important;
+      width: 100%;
     }
+
+    /* 2. Center and resize the Canvas */
+    .canvas-container {
+      width: 100% !important;
+      display: flex;
+      justify-content: center;
+      margin: 0 auto;
+    }
+    
+    canvas {
+      width: 100% !important; /* Force full width of container */
+      height: auto !important; /* Maintain aspect ratio */
+      max-width: 100% !important;
+    }
+
+    /* 3. Fix "Block Tip" Visibility */
+    #blockDescriptionBox {
+      position: static !important; /* Don't float */
+      width: 90% !important;
+      margin: 10px auto !important;
+      background: rgba(255, 255, 255, 0.95) !important; /* Opaque white background */
+      color: #333 !important; /* Dark text */
+      padding: 15px !important;
+      border-radius: 8px !important;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.3) !important;
+      display: block !important;
+    }
+    
+    /* Ensure header and text inside are readable */
+    #blockDescriptionBox h3, 
+    #blockDescriptionBox p {
+      color: #333 !important;
+      margin: 5px 0 !important;
+      text-shadow: none !important;
+    }
+
+    /* 4. Move Floating Buttons UP to avoid browser bar */
+    #restartLevelBtn, 
+    #musicToggle, 
+    button[onclick="toggleAntigravity()"] {
+      bottom: 80px !important; /* Move up above the browser nav bar */
+      padding: 10px 16px !important;
+      font-size: 1rem !important;
+      z-index: 99999; /* Ensure they are on top */
+    }
+
+    /* 5. Separate the buttons horizontally so they don't overlap */
+    button[onclick="toggleAntigravity()"] {
+      left: 20px !important;
+    }
+    
+    #musicToggle {
+      right: 20px !important;
+    }
+    
+    #restartLevelBtn {
+      /* Center this button or place it near the others */
+      right: auto !important; 
+      left: 50% !important;
+      transform: translateX(-50%); /* Perfectly center it */
+    }
+
+    /* 6. Add extra padding to bottom of page so buttons don't cover levels */
+    body {
+      padding-bottom: 120px !important;
+    }
+  }
 
 
 
