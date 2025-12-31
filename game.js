@@ -279,10 +279,19 @@ function resizeCanvas() {
   canvas.width = COLS * TILE_SIZE;
   canvas.height = ROWS * TILE_SIZE;
 
-  // Responsively scale canvas to screen width (mobile-safe)
-  const scaleFactor = Math.min(window.innerWidth / canvas.width, 1);
-  canvas.style.width = canvas.width * scaleFactor + "px";
-  canvas.style.height = canvas.height * scaleFactor + "px";
+  // Get available screen space
+  // We subtract a little (e.g., 100px) to leave room for the UI buttons
+  const maxWidth = window.innerWidth;
+  const maxHeight = window.innerHeight - 80; 
+
+  // Calculate the best scale to fit BOTH width and height
+  const scaleX = maxWidth / canvas.width;
+  const scaleY = maxHeight / canvas.height;
+  const scaleFactor = Math.min(scaleX, scaleY, 1); // Never scale up past 100%
+
+  // Apply the scale
+  canvas.style.width = (canvas.width * scaleFactor) + "px";
+  canvas.style.height = (canvas.height * scaleFactor) + "px";
 }
 
 function updateStatus(message) {

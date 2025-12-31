@@ -333,60 +333,81 @@
       z-index: 10000;
     }
 
-    /* Show only when portrait on small screens */
-    @media only screen and (max-width: 768px) and (orientation: portrait) {
-      #rotateNotice {
-        display: block;
+    /* --- MOBILE LAYOUT --- */
+    @media screen and (max-width: 900px) {
+      /* 1. Maximize screen usage */
+      body {
+        padding: 0;
+        margin: 0;
+        /* Prevent "pull to refresh" on mobile */
+        overscroll-behavior: none; 
+        background: #1a2a6c; /* Simplified background for performance */
       }
-    }
 
-    #blockDescriptionBox {
-      max-height: 40px;
-      overflow: hidden;
-      cursor: pointer;
-      transition: max-height 0.3s ease;
-    }
+      /* 2. Remove the white box container look to save space */
+      .container {
+        padding: 5px;
+        margin: 0;
+        width: 100%;
+        max-width: 100%;
+        border-radius: 0;
+        box-shadow: none;
+        background: transparent;
+      }
 
-    #blockDescriptionBox.expanded {
-      max-height: 300px; /* Enough to show full content */
-    }
+      /* 3. Smaller Title */
+      h1 {
+        font-size: 1.5rem;
+        margin: 10px 0;
+        color: white; /* Make text readable on dark background */
+        text-shadow: 1px 1px 2px black;
+      }
 
-    .floating-buttons {
-      position: fixed;
-      bottom: 20px;
-      left: 20px;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      z-index: 9999;
-    }
+      /* 4. Canvas should fill the width */
+      .canvas-container {
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        overflow: hidden; /* Prevent scrolling if canvas fits */
+      }
 
-    #blockTipToggle {
-      background-color: #3498db;
-      color: white;
-      padding: 8px 14px;
-      border-radius: 20px;
-      font-weight: bold;
-      cursor: pointer;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-    }
+      /* 5. Make controls touch-friendly */
+      #controls {
+        flex-direction: column; /* Stack controls vertically if needed, or... */
+        display: grid; 
+        grid-template-columns: 1fr 1fr; /* ...grid them for easier tapping */
+        gap: 10px;
+        padding: 10px;
+        width: 95%;
+      }
 
-    #blockDescriptionBox {
-      position: fixed;
-      bottom: 70px;
-      left: 20px;
-      max-width: 300px;
-      background: #fefefe;
-      border: 2px solid #3498db;
-      padding: 15px;
-      border-radius: 10px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-      font-size: 14px;
-      z-index: 9998;
-    }
+      /* 6. Bigger buttons for thumbs */
+      button, select {
+        min-height: 44px; /* Minimum touch target size */
+        font-size: 1rem;
+        width: 100%;
+      }
 
-    #blockDescriptionBox.hidden {
-      display: none;
+      /* 7. Hide non-essential stuff on mobile to save space */
+      footer {
+        display: none;
+      }
+      
+      .instructions {
+        display: none; /* Hide instructions on mobile once they know how to play */
+      }
+
+      /* 8. Adjust floating buttons (Antigravity/Music) positions */
+      #restartLevelBtn, #musicToggle, button[onclick="toggleAntigravity()"] {
+        bottom: 10px !important; /* Move them lower */
+        padding: 8px 12px !important;
+        font-size: 0.9rem !important;
+        opacity: 0.9;
+      }
+      
+      /* Stack floating buttons if screen is very short (landscape) */
+      #musicToggle { right: 10px !important; }
+      #restartLevelBtn { right: 100px !important; bottom: 10px !important; }
     }
 
 
