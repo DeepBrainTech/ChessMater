@@ -382,31 +382,52 @@
     #restartLevelBtn, 
     #musicToggle, 
     button[onclick="toggleAntigravity()"] {
-      bottom: 80px !important; /* Move up above the browser nav bar */
-      padding: 10px 16px !important;
-      font-size: 1rem !important;
-      z-index: 99999; /* Ensure they are on top */
+      position: fixed !important;
+      bottom: 10px !important;
+      z-index: 10000 !important;
+      /* Make buttons smaller to fit side-by-side */
+      font-size: 0.8rem !important; 
+      padding: 8px 10px !important;
+      min-height: 40px !important; /* Override the big button size */
+      width: auto !important; /* Let them shrink to fit text */
+      box-shadow: 0 4px 10px rgba(0,0,0,0.4) !important;
     }
 
     /* 5. Separate the buttons horizontally so they don't overlap */
     button[onclick="toggleAntigravity()"] {
-      left: 20px !important;
+      left: 10px !important;
+      width: 30% !important; /* Assign explicit width shares */
     }
     
     #musicToggle {
-      right: 20px !important;
+      right: 10px !important;
+      left: auto !important;
+      width: 25% !important;
     }
     
     #restartLevelBtn {
-      /* Center this button or place it near the others */
-      right: auto !important; 
       left: 50% !important;
-      transform: translateX(-50%); /* Perfectly center it */
+      transform: translateX(-50%) !important;
+      width: 30% !important;
+      right: auto !important;
     }
 
     /* 6. Add extra padding to bottom of page so buttons don't cover levels */
     body {
       padding-bottom: 120px !important;
+    }
+
+    body::after {
+      content: "";
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 70px; /* Height of the button area */
+      background: rgba(26, 42, 108, 0.95); /* Dark Blue to match theme */
+      border-top: 1px solid rgba(255,255,255,0.2);
+      z-index: 9999; /* Just behind the buttons */
+      pointer-events: none; /* Let clicks pass through if needed */
     }
   }
 
