@@ -458,6 +458,9 @@
         // Save user + token for the game
         localStorage.setItem("cm_user", JSON.stringify(user));
         localStorage.setItem("cm_token", token);
+
+        history.replaceState(null, null, window.location.pathname + window.location.search);
+        
       } catch (err) {
         console.error("Invalid JWT token:", err);
       }
