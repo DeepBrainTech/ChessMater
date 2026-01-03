@@ -535,6 +535,16 @@ function loadPuzzle(puzzleData) {
         }
       }
     }
+
+    const LEVEL_BLOCK_DESCRIPTIONS = [
+      "Level 1: Introduction to basic movement and green solid blocks.",
+      "Level 2: Knights move differently—plan your jumps!",
+      "Level 3: Blue Phase Blocks can be passed from below only.",
+      "Level 4: Transformer blocks change your chess piece type!",
+      "Level 5: Objective blocks must be stepped on before the goal.",
+      "Level 6: Counter Goals lock after X moves—reach them in time!",
+      "Level 7: Beware of bombs! They move and explode."
+    ];
     
     updatePlayerCount();
     updateObjectiveCount();
@@ -564,15 +574,6 @@ function loadPuzzle(puzzleData) {
     }
   }
 
-    const LEVEL_BLOCK_DESCRIPTIONS = [
-      "Level 1: Introduction to basic movement and green solid blocks.",
-      "Level 2: Knights move differently—plan your jumps!",
-      "Level 3: Blue Phase Blocks can be passed from below only.",
-      "Level 4: Transformer blocks change your chess piece type!",
-      "Level 5: Objective blocks must be stepped on before the goal.",
-      "Level 6: Counter Goals lock after X moves—reach them in time!",
-      "Level 7: Beware of bombs! They move and explode."
-    ];
     drawBoard();
   } catch (error) {
     updateStatus("Error loading puzzle: " + error.message);
