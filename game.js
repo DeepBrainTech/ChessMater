@@ -1391,21 +1391,21 @@ function handleTransformerMenuClick(e) {
     bottom: startY + menuHeight + outerMargin + 20
   };
   
-  if (x < menuBounds.left || x > menuBounds.right || y < menuBounds.top || y > menuBounds.bottom) {
-    showTransformerMenu = false;
+  // if (x < menuBounds.left || x > menuBounds.right || y < menuBounds.top || y > menuBounds.bottom) {
+  //   showTransformerMenu = false;
     
-    if (transformerPosition) {
-      board[transformerPosition.row][transformerPosition.col] = CELL_TYPES.PLAYER;
-    }
+  //   if (transformerPosition) {
+  //     board[transformerPosition.row][transformerPosition.col] = CELL_TYPES.PLAYER;
+  //   }
     
-    transformerPosition = null;
-    transformerPlayerIndex = -1;
-    updateStatus("Transformation cancelled");
+  //   transformerPosition = null;
+  //   transformerPlayerIndex = -1;
+  //   updateStatus("Transformation cancelled");
     
-    if (gravityEnabled) {
-      applyGravity();
-    }
-  }
+  //   if (gravityEnabled) {
+  //     applyGravity();
+  //   }
+  // }
 }
 
 // --- Draw possible moves for selected player ---
