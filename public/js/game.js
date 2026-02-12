@@ -108,6 +108,7 @@ let antigravityEnabled = false;
 let risingPieces = [];
 let lastRiseTime = 0;
 const RISE_SPEED = 700; // pixels per second
+let currentLevelIndex = 0;
 
 
 // Transformer block variables
@@ -115,7 +116,9 @@ let showTransformerMenu = false;
 let transformerPosition = null;
 let transformerPlayerIndex = -1;
 
-document.getElementById("boardSize").addEventListener("change", (e) => {
+const boardSizeBtn = document.getElementById("boardSize");
+if (boardSizeBtn) {
+  boardSizeBtn.addEventListener("change", (e) => {
   const size = e.target.value;
   
   if (size === "custom") {
@@ -138,9 +141,8 @@ document.getElementById("boardSize").addEventListener("change", (e) => {
         break;
     }
   }
-});
+})};
 
-// Toggle Fog setting for the current level
 const fogToggle = document.getElementById("levelFogToggle");
 if (fogToggle) {
   fogToggle.addEventListener("change", (e) => {
@@ -150,7 +152,9 @@ if (fogToggle) {
   });
 }
 
-document.getElementById("applyCustomSize").addEventListener("click", () => {
+const applyBtn = document.getElementById("applyCustomSize");
+if (applyBtn) {
+   applyBtn.addEventListener("click", () => {
   const customRows = parseInt(document.getElementById("customRows").value) || DEFAULT_ROWS;
   const customCols = parseInt(document.getElementById("customCols").value) || DEFAULT_COLS;
   
@@ -159,9 +163,11 @@ document.getElementById("applyCustomSize").addEventListener("click", () => {
   const validCols = Math.min(Math.max(customCols, 4), 30);
   
   resizeBoard(validRows, validCols);
-});
+})};
 
-document.getElementById("modeSelect").addEventListener("change", (e) => {
+const modeSelect = document.getElementById("modeSelect");
+if (modeSelect) {
+   modeSelect.addEventListener("change", (e) => {
   mode = e.target.value;
   selectedPlayerIndex = -1; // Deselect when switching modes
   updateStatus(`Mode: ${mode === 'edit' ? 'Edit Mode' : 'Play Mode'}`);
@@ -180,29 +186,48 @@ document.getElementById("modeSelect").addEventListener("change", (e) => {
   if (mode === "play" && gravityEnabled && !gameWon) {
     applyGravity();
   }
-});
+})};
 
-document.getElementById("editMode").addEventListener("change", (e) => {
-  editMode = e.target.value;
-  updateStatus(`Tool: ${editMode.replace('player_', '')}`);
 
-  // Show counter input only for counter goal
-  document.getElementById("counterGoalSettings").style.display =
-    editMode === "counter_goal" ? "block" : "none";
-});
+const nextLevelBtn = document.getElementById("nextLevelBtn");
+if (nextLevelBtn) {
+  nextLevelBtn.addEventListener("click", () => {
+    if (currentLevelIndex < LEVELS.length - 1) {
+      currentLevelIndex++;
+      loadPuzzle(LEVELS[currentLevelIndex]);
+      nextLevelBtn.style.display = "none";
+      updateStatus(`Starting Level ${currentLevelIndex + 1}`);
+    } else {
+      updateStatus("You have beaten all levels! 🎉");
+    }
+  });
+}
 
 // gravityBtn.addEventListener("click", () => {
 //   applyGravity();
 // });
 
-downloadBtn.addEventListener("click", () => {
-  saveLevelToFolder();
-});
+if (downloadBtn) {
+  downloadBtn.addEventListener("click", () => {
+    saveLevelToFolder();
+  });
+}
 
-eraseBoardBtn.addEventListener("click", () => {
-  if (confirm("Are you sure you want to erase the entire board? This cannot be undone.")) {
-    eraseBoard();
-  }
+if (eraseBoardBtn) {
+  eraseBoardBtn.addEventListener("click", () => {
+    if (confirm("Are you sure you want to erase the entire board? This cannot be undone.")) {
+      eraseBoard();
+    }
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const tipToggle = document.getElementById('blockTipToggle');
+  const tipBox = document.getElementById('blockDescriptionBox');
+
+  tipToggle.addEventListener('click', () => {
+    tipBox.classList.toggle('hidden');
+  });
 });
 
 // Function to resize the board
@@ -253,8 +278,20 @@ function resizeBoard(newRows, newCols) {
 function resizeCanvas() {
   canvas.width = COLS * TILE_SIZE;
   canvas.height = ROWS * TILE_SIZE;
-  canvas.style.width = `${COLS * TILE_SIZE}px`;
-  canvas.style.height = `${ROWS * TILE_SIZE}px`;
+
+  // Get available screen space
+  // We subtract a little (e.g., 100px) to leave room for the UI buttons
+  const maxWidth = window.innerWidth;
+  const maxHeight = window.innerHeight - 80; 
+
+  // Calculate the best scale to fit BOTH width and height
+  const scaleX = maxWidth / canvas.width;
+  const scaleY = maxHeight / canvas.height;
+  const scaleFactor = Math.min(scaleX, scaleY, 1); // Never scale up past 100%
+
+  // Apply the scale
+  canvas.style.width = (canvas.width * scaleFactor) + "px";
+  canvas.style.height = (canvas.height * scaleFactor) + "px";
 }
 
 function updateStatus(message) {
@@ -367,7 +404,7 @@ function saveLevelToFolder() {
     goal: goal, // This should include type and counter if it's a counter goal
     objectives: objectives,
     bombs: bombs, // ✅ Add bombs to saved data
-    fog: document.getElementById("levelFogToggle") ? document.getElementById("levelFogToggle").checked : false,
+    fog: fogEnabled,
     createdAt: new Date().toISOString()
   };
   
@@ -403,7 +440,7 @@ function loadPuzzle(puzzleData) {
     fogEnabled = !!puzzleData.fog; // Default to false if property is missing
     const fogToggleBtn = document.getElementById("levelFogToggle");
     if (fogToggleBtn) {
-    fogToggleBtn.checked = fogEnabled;
+      fogToggleBtn.checked = fogEnabled;
     }
     
     // Resize board first
@@ -498,6 +535,16 @@ function loadPuzzle(puzzleData) {
         }
       }
     }
+
+    const LEVEL_BLOCK_DESCRIPTIONS = [
+      "Level 1: Introduction to basic movement and green solid blocks.",
+      "Level 2: Knights move differently—plan your jumps!",
+      "Level 3: Blue Phase Blocks can be passed from below only.",
+      "Level 4: Transformer blocks change your chess piece type!",
+      "Level 5: Objective blocks must be stepped on before the goal.",
+      "Level 6: Counter Goals lock after X moves—reach them in time!",
+      "Level 7: Beware of bombs! They move and explode."
+    ];
     
     updatePlayerCount();
     updateObjectiveCount();
@@ -509,6 +556,24 @@ function loadPuzzle(puzzleData) {
     if (typeof enablePlayerControls === "function") {
         enablePlayerControls();
     }
+    // --- Show block tip only for first 7 levels ---
+    const descBox = document.getElementById("blockDescriptionBox");
+    const descText = document.getElementById("blockDescription");
+
+    // Determine which level was loaded
+    currentLevelIndex = LEVELS.findIndex(lvl => lvl.name === puzzleData.name);
+    if (descBox && descText) {
+    if (currentLevelIndex >= 0 && currentLevelIndex < 7) {
+      descBox.style.display = "block";
+      descText.textContent = LEVEL_BLOCK_DESCRIPTIONS[currentLevelIndex];
+    } else if (currentLevelIndex === 30) {
+      descBox.style.display = "block";
+      descText.textContent = "Level 31: ⚔️ Welcome to Fog of War! In this level, the board is shrouded in mystery — you can only see tiles your pieces can reach. Plan your moves carefully and explore the unknown. What lies beyond could be danger... or your path to victory. 🎯 Tip: Use long-range pieces like the Queen or Bishop to reveal more of the board quickly.";
+    } else {
+      descBox.style.display = "none";
+    }
+  }
+
     drawBoard();
   } catch (error) {
     updateStatus("Error loading puzzle: " + error.message);
@@ -774,6 +839,15 @@ function updateFallingPieces() {
   }
 }
 
+function showNextLevelButton() {
+  const nextBtn = document.getElementById("nextLevelBtn");
+  if (currentLevelIndex < LEVELS.length - 1) {
+    nextBtn.style.display = "inline-block";
+  } else {
+    nextBtn.style.display = "none";
+  }
+}
+
 
 function handleGravityTeleport(player, teleportType) {
   // Get all teleport blocks of the same color
@@ -872,7 +946,52 @@ function checkGravityTeleportation() {
 }
 
 // Check if any player has reached the goal
-function checkWinCondition() {
+async function checkWinCondition() {
+  if (gameWon) {
+    // Unlock next level
+    const res = await fetch("https://chessmater-production.up.railway.app/progress", {
+      credentials: 'include',
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("cm_token")}`
+      }
+    });
+    const data = await res.json();
+    const maxUnlocked = parseInt(data.maxUnlocked || "1");
+    const nextLevel = currentLevelIndex + 2;
+
+    if (nextLevel > maxUnlocked) {
+      try {
+        const res = await fetch("https://chessmater-production.up.railway.app/progress", {
+          method: "POST",
+          credentials: 'include',
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${localStorage.getItem("cm_token")}`,
+          },
+          body: JSON.stringify({ maxUnlocked: nextLevel })
+        });
+
+        const data = await res.json();
+        console.log("🔐 Progress updated:", data);
+    
+        if (!res.ok) {
+          // Use 'data' because you already read the error message into it
+          console.error("❌ Failed to update progress:", res.status, data);
+        } else {
+          console.log("✅ Progress updated to level", nextLevel);
+        }
+    
+        localStorage.setItem("cm_maxUnlocked", nextLevel.toString());
+    
+      } catch (err) {
+        console.error("❌ Error sending POST /progress:", err);
+      }
+    }
+
+    loadLevels();
+
+    showNextLevelButton();
+  }
   if (gameWon || !goal) return;
 
   // Counter goal locked?
@@ -888,6 +1007,7 @@ function checkWinCondition() {
       gameWon = true;
       updateStatus("🎉 Puzzle solved! All objectives completed and goal reached!");
       triggerConfetti();
+      showNextLevelButton();
       break;
     }
   }
@@ -1271,21 +1391,21 @@ function handleTransformerMenuClick(e) {
     bottom: startY + menuHeight + outerMargin + 20
   };
   
-  if (x < menuBounds.left || x > menuBounds.right || y < menuBounds.top || y > menuBounds.bottom) {
-    showTransformerMenu = false;
+  // if (x < menuBounds.left || x > menuBounds.right || y < menuBounds.top || y > menuBounds.bottom) {
+  //   showTransformerMenu = false;
     
-    if (transformerPosition) {
-      board[transformerPosition.row][transformerPosition.col] = CELL_TYPES.PLAYER;
-    }
+  //   if (transformerPosition) {
+  //     board[transformerPosition.row][transformerPosition.col] = CELL_TYPES.PLAYER;
+  //   }
     
-    transformerPosition = null;
-    transformerPlayerIndex = -1;
-    updateStatus("Transformation cancelled");
+  //   transformerPosition = null;
+  //   transformerPlayerIndex = -1;
+  //   updateStatus("Transformation cancelled");
     
-    if (gravityEnabled) {
-      applyGravity();
-    }
-  }
+  //   if (gravityEnabled) {
+  //     applyGravity();
+  //   }
+  // }
 }
 
 // --- Draw possible moves for selected player ---
@@ -1987,8 +2107,8 @@ function drawBoard() {
 
 // --- Confetti Celebration ---
 function triggerConfetti() {
-  //const Winsound = new Audio("woo-hoo-82843.mp3");
-  const Winsound = new Audio("completion.mp3");
+  //const Winsound = new Audio("assets/audio/woo-hoo-82843.mp3");
+  const Winsound = new Audio("assets/audio/completion.mp3");
   Winsound.currentTime = 0;
   Winsound.volume = 0.7;
   Winsound.play().catch(err => console.log("Audio err", err));
@@ -2733,6 +2853,28 @@ function restartLevel() {
 
 canvas.addEventListener("click", handleMove);
 
+// Touch support
+canvas.addEventListener("touchstart", (e) => {
+  e.preventDefault();
+
+  const touch = e.touches[0];
+  const rect = canvas.getBoundingClientRect();
+
+  // Adjust for scaling
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+
+  const x = (touch.clientX - rect.left) * scaleX;
+  const y = (touch.clientY - rect.top) * scaleY;
+
+  const simulatedEvent = {
+    clientX: x + rect.left,
+    clientY: y + rect.top
+  };
+
+  handleMove(simulatedEvent);
+}, { passive: false });
+
 // --- Add keyboard controls for deselection ---
 document.addEventListener("keydown", (e) => {
   if (mode === "play" && e.key === "Escape") {
@@ -2806,10 +2948,22 @@ confettiStyle.textContent = `
     }
   }
 `;
+
+document.addEventListener('DOMContentLoaded', () => {
+  const blockBox = document.getElementById('blockDescriptionBox');
+  
+  if (blockBox) {
+    blockBox.addEventListener('click', () => {
+      blockBox.classList.toggle('expanded');
+    });
+  }
+});
 document.head.appendChild(confettiStyle);
+window.addEventListener('resize', resizeCanvas);
 
 // Initialize the game
 initializeCanvas();
+resizeCanvas();
 updateStatus("Welcome to Multi-Player Chess Puzzle with Gravity! Start by placing your player pieces.");
 updatePlayerCount();
 updateObjectiveCount();
