@@ -782,6 +782,58 @@
       window.authReady = Promise.resolve();
     }
 
+    // 调试助手：检查 token 状态
+    window.checkTokenStatus = function() {
+      console.log("🔐 Token Status:");
+      console.log("  - Token exists:", !!window.cmToken);
+      console.log("  - User exists:", !!window.cmUser);
+      if (window.cmToken) {
+        try {
+          const parts = window.cmToken.split('.');
+          const payload = JSON.parse(atob(parts[1]));
+          console.log("  - User ID:", payload.user_id);
+          console.log("  - Username:", payload.username);
+          console.log("  - Issued at:", new Date(payload.iat * 1000).toLocaleString());
+          console.log("  - Expires at:", new Date(payload.exp * 1000).toLocaleString());
+          const now = Math.floor(Date.now() / 1000);
+          console.log("  - Time until expiry:", Math.floor((payload.exp - now) / 60), "minutes");
+          console.log("  - Token is valid:", payload.exp > now);
+        } catch (err) {
+          console.error("  - Error parsing token:", err);
+        }
+      }
+      if (window.cmUser) {
+        console.log("  - Current user:", window.cmUser);
+      }
+    };
+
+    // 检测可能干扰的浏览器扩展
+    window.detectInterference = function() {
+      console.log("🔍 Checking for browser extension interference:");
+      
+      // 检查 fetch 是否被修改
+      const isFetchModified = fetch.toString().includes('[native code]') === false;
+      console.log("  - fetch modified:", isFetchModified);
+      
+      // 检查是否有 installHook
+      if (window.installHook || document.querySelector('script[src*="installHook"]')) {
+        console.warn("  ⚠️ Detected installHook - this may be intercepting requests!");
+      }
+      
+      // 检查常见的扩展特征
+      const extensions = [];
+      if (window.chrome && window.chrome.runtime) extensions.push("Chrome extension detected");
+      if (document.documentElement.getAttribute('data-extension')) extensions.push("Extension marker found");
+      
+      if (extensions.length > 0) {
+        console.log("  - Extensions detected:", extensions);
+        console.warn("  ⚠️ Browser extensions may be interfering with network requests");
+        console.log("  💡 Try testing in incognito/private mode with extensions disabled");
+      } else {
+        console.log("  ✅ No obvious extension interference detected");
+      }
+    };
+
     function updateCurrentUserName() {
       const el1 = document.getElementById("startScreenUserName");
       const el2 = document.getElementById("mainContainerUserName");

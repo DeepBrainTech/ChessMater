@@ -621,7 +621,7 @@ function setupFileUpload() {
 
 function decrementCounterAfterMove() {
   // If landing on goal won the game, do nothing
-  checkWinCondition();
+  checkWinCondition(); // async function, will run in background
   if (gameWon) return;
 
   if (goal && goal.type === "counter" && goal.counter > 0) {
@@ -951,72 +951,96 @@ function checkGravityTeleportation() {
 }
 
 // Check if any player has reached the goal
-async function checkWinCondition() {
-  if (gameWon) {
-    // Unlock next level
-    let maxUnlocked = 1;
-    try {
-      const token = window.cmToken;
-      if (!token) {
-        maxUnlocked = parseInt(localStorage.getItem("cm_maxUnlocked") || "1", 10);
-      } else {
-        const res = await fetch("https://chessmater-production.up.railway.app/progress", {
-          credentials: 'include',
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        if (res.ok) {
-          const data = await res.json();
-          maxUnlocked = parseInt(data.maxUnlocked || "1", 10);
-        } else {
-          // GET 失败时不清空 token（可能是临时网络问题），仅记录并使用本地进度
-          console.warn(`⚠️ GET /progress failed with ${res.status}, using local progress`);
-          maxUnlocked = parseInt(localStorage.getItem("cm_maxUnlocked") || "1", 10);
-        }
-      }
-    } catch (err) {
-      console.warn("⚠️ Could not fetch progress from server:", err);
-      maxUnlocked = parseInt(localStorage.getItem("cm_maxUnlocked") || "1", 10);
-    }
-    
-    const nextLevel = currentLevelIndex + 2;
-    const newMaxUnlocked = Math.max(maxUnlocked, nextLevel);
+let isCheckingWinCondition = false; // 防止重复调用
 
-    if (nextLevel > maxUnlocked) {
-      const token = window.cmToken;
-      if (token) {
-        try {
+async function checkWinCondition() {
+  if (isCheckingWinCondition) {
+    console.log("⏳ Win condition check already in progress, skipping...");
+    return;
+  }
+  
+  if (gameWon) {
+    if (isCheckingWinCondition) return; // 双重检查
+    isCheckingWinCondition = true;
+    
+    try {
+      // 等待 token 验证完成
+      await (window.authReady || Promise.resolve());
+      
+      // Unlock next level
+      let maxUnlocked = 1;
+      try {
+        const token = window.cmToken;
+        if (!token) {
+          maxUnlocked = parseInt(localStorage.getItem("cm_maxUnlocked") || "1", 10);
+        } else {
           const res = await fetch("https://chessmater-production.up.railway.app/progress", {
-            method: "POST",
             credentials: 'include',
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({ maxUnlocked: nextLevel })
+            headers: { Authorization: `Bearer ${token}` }
           });
           if (res.ok) {
             const data = await res.json();
-            console.log("🔐 Progress updated:", data);
+            maxUnlocked = parseInt(data.maxUnlocked || "1", 10);
           } else {
-            console.error(`❌ Failed to update progress: ${res.status}`);
-            if (res.status === 401) {
-              console.error('Token was rejected. Clearing session.');
-              window.cmToken = null;
-              window.cmUser = null;
-            }
+            // GET 失败时不清空 token（可能是临时网络问题），仅记录并使用本地进度
+            const errorData = await res.json().catch(() => ({}));
+            console.warn(`⚠️ GET /progress failed with ${res.status}`, errorData);
+            maxUnlocked = parseInt(localStorage.getItem("cm_maxUnlocked") || "1", 10);
           }
-        } catch (err) {
-          console.error("❌ Error sending POST /progress:", err);
         }
+      } catch (err) {
+        console.warn("⚠️ Could not fetch progress from server:", err);
+        maxUnlocked = parseInt(localStorage.getItem("cm_maxUnlocked") || "1", 10);
       }
-      localStorage.setItem("cm_maxUnlocked", nextLevel.toString());
-    }
+      
+      const nextLevel = currentLevelIndex + 2;
+      const newMaxUnlocked = Math.max(maxUnlocked, nextLevel);
 
-    if (typeof loadLevels === 'function') {
-      loadLevels(newMaxUnlocked);
-    }
+      if (nextLevel > maxUnlocked) {
+        const token = window.cmToken;
+        if (token) {
+          try {
+            console.log("📤 Sending progress update:", { maxUnlocked: nextLevel });
+            const res = await fetch("https://chessmater-production.up.railway.app/progress", {
+              method: "POST",
+              credentials: 'include',
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify({ maxUnlocked: nextLevel })
+            });
+            if (res.ok) {
+              const data = await res.json();
+              console.log("🔐 Progress updated:", data);
+            } else {
+              const errorData = await res.json().catch(() => ({}));
+              console.error(`❌ Failed to update progress: ${res.status}`, errorData);
+              if (res.status === 401) {
+                console.error('Token was rejected. Error:', errorData.error);
+                window.cmToken = null;
+                window.cmUser = null;
+                // 可选：提示用户重新登录
+                if (typeof updateLoginPromptVisibility === 'function') {
+                  updateLoginPromptVisibility();
+                }
+              }
+            }
+          } catch (err) {
+            console.error("❌ Error sending POST /progress:", err);
+          }
+        }
+        localStorage.setItem("cm_maxUnlocked", nextLevel.toString());
+      }
 
-    showNextLevelButton();
+      if (typeof loadLevels === 'function') {
+        loadLevels(newMaxUnlocked);
+      }
+
+      showNextLevelButton();
+    } finally {
+      isCheckingWinCondition = false;
+    }
   }
   if (gameWon || !goal) return;
 

@@ -68,8 +68,12 @@ app.use(express.json());
  * Authenticate ChessMater JWT (same secret/audience/issuer as main portal)
  */
 function authenticate(req, res, next) {
-  const token = req.headers.authorization?.split(' ')[1];
+  const authHeader = req.headers.authorization;
+  console.log('🔐 Auth header:', authHeader ? `Bearer ${authHeader.split(' ')[1]?.substring(0, 20)}...` : 'missing');
+  
+  const token = authHeader?.split(' ')[1];
   if (!token) {
+    console.error('❌ No token provided in Authorization header');
     return res.status(401).json({ error: 'No token provided' });
   }
 
@@ -81,6 +85,8 @@ function authenticate(req, res, next) {
       issuer: CHESSMATER_ISS
     });
 
+    console.log('✅ Token verified for user:', decoded.username || decoded.user_id);
+
     // Attach decoded user to request
     req.user = {
       user_id: decoded.user_id,
@@ -89,7 +95,7 @@ function authenticate(req, res, next) {
     };
     next();
   } catch (err) {
-    console.error('Token verification failed:', err.name, err.message);
+    console.error('❌ Token verification failed:', err.name, err.message);
     if (err.name === 'TokenExpiredError') {
       return res.status(401).json({ error: 'Token expired' });
     } else if (err.name === 'JsonWebTokenError') {
@@ -257,17 +263,25 @@ app.get('/init', async (req, res) => {
 });
 
 app.get('/progress', authenticate, async (req, res) => {
-  const result = await pool.query(
-    'SELECT max_unlocked FROM user_progress WHERE user_id = $1',
-    [req.user.user_id]
-  );
-  res.json({ maxUnlocked: result.rows[0]?.max_unlocked || 1 });
+  console.log('📥 GET /progress for user:', req.user.user_id);
+  try {
+    const result = await pool.query(
+      'SELECT max_unlocked FROM user_progress WHERE user_id = $1',
+      [req.user.user_id]
+    );
+    const maxUnlocked = result.rows[0]?.max_unlocked || 1;
+    console.log('✅ Returning maxUnlocked:', maxUnlocked);
+    res.json({ maxUnlocked });
+  } catch (err) {
+    console.error('❌ Error fetching progress:', err);
+    res.status(500).json({ error: 'Failed to fetch progress' });
+  }
 });
 
 app.post('/progress', authenticate, async (req, res) => {
     const { maxUnlocked } = req.body;
   
-    console.log("📥 Received progress update from user", req.user.id, "with maxUnlocked:", maxUnlocked);
+    console.log("📥 POST /progress - user:", req.user.user_id, "maxUnlocked:", maxUnlocked);
   
     try {
       await pool.query(
@@ -279,6 +293,7 @@ app.post('/progress', authenticate, async (req, res) => {
         `,
         [req.user.user_id, maxUnlocked]
       );
+      console.log("✅ Progress saved successfully");
       res.json({ success: true });
     } catch (err) {
       console.error("❌ Error saving progress:", err);
@@ -288,21 +303,35 @@ app.post('/progress', authenticate, async (req, res) => {
 
 app.post('/saveLevel', authenticate, async (req, res) => {
   const { levelName, levelData } = req.body;
-  await pool.query(
-    `INSERT INTO levels (user_id, level_name, level_data)
-     VALUES ($1, $2, $3)`,
-    [req.user.id, levelName, levelData]
-  );
-  res.json({ success: true });
+  console.log('📥 POST /saveLevel for user:', req.user.user_id);
+  try {
+    await pool.query(
+      `INSERT INTO levels (user_id, level_name, level_data)
+       VALUES ($1, $2, $3)`,
+      [req.user.user_id, levelName, levelData]
+    );
+    console.log('✅ Level saved successfully:', levelName);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('❌ Error saving level:', err);
+    res.status(500).json({ error: 'Failed to save level' });
+  }
 });
 
 app.get('/loadLevels', authenticate, async (req, res) => {
-  const result = await pool.query(
-    `SELECT level_name, level_data FROM levels WHERE user_id = $1
-     ORDER BY created_at DESC`,
-    [req.user.id]
-  );
-  res.json(result.rows);
+  console.log('📥 GET /loadLevels for user:', req.user.user_id);
+  try {
+    const result = await pool.query(
+      `SELECT level_name, level_data FROM levels WHERE user_id = $1
+       ORDER BY created_at DESC`,
+      [req.user.user_id]
+    );
+    console.log('✅ Loaded levels:', result.rows.length);
+    res.json(result.rows);
+  } catch (err) {
+    console.error('❌ Error loading levels:', err);
+    res.status(500).json({ error: 'Failed to load levels' });
+  }
 });
 
 app.get('/leaderboard', authenticate, async (req, res) => {
