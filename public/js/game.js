@@ -977,10 +977,6 @@ function syncProgressAfterWin() {
     loadLevels(mergedUnlocked);
   }
 
-  if (!window.cmUser || !window.cmSessionReady) {
-    return;
-  }
-
   const progressData = {
     maxUnlocked: mergedUnlocked,
     level: solvedLevel,
@@ -988,12 +984,18 @@ function syncProgressAfterWin() {
   };
   const jsonBody = JSON.stringify(progressData);
 
-  fetch("https://chessmater-production.up.railway.app/progress", {
+  const apiBaseUrl = window.API_BASE_URL || 'https://chessmater-production.up.railway.app';
+  const headers = {
+    "Content-Type": "application/json"
+  };
+  if (window.cmToken) {
+    headers.Authorization = `Bearer ${window.cmToken}`;
+  }
+
+  fetch(`${apiBaseUrl}/progress`, {
     method: "POST",
     credentials: 'include',
-    headers: {
-      "Content-Type": "application/json"
-    },
+    headers,
     body: jsonBody
   }).then(() => {}).catch(() => {});
 }

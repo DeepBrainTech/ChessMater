@@ -764,17 +764,54 @@
       localStorage.setItem("cm_locale", locale);
     }
 
+    // 检测是否是本地开发环境
+    function isPrivateLanHost(hostname) {
+      if (!hostname) return false;
+      if (/^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname)) return true;
+      if (/^192\.168\.\d{1,3}\.\d{1,3}$/.test(hostname)) return true;
+      const match172 = hostname.match(/^172\.(\d{1,3})\.\d{1,3}\.\d{1,3}$/);
+      if (match172) {
+        const second = Number(match172[1]);
+        return second >= 16 && second <= 31;
+      }
+      return false;
+    }
+
+    const host = window.location.hostname;
+    const isLocalDev = host === 'localhost' || 
+                       host === '127.0.0.1' || 
+                       host === '0.0.0.0' ||
+                       host === '' ||
+                       isPrivateLanHost(host);
+    // 全局API基础URL，供其他函数使用
+    window.API_BASE_URL = isLocalDev ? `http://${host || 'localhost'}:3000` : 'https://chessmater-production.up.railway.app';
+
     // 仅使用主站 URL 带来的 token，会话内用 window 保存，不使用 localStorage
     window.cmToken = null;
     window.cmUser = null;
     window.cmSessionReady = false;
     let user = null;
-    if (gameToken) {
+    
+    // 本地开发模式：自动设置测试用户
+    if (isLocalDev && !gameToken) {
+      console.log('🔧 本地开发模式：自动设置测试用户');
+      window.cmToken = 'dev-token';
+      window.cmUser = {
+        id: 999,
+        username: 'dev_user',
+        portal_user_id: '999',
+        user_id: 999
+      };
+      window.cmSessionReady = true;
+      window.authReady = Promise.resolve();
+      updateCurrentUserName();
+      if (typeof window.updateLoginPromptVisibility === 'function') window.updateLoginPromptVisibility();
+    } else if (gameToken) {
       try {
         const payload = gameToken.split(".")[1];
         user = JSON.parse(atob(payload));
 
-        window.authReady = fetch('https://chessmater-production.up.railway.app/api/auth/verify', {
+        window.authReady = fetch(`${window.API_BASE_URL}/api/auth/verify`, {
           method: 'POST',
           credentials: 'include',
           headers: {
@@ -1073,7 +1110,7 @@
 
       function getLeaderboardRequestUrl() {
         const raw = leaderboardModeSelect ? leaderboardModeSelect.value : "progress";
-        const base = "https://chessmater-production.up.railway.app/leaderboard";
+        const base = `${window.API_BASE_URL || 'https://chessmater-production.up.railway.app'}/leaderboard`;
         if (!raw || raw === "progress") return base;
         if (raw.startsWith("level:")) {
           const level = Number.parseInt(raw.split(":")[1], 10);
@@ -1259,15 +1296,15 @@
       try {
         // 等待 token 验证完成
         await (window.authReady || Promise.resolve());
-        
-        // 未登录用户：只能玩第一关
-        if (!window.cmUser || !window.cmSessionReady) {
-          return mergeMaxUnlocked(1);
+        const headers = {};
+        if (window.cmToken) {
+          headers.Authorization = `Bearer ${window.cmToken}`;
         }
-        
-        // 已登录用户：从服务器获取进度（使用会话 cookie）
-        const res = await fetch("https://chessmater-production.up.railway.app/progress", {
+
+        // 尝试从服务器获取进度（优先会话 cookie，cookie 受限时回退到 Bearer token）
+        const res = await fetch(`${window.API_BASE_URL || 'https://chessmater-production.up.railway.app'}/progress`, {
           credentials: 'include',
+          headers,
         });
 
         if (!res.ok) {
