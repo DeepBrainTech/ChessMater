@@ -6,65 +6,79 @@ const pool = require('./db');
 
 const app = express();
 
-// ChessMater JWT 配置（必须与主站点一致）
+// ChessMater JWT config (must match main portal)
 const CHESSMATER_SECRET = process.env.CHESSMATER_JWT_SECRET || 'change-this-chessmater-secret';
 const CHESSMATER_ALG = process.env.CHESSMATER_JWT_ALG || 'HS256';
 const CHESSMATER_AUD = process.env.CHESSMATER_JWT_AUD || 'chessmater';
 const CHESSMATER_ISS = process.env.CHESSMATER_JWT_ISS || 'main-portal';
 
+const ALLOWED_ORIGINS = [
+  'https://chessmater.pages.dev',
+  'https://chessmater-production.up.railway.app',
+  'https://chessmaster.deepbraintechnology.com',
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+  'http://localhost:5500',
+  'http://127.0.0.1:5500',
+];
+
+function isOriginAllowed(origin) {
+  if (!origin) return true;
+  if (ALLOWED_ORIGINS.includes(origin)) return true;
+  if (origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:') || origin.startsWith('http://0.0.0.0:')) return true;
+  if (origin.includes('pages.dev') || origin.includes('deepbraintechnology.com')) return true;
+  return false;
+}
+
+// Handle preflight first: OPTIONS returns CORS headers without auth
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (isOriginAllowed(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin || '*');
+  }
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  if (req.method === 'OPTIONS') {
+    return res.status(204).end();
+  }
+  next();
+});
+
 const corsOptions = {
-    origin: function (origin, callback) {
-      if (!origin) return callback(null, true);
-      // Allow local development servers
-      const isLocalDev = origin.startsWith('http://localhost:') || 
-                        origin.startsWith('http://127.0.0.1:') ||
-                        origin.startsWith('http://0.0.0.0:');
-      // Allow production domains
-      const isProduction = origin === 'https://chessmater.pages.dev' ||
-                          origin === 'https://chessmater-production.up.railway.app' ||
-                          origin === 'https://chessmaster.deepbraintechnology.com' ||
-                          origin.includes('pages.dev') ||
-                          origin.includes('deepbraintechnology.com');
-      
-      if (isLocalDev || isProduction) {
-        return callback(null, true);
-      } else {
-        console.warn('CORS blocked origin:', origin);
-        return callback(new Error('Not allowed by CORS'));
-      }
-    },
-    credentials: true,
-    methods: ['GET', 'POST', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-  };
-  
-  // Apply CORS middleware
-  app.use(cors(corsOptions));
-  
-  // Explicitly handle OPTIONS preflight requests
-  app.options('*', cors(corsOptions));
-  
-  app.use(express.json());
+  origin: function (origin, callback) {
+    if (isOriginAllowed(origin)) return callback(null, true);
+    console.warn('CORS blocked origin:', origin);
+    return callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+};
+
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
+
+app.use(express.json());
 
 /**
- * 验证 ChessMater JWT token
- * 使用与主站点相同的密钥、audience 和 issuer 进行验证
+ * Authenticate ChessMater JWT (same secret/audience/issuer as main portal)
  */
 function authenticate(req, res, next) {
   const token = req.headers.authorization?.split(' ')[1];
   if (!token) {
-    return res.status(401).json({ error: '未提供 token' });
+    return res.status(401).json({ error: 'No token provided' });
   }
 
   try {
-    // 使用 jwt.verify 验证 token（包括签名、audience、issuer）
+    // Verify token (signature, audience, issuer)
     const decoded = jwt.verify(token, CHESSMATER_SECRET, {
       algorithms: [CHESSMATER_ALG],
       audience: CHESSMATER_AUD,
       issuer: CHESSMATER_ISS
     });
 
-    // 将解码后的用户信息附加到请求对象
+    // Attach decoded user to request
     req.user = {
       user_id: decoded.user_id,
       username: decoded.username,
@@ -72,51 +86,50 @@ function authenticate(req, res, next) {
     };
     next();
   } catch (err) {
-    console.error('Token 验证失败:', err.message);
+    console.error('Token verification failed:', err.message);
     if (err.name === 'TokenExpiredError') {
-      return res.status(401).json({ error: 'Token 已过期' });
+      return res.status(401).json({ error: 'Token expired' });
     } else if (err.name === 'JsonWebTokenError') {
-      return res.status(401).json({ error: '无效的 token' });
+      return res.status(401).json({ error: 'Invalid token' });
     } else {
-      return res.status(401).json({ error: 'Token 验证失败' });
+      return res.status(401).json({ error: 'Token verification failed' });
     }
   }
 }
 
 /**
- * Token 验证端点 - 验证 token 并自动创建/查找用户
- * 与 QuantumGo 类似的用户鉴定流程
+ * Token verify endpoint: validate token and create/find user (QuantumGo-style flow)
  */
 app.post('/api/auth/verify', async (req, res) => {
   const token = req.headers.authorization?.split(' ')[1];
   if (!token) {
     return res.status(401).json({ 
       success: false,
-      message: '未提供 token' 
+      message: 'No token provided' 
     });
   }
 
   try {
-    // 验证 JWT token
+    // Verify JWT
     const decoded = jwt.verify(token, CHESSMATER_SECRET, {
       algorithms: [CHESSMATER_ALG],
       audience: CHESSMATER_AUD,
       issuer: CHESSMATER_ISS
     });
 
-    // 检查 token 是否过期（额外检查）
+    // Extra expiry check
     const now = Math.floor(Date.now() / 1000);
     if (decoded.exp && decoded.exp < now) {
       return res.status(401).json({
         success: false,
-        message: '令牌已过期 | Token expired'
+        message: 'Token expired'
       });
     }
 
     const username = decoded.username;
     const portalUserId = decoded.user_id;
 
-    // 检查用户是否存在，不存在则自动创建
+    // Find or create user
     let user;
     try {
       const userResult = await pool.query(
@@ -145,7 +158,7 @@ app.post('/api/auth/verify', async (req, res) => {
       console.error('数据库操作失败:', dbErr);
       return res.status(500).json({
         success: false,
-        message: `创建用户失败 | Failed to create user: ${dbErr.message}`
+        message: `Failed to create user: ${dbErr.message}`
       });
     }
 
@@ -158,21 +171,21 @@ app.post('/api/auth/verify', async (req, res) => {
       }
     });
   } catch (err) {
-    console.error('Token 验证失败:', err.message);
+    console.error('Token verification failed:', err.message);
     if (err.name === 'TokenExpiredError') {
       return res.status(401).json({
         success: false,
-        message: '令牌已过期 | Token expired'
+        message: 'Token expired'
       });
     } else if (err.name === 'JsonWebTokenError') {
       return res.status(401).json({
         success: false,
-        message: `令牌无效或已过期 | Invalid token: ${err.message}`
+        message: `Invalid or expired token: ${err.message}`
       });
     } else {
       return res.status(401).json({
         success: false,
-        message: `Token 验证失败: ${err.message}`
+        message: `Token verification failed: ${err.message}`
       });
     }
   }

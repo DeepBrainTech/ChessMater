@@ -366,6 +366,25 @@
       background-color: #8e44ad;
     }
 
+    #loginPrompt {
+      margin-top: 12px;
+      padding: 10px 16px;
+      background: rgba(231, 76, 60, 0.2);
+      border: 1px solid #e74c3c;
+      border-radius: 8px;
+      color: #fff;
+      font-size: 0.95rem;
+      text-align: center;
+    }
+    #loginPrompt a {
+      color: #f1c40f;
+      text-decoration: underline;
+      margin-left: 6px;
+    }
+    #loginPrompt a:hover {
+      color: #f39c12;
+    }
+
     .leaderboard-modal {
       display: none;
       position: fixed;
@@ -738,12 +757,14 @@
             localStorage.setItem("cm_user", JSON.stringify(data.user));
             localStorage.setItem("cm_token", gameToken);
             updateCurrentUserName();
+            if (typeof window.updateLoginPromptVisibility === 'function') window.updateLoginPromptVisibility();
           } else {
             console.error('Token 验证失败:', data.message);
             // 即使验证失败，也保存 token 以便后续重试
             localStorage.setItem("cm_token", gameToken);
             localStorage.setItem("cm_user", JSON.stringify(user));
             updateCurrentUserName();
+            if (typeof window.updateLoginPromptVisibility === 'function') window.updateLoginPromptVisibility();
           }
         })
         .catch(err => {
@@ -752,6 +773,7 @@
           localStorage.setItem("cm_token", gameToken);
           localStorage.setItem("cm_user", JSON.stringify(user));
           updateCurrentUserName();
+          if (typeof window.updateLoginPromptVisibility === 'function') window.updateLoginPromptVisibility();
         });
 
         // 清除 URL hash（保持 URL 清洁）
@@ -793,6 +815,7 @@
   <div id="startScreen" class="start-screen">
     <h1>ChessMater</h1>
     <p id="startScreenUserName" class="current-user-name"></p>
+    <p id="loginPrompt" class="login-prompt" style="display: none;">Please log in to play. <a href="https://game.deepbraintechnology.com/" target="_blank">Go to main portal to log in</a></p>
     <div class="start-screen-buttons">
       <button id="startButton">Start Game</button>
       <button id="leaderboardButton">🏆 Leaderboard</button>
@@ -992,6 +1015,10 @@
 
       if (leaderboardButton) {
         leaderboardButton.addEventListener("click", () => {
+          if (!isLoggedIn()) {
+            alert("Please log in to view the leaderboard");
+            return;
+          }
           leaderboardModal.classList.add("active");
           loadLeaderboard();
         });
@@ -1202,7 +1229,17 @@
       drawBoard();
     }
     
+    function isLoggedIn() {
+      return !!(localStorage.getItem("cm_token") && localStorage.getItem("cm_user"));
+    }
+    function updateLoginPromptVisibility() {
+      const el = document.getElementById("loginPrompt");
+      if (el) el.style.display = isLoggedIn() ? "none" : "block";
+    }
+    window.updateLoginPromptVisibility = updateLoginPromptVisibility;
+
     document.addEventListener("DOMContentLoaded", () => {
+    updateLoginPromptVisibility();
     // Load level buttons
     loadLevels();
 
@@ -1263,6 +1300,10 @@
     const startButton = document.getElementById("startButton");
     if (startButton) {
         startButton.addEventListener("click", () => {
+        if (!isLoggedIn()) {
+          alert("Please log in to continue playing");
+          return;
+        }
         const startScreen = document.getElementById("startScreen");
         if (startScreen) {
             startScreen.style.display = "none";
