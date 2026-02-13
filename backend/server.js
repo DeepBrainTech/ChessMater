@@ -11,6 +11,11 @@ const CHESSMATER_SECRET = process.env.CHESSMATER_JWT_SECRET || 'CHESSMATER';
 const CHESSMATER_ALG = process.env.CHESSMATER_JWT_ALG || 'HS256';
 const CHESSMATER_AUD = process.env.CHESSMATER_JWT_AUD || 'chessmater';
 const CHESSMATER_ISS = process.env.CHESSMATER_JWT_ISS || 'main-portal';
+const CHESSMATER_SESSION_SECRET = process.env.CHESSMATER_SESSION_JWT_SECRET || CHESSMATER_SECRET;
+const CHESSMATER_SESSION_AUD = process.env.CHESSMATER_SESSION_JWT_AUD || 'chessmater-session';
+const CHESSMATER_SESSION_ISS = process.env.CHESSMATER_SESSION_JWT_ISS || 'chessmater-backend';
+const CHESSMATER_SESSION_EXPIRE_SECONDS = Number(process.env.CHESSMATER_SESSION_EXPIRE_SECONDS || 86400);
+const SESSION_COOKIE_NAME = 'cm_session';
 
 const ALLOWED_ORIGINS = [
   'https://chessmater.pages.dev',
@@ -64,50 +69,104 @@ app.use(cors(corsOptions));
 
 app.use(express.json());
 
+function parseCookies(cookieHeader) {
+  const out = {};
+  if (!cookieHeader) return out;
+  for (const pair of cookieHeader.split(';')) {
+    const idx = pair.indexOf('=');
+    if (idx < 0) continue;
+    const key = pair.slice(0, idx).trim();
+    const value = pair.slice(idx + 1).trim();
+    out[key] = decodeURIComponent(value);
+  }
+  return out;
+}
+
+function verifyPortalToken(token) {
+  return jwt.verify(token, CHESSMATER_SECRET, {
+    algorithms: [CHESSMATER_ALG],
+    audience: CHESSMATER_AUD,
+    issuer: CHESSMATER_ISS
+  });
+}
+
+function verifySessionToken(token) {
+  return jwt.verify(token, CHESSMATER_SESSION_SECRET, {
+    algorithms: [CHESSMATER_ALG],
+    audience: CHESSMATER_SESSION_AUD,
+    issuer: CHESSMATER_SESSION_ISS
+  });
+}
+
+function issueSessionToken(user) {
+  const now = Math.floor(Date.now() / 1000);
+  return jwt.sign(
+    {
+      sub: user.sub || user.username || String(user.user_id),
+      user_id: user.user_id,
+      username: user.username,
+      typ: 'cm_session',
+      iat: now,
+      exp: now + CHESSMATER_SESSION_EXPIRE_SECONDS,
+      iss: CHESSMATER_SESSION_ISS,
+      aud: CHESSMATER_SESSION_AUD
+    },
+    CHESSMATER_SESSION_SECRET,
+    { algorithm: CHESSMATER_ALG }
+  );
+}
+
+function setSessionCookie(req, res, token) {
+  const forwardedProto = String(req.headers['x-forwarded-proto'] || '').toLowerCase();
+  const host = String(req.headers.host || '').toLowerCase();
+  const isLocalHost = host.startsWith('localhost') || host.startsWith('127.0.0.1');
+  const secure = req.secure || forwardedProto.includes('https') || !isLocalHost;
+  res.cookie(SESSION_COOKIE_NAME, token, {
+    httpOnly: true,
+    secure,
+    sameSite: secure ? 'none' : 'lax',
+    maxAge: CHESSMATER_SESSION_EXPIRE_SECONDS * 1000,
+    path: '/'
+  });
+}
+
 /**
  * Authenticate ChessMater JWT (same secret/audience/issuer as main portal)
  */
 function authenticate(req, res, next) {
   const authHeader = req.headers.authorization;
-  console.log('🔐 Auth header:', authHeader ? `Bearer ${authHeader.split(' ')[1]?.substring(0, 20)}...` : 'missing');
-  
-  const token = authHeader?.split(' ')[1];
-  if (!token) {
-    console.error('❌ No token provided in Authorization header');
-    return res.status(401).json({ error: 'No token provided' });
-  }
+  const bearerToken = authHeader?.split(' ')[1];
+  const sessionToken = parseCookies(req.headers.cookie)[SESSION_COOKIE_NAME];
 
-  try {
-    // Verify token (signature, audience, issuer)
-    const decoded = jwt.verify(token, CHESSMATER_SECRET, {
-      algorithms: [CHESSMATER_ALG],
-      audience: CHESSMATER_AUD,
-      issuer: CHESSMATER_ISS
-    });
-
-    console.log('✅ Token verified for user:', decoded.username || decoded.user_id);
-
-    // Attach decoded user to request
-    req.user = {
-      user_id: decoded.user_id,
-      username: decoded.username,
-      sub: decoded.sub
-    };
-    next();
-  } catch (err) {
-    console.error('❌ Token verification failed:', err.name, err.message);
-    if (err.name === 'TokenExpiredError') {
-      return res.status(401).json({ error: 'Token expired' });
-    } else if (err.name === 'JsonWebTokenError') {
-      // invalid signature = CHESSMATER_JWT_SECRET does not match main portal secret
-      return res.status(401).json({
-        error: 'Invalid token',
-        hint: err.message.includes('signature') ? 'JWT secret mismatch: set CHESSMATER_JWT_SECRET to the same value as the main portal.' : undefined
-      });
-    } else {
-      return res.status(401).json({ error: 'Token verification failed' });
+  if (sessionToken) {
+    try {
+      const decoded = verifySessionToken(sessionToken);
+      req.user = {
+        user_id: decoded.user_id,
+        username: decoded.username,
+        sub: decoded.sub
+      };
+      return next();
+    } catch (err) {
+      console.warn('Session cookie auth failed:', err.name, err.message);
     }
   }
+
+  if (bearerToken) {
+    try {
+      const decoded = verifyPortalToken(bearerToken);
+      req.user = {
+        user_id: decoded.user_id,
+        username: decoded.username,
+        sub: decoded.sub
+      };
+      return next();
+    } catch (err) {
+      console.warn('Bearer auth failed:', err.name, err.message);
+    }
+  }
+
+  return res.status(401).json({ error: 'Unauthorized' });
 }
 
 /**
@@ -124,11 +183,7 @@ app.post('/api/auth/verify', async (req, res) => {
 
   try {
     // Verify JWT
-    const decoded = jwt.verify(token, CHESSMATER_SECRET, {
-      algorithms: [CHESSMATER_ALG],
-      audience: CHESSMATER_AUD,
-      issuer: CHESSMATER_ISS
-    });
+    const decoded = verifyPortalToken(token);
 
     console.log('✅ JWT verified, decoded:', { username: decoded.username, user_id: decoded.user_id, sub: decoded.sub });
 
@@ -186,8 +241,16 @@ app.post('/api/auth/verify', async (req, res) => {
       });
     }
 
+    const sessionToken = issueSessionToken({
+      user_id: portalUserId,
+      username,
+      sub: decoded.sub || username
+    });
+    setSessionCookie(req, res, sessionToken);
+
     res.json({
       success: true,
+      sessionExpiresIn: CHESSMATER_SESSION_EXPIRE_SECONDS,
       user: {
         id: user.id,
         username: user.username,

@@ -964,7 +964,6 @@ async function checkWinCondition() {
     isCheckingWinCondition = true;
     
     try {
-      const token = window.cmToken;
       const nextLevel = currentLevelIndex + 2;
       
       // 更新内存中的进度（立即解锁下一关）
@@ -979,41 +978,20 @@ async function checkWinCondition() {
       }
       
       // 未登录用户无法同步到服务器
-      if (!token) {
+      if (!window.cmUser || !window.cmSessionReady) {
         console.log("📝 Not logged in, progress not synced to server");
         showNextLevelButton();
         return;
       }
       
-      // 诊断日志：检查token状态
-      console.log("🔐 Syncing progress to server:");
-      console.log("  - Token exists:", !!token);
-      console.log("  - Token length:", token ? token.length : 0);
-      console.log("  - Token preview:", token ? token.substring(0, 20) + "..." : "null");
+      console.log("🔐 Syncing progress to server via session cookie");
       
-      // 检查token是否过期
-      try {
-        const parts = token.split('.');
-        if (parts.length === 3) {
-          const payload = JSON.parse(atob(parts[1]));
-          const now = Math.floor(Date.now() / 1000);
-          const timeLeft = payload.exp - now;
-          console.log("  - Token expires in:", Math.floor(timeLeft / 60), "minutes");
-          if (timeLeft < 0) {
-            console.error("  ❌ Token已过期！");
-          }
-        }
-      } catch (e) {
-        console.warn("  ⚠️ Could not parse token:", e.message);
-      }
-      
-      // 已登录用户：静默同步到服务器（不等待结果，不影响游戏流程）
+      // 已登录用户：静默同步到服务器（使用会话 cookie）
       fetch("https://chessmater-production.up.railway.app/progress", {
         method: "POST",
         credentials: 'include',
         headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json"
         },
         body: JSON.stringify({ maxUnlocked: nextLevel })
       })

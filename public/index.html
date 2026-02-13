@@ -733,6 +733,7 @@
     // 仅使用主站 URL 带来的 token，会话内用 window 保存，不使用 localStorage
     window.cmToken = null;
     window.cmUser = null;
+    window.cmSessionReady = false;
     let user = null;
     if (gameToken) {
       try {
@@ -743,6 +744,7 @@
 
         window.authReady = fetch('https://chessmater-production.up.railway.app/api/auth/verify', {
           method: 'POST',
+          credentials: 'include',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${gameToken}`
@@ -754,12 +756,14 @@
             console.log('User verified:', data);
             window.cmToken = gameToken;
             window.cmUser = data.user;
+            window.cmSessionReady = true;
             updateCurrentUserName();
             if (typeof window.updateLoginPromptVisibility === 'function') window.updateLoginPromptVisibility();
           } else {
             console.error('Token verification failed:', data.message);
             window.cmToken = gameToken;
             window.cmUser = user ? { id: user.sub, username: user.username, portal_user_id: user.user_id } : null;
+            window.cmSessionReady = false;
             updateCurrentUserName();
             if (typeof window.updateLoginPromptVisibility === 'function') window.updateLoginPromptVisibility();
           }
@@ -770,15 +774,18 @@
           console.error('Token verify request failed:', err);
           window.cmToken = gameToken;
           window.cmUser = user ? { id: user.sub, username: user.username, portal_user_id: user.user_id } : null;
+          window.cmSessionReady = false;
           updateCurrentUserName();
           if (typeof window.updateLoginPromptVisibility === 'function') window.updateLoginPromptVisibility();
           history.replaceState(null, null, window.location.pathname + window.location.search);
         });
       } catch (err) {
         console.error("JWT parse error:", err);
+        window.cmSessionReady = false;
         window.authReady = Promise.resolve();
       }
     } else {
+      window.cmSessionReady = false;
       window.authReady = Promise.resolve();
     }
 
@@ -814,10 +821,9 @@
       
       // 测试发送一个请求
       console.log("\n🧪 Testing token with server...");
-      if (window.cmToken) {
+      if (window.cmSessionReady) {
         fetch("https://chessmater-production.up.railway.app/progress", {
           credentials: 'include',
-          headers: { Authorization: `Bearer ${window.cmToken}` }
         })
         .then(res => {
           console.log("  - Server response:", res.status, res.statusText);
@@ -1114,16 +1120,13 @@
         leaderboardList.innerHTML = '<div class="leaderboard-loading">Loading leaderboard...</div>';
         await (window.authReady || Promise.resolve());
         try {
-          const token = window.cmToken;
-          
-          if (!token) {
+          if (!window.cmUser) {
             leaderboardList.innerHTML = '<div class="leaderboard-error">Please log in to view the leaderboard</div>';
             return;
           }
           
           const res = await fetch("https://chessmater-production.up.railway.app/leaderboard", {
             credentials: 'include',
-            headers: { Authorization: token ? `Bearer ${token}` : '' },
           });
 
           if (res.status === 401) {
@@ -1231,19 +1234,16 @@
         // 等待 token 验证完成
         await (window.authReady || Promise.resolve());
         
-        const token = window.cmToken;
-        
         // 未登录用户：只能玩第一关
-        if (!token) {
+        if (!window.cmUser || !window.cmSessionReady) {
           console.log("📝 Not logged in, only level 1 available");
           window.currentMaxUnlocked = 1;
           return 1;
         }
         
-        // 已登录用户：从服务器获取进度（只在首页加载时调用一次）
+        // 已登录用户：从服务器获取进度（使用会话 cookie）
         const res = await fetch("https://chessmater-production.up.railway.app/progress", {
           credentials: 'include',
-          headers: { Authorization: `Bearer ${token}` },
         });
 
         if (!res.ok) {
