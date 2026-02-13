@@ -773,8 +773,6 @@
       try {
         const payload = gameToken.split(".")[1];
         user = JSON.parse(atob(payload));
-        console.log("ChessMater user:", user);
-        console.log("Locale:", locale);
 
         window.authReady = fetch('https://chessmater-production.up.railway.app/api/auth/verify', {
           method: 'POST',
@@ -787,7 +785,6 @@
         .then(response => response.json())
         .then(data => {
           if (data.success) {
-            console.log('User verified:', data);
             window.cmToken = gameToken;
             window.cmUser = data.user;
             window.cmSessionReady = true;
@@ -823,86 +820,8 @@
       window.authReady = Promise.resolve();
     }
 
-    // 调试助手：检查 token 状态
-    window.checkTokenStatus = function() {
-      console.log("🔐 Token Status:");
-      console.log("  - Token exists:", !!window.cmToken);
-      console.log("  - User exists:", !!window.cmUser);
-      if (window.cmToken) {
-        try {
-          const parts = window.cmToken.split('.');
-          const payload = JSON.parse(atob(parts[1]));
-          console.log("  - User ID:", payload.user_id);
-          console.log("  - Username:", payload.username);
-          console.log("  - Issued at:", new Date(payload.iat * 1000).toLocaleString());
-          console.log("  - Expires at:", new Date(payload.exp * 1000).toLocaleString());
-          const now = Math.floor(Date.now() / 1000);
-          const timeLeft = payload.exp - now;
-          console.log("  - Time until expiry:", Math.floor(timeLeft / 60), "minutes");
-          console.log("  - Token is valid:", payload.exp > now ? "✅ YES" : "❌ NO (EXPIRED)");
-          
-          // 显示完整的payload
-          console.log("  - Full payload:", payload);
-        } catch (err) {
-          console.error("  - Error parsing token:", err);
-        }
-      } else {
-        console.log("  ❌ No token found");
-      }
-      if (window.cmUser) {
-        console.log("  - Current user:", window.cmUser);
-      }
-      
-      // 测试发送一个请求
-      console.log("\n🧪 Testing token with server...");
-      if (window.cmSessionReady) {
-        fetch("https://chessmater-production.up.railway.app/progress", {
-          credentials: 'include',
-        })
-        .then(res => {
-          console.log("  - Server response:", res.status, res.statusText);
-          if (res.status === 401) {
-            console.error("  ❌ Token rejected by server (401)");
-          } else if (res.ok) {
-            console.log("  ✅ Token accepted by server");
-          }
-          return res.json();
-        })
-        .then(data => {
-          console.log("  - Response data:", data);
-        })
-        .catch(err => {
-          console.error("  - Request failed:", err);
-        });
-      }
-    };
-
-    // 检测可能干扰的浏览器扩展
-    window.detectInterference = function() {
-      console.log("🔍 Checking for browser extension interference:");
-      
-      // 检查 fetch 是否被修改
-      const isFetchModified = fetch.toString().includes('[native code]') === false;
-      console.log("  - fetch modified:", isFetchModified);
-      
-      // 检查是否有 installHook
-      if (window.installHook || document.querySelector('script[src*="installHook"]')) {
-        console.warn("  ⚠️ Detected installHook - this may be intercepting requests!");
-      }
-      
-      // 检查常见的扩展特征
-      const extensions = [];
-      if (window.chrome && window.chrome.runtime) extensions.push("Chrome extension detected");
-      if (document.documentElement.getAttribute('data-extension')) extensions.push("Extension marker found");
-      
-      if (extensions.length > 0) {
-        console.log("  - Extensions detected:", extensions);
-        console.warn("  ⚠️ Browser extensions may be interfering with network requests");
-        console.log("  💡 Try testing in incognito/private mode with extensions disabled");
-      } else {
-        console.log("  ✅ No obvious extension interference detected");
-      }
-    };
+    window.checkTokenStatus = function() { /* debug: token status */ };
+    window.detectInterference = function() { /* debug: extension check */ };
 
     function updateCurrentUserName() {
       const el1 = document.getElementById("startScreenUserName");
@@ -1086,7 +1005,7 @@
         startButton.addEventListener("click", () => {
           if (!musicPlaying) {
             bgMusic.volume = 0.5; // Optional: softer background
-            bgMusic.play().catch(err => console.warn("Autoplay blocked:", err));
+            bgMusic.play().catch(() => {});
             musicPlaying = true;
             musicToggle.textContent = "🔊 Music";
           }
@@ -1231,6 +1150,7 @@
         }
 
         const currentUserId = window.cmUser ? (window.cmUser.user_id || window.cmUser.portal_user_id || window.cmUser.id) : null;
+        const currentUserIdStr = currentUserId != null ? String(currentUserId) : "";
         const isLevelMode = !!(mode && mode.startsWith("level:"));
         const selectedLevel = isLevelMode ? Number.parseInt(mode.split(":")[1], 10) : null;
         const html = leaderboardData.map((entry, index) => {
@@ -1240,7 +1160,7 @@
           else if (rank === 2) rankClass = "silver";
           else if (rank === 3) rankClass = "bronze";
 
-          const isCurrentUser = entry.user_id === currentUserId;
+          const isCurrentUser = (entry.user_id != null && String(entry.user_id) === currentUserIdStr);
           // Format user_id to be more readable (show first 8 chars)
           const userId = entry.user_id || "";
           const displayName = entry.username || (userId.length > 8 ? userId.substring(0, 8) + "..." : userId) || "Anonymous";
@@ -1257,7 +1177,7 @@
           `;
         }).join("");
 
-        const myIndex = currentUserId ? leaderboardData.findIndex((entry) => entry.user_id === currentUserId) : -1;
+        const myIndex = currentUserIdStr ? leaderboardData.findIndex((entry) => entry.user_id != null && String(entry.user_id) === currentUserIdStr) : -1;
         const myRank = myIndex >= 0 ? myIndex + 1 : null;
         let title = isLevelMode && Number.isFinite(selectedLevel)
           ? `Level ${selectedLevel} - Fewest Moves`
@@ -1342,7 +1262,6 @@
         
         // 未登录用户：只能玩第一关
         if (!window.cmUser || !window.cmSessionReady) {
-          console.log("📝 Not logged in, only level 1 available");
           return mergeMaxUnlocked(1);
         }
         
@@ -1352,17 +1271,14 @@
         });
 
         if (!res.ok) {
-          console.warn(`⚠️ Failed to fetch progress (${res.status}), defaulting to level 1`);
           return mergeMaxUnlocked(1);
         }
 
         const data = await res.json();
         const maxUnlocked = parseInt(data.maxUnlocked || "1", 10);
-        console.log("✅ Fetched progress from server:", maxUnlocked);
         return mergeMaxUnlocked(maxUnlocked);
 
       } catch (err) {
-        console.warn("⚠️ Error fetching progress:", err);
         return mergeMaxUnlocked(1);
       }
     }
@@ -1378,14 +1294,9 @@
       let maxUnlocked;
       if (optionalMaxUnlocked !== undefined) {
         maxUnlocked = mergeMaxUnlocked(optionalMaxUnlocked);
-        console.log("🔵 loadLevels called with explicit progress:", optionalMaxUnlocked, "merged to:", maxUnlocked);
       } else if (window.currentMaxUnlocked > 1) {
-        // 使用缓存的进度(通关后更新的)
         maxUnlocked = mergeMaxUnlocked(window.currentMaxUnlocked);
-        console.log("🟡 loadLevels using cached progress:", maxUnlocked);
       } else {
-        // 首次加载,从服务器获取
-        console.log("🟢 loadLevels fetching from server...");
         maxUnlocked = await fetchProgress();
       }
 
@@ -1426,8 +1337,6 @@
 
         levelGrid.appendChild(button);
       });
-      
-      console.log("🎮 Loaded", LEVELS.length, "levels, unlocked up to level", maxUnlocked);
     }
 
 
@@ -1501,8 +1410,6 @@
         const computedStyle = window.getComputedStyle(startScreenEl);
         const isVisible = computedStyle.display !== "none";
         if (isVisible && typeof loadLevels === "function") {
-          console.log("🏠 Returned to home page, refreshing levels with progress:", window.currentMaxUnlocked);
-          // 重新加载关卡列表,使用最新的进度
           loadLevels(window.currentMaxUnlocked);
           // 清除刷新标记
           window.progressNeedsRefresh = false;

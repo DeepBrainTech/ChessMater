@@ -231,9 +231,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (tipBox) tipBox.classList.toggle('hidden');
       });
     }
-  } catch (e) {
-    console.warn('Block tip toggle init skipped:', e);
-  }
+  } catch (e) {}
 });
 
 // Function to resize the board
@@ -956,62 +954,39 @@ function checkGravityTeleportation() {
 let isCheckingWinCondition = false; // prevent duplicate checks
 
 function syncProgressAfterWin() {
-  console.log("🎯 syncProgressAfterWin called");
-  console.log("  📝 currentLevelIndex:", currentLevelIndex);
-  console.log("  📝 levelMoveCount:", levelMoveCount);
-  console.log("  📝 currentPuzzleData:", currentPuzzleData);
-  
-  // 如果currentLevelIndex是-1(未找到),尝试通过名称查找
   let actualLevelIndex = currentLevelIndex;
   if (actualLevelIndex < 0 && typeof LEVELS !== "undefined" && currentPuzzleData && currentPuzzleData.name) {
     actualLevelIndex = LEVELS.findIndex(lvl => lvl.name === currentPuzzleData.name);
-    console.log("  🔍 Re-searched level by name, found index:", actualLevelIndex);
   }
-  
-  // 如果还是找不到,使用0作为默认值
   if (actualLevelIndex < 0) {
     actualLevelIndex = 0;
-    console.warn("  ⚠️ Could not determine level index, defaulting to 0");
   }
-  
+
   const solvedIndex = actualLevelIndex;
-  const solvedLevel = solvedIndex + 1;  // 关卡编号从1开始
-  const nextLevel = solvedIndex + 2;    // 下一个解锁的关卡
-  
-  console.log("  🔢 solvedIndex:", solvedIndex, "solvedLevel:", solvedLevel, "nextLevel:", nextLevel);
-  
+  const solvedLevel = solvedIndex + 1;
+  const nextLevel = solvedIndex + 2;
+
   const mergedUnlocked = typeof window.mergeMaxUnlocked === "function"
     ? window.mergeMaxUnlocked(nextLevel)
     : Math.max(window.currentMaxUnlocked || 1, nextLevel);
 
   window.currentMaxUnlocked = mergedUnlocked;
-  console.log("🔓 Unlocked level:", mergedUnlocked, "from solved level:", solvedLevel);
-
-  // 标记进度已更新
   window.progressNeedsRefresh = true;
 
-  // 由前端决定：出现 Next Level ➡️ 时下一关即解锁，立刻刷新游戏页上的关卡列表，下一关直接变蓝（无需点 Back to Home）
   if (typeof loadLevels === 'function') {
     loadLevels(mergedUnlocked);
   }
-  console.log("✅ Progress updated to level", mergedUnlocked);
 
   if (!window.cmUser || !window.cmSessionReady) {
-    console.log("Not logged in, progress not synced to server");
     return;
   }
 
-  console.log("📤 Syncing progress to server via session cookie");
-  
   const progressData = {
     maxUnlocked: mergedUnlocked,
     level: solvedLevel,
     moves: levelMoveCount
   };
-  
-  console.log("📊 Progress data (before stringify):", progressData);
   const jsonBody = JSON.stringify(progressData);
-  console.log("📊 JSON body to send:", jsonBody);
 
   fetch("https://chessmater-production.up.railway.app/progress", {
     method: "POST",
@@ -1020,28 +995,7 @@ function syncProgressAfterWin() {
       "Content-Type": "application/json"
     },
     body: jsonBody
-  })
-  .then(res => {
-    if (res.ok) {
-      console.log("✅ Progress synced to server successfully");
-      return res.json();
-    } else {
-      console.warn(`⚠️ Server sync failed (${res.status}), but progress saved in memory`);
-      return res.json().then(data => {
-        console.error("📛 Error details:", data);
-      }).catch(() => {
-        console.error("📛 Could not parse error response");
-      });
-    }
-  })
-  .then(data => {
-    if (data && data.success) {
-      console.log("🎉 Progress confirmed by server");
-    }
-  })
-  .catch(err => {
-    console.warn("⚠️ Network error syncing progress:", err.message);
-  });
+  }).then(() => {}).catch(() => {});
 }
 
 async function checkWinCondition() {
@@ -1277,7 +1231,7 @@ function movePlayer(playerIndex, newRow, newCol) {
   const moveSound = document.getElementById("moveSound");
   if (moveSound) {
     moveSound.currentTime = 0; // reset to start for rapid reuse
-    moveSound.play().catch(err => console.warn("Sound play blocked:", err));
+    moveSound.play().catch(() => {});
   }
 }
 
@@ -2176,7 +2130,7 @@ function triggerConfetti() {
   const Winsound = new Audio("assets/audio/completion.mp3");
   Winsound.currentTime = 0;
   Winsound.volume = 0.7;
-  Winsound.play().catch(err => console.log("Audio err", err));
+  Winsound.play().catch(() => {});
   const confettiCount = 150; // More confetti!
   const confettiColors = [
     '#ff6b6b', '#4ecdc4', '#f9ca24', '#6c5ce7', '#00b894', 
@@ -2392,7 +2346,7 @@ function moveBombs() {
       const explosionSound = document.getElementById("explosionSound");
       if (explosionSound) {
           explosionSound.currentTime = 0; // Reset to start
-          explosionSound.play().catch(err => console.warn("Explosion sound play blocked:", err));
+          explosionSound.play().catch(() => {});
       }
 
       // Save explosion animation details
@@ -2438,7 +2392,7 @@ function updateBombs() {
       const explosionSound = document.getElementById("explosionSound");
       if (explosionSound) {
         explosionSound.currentTime = 0; // Reset to start
-        explosionSound.play().catch(err => console.warn("Explosion sound play blocked:", err));
+        explosionSound.play().catch(() => {});
       }
       
       // Create explosion animation
@@ -2520,7 +2474,7 @@ function handleBombCollision(player, playerIndex, bombRow, bombCol) {
   const explosionSound = document.getElementById("explosionSound");
   if (explosionSound) {
     explosionSound.currentTime = 0; // Reset to start
-    explosionSound.play().catch(err => console.warn("Explosion sound play blocked:", err));
+    explosionSound.play().catch(() => {});
   }
 
   // Create explosion animation at the bomb's position
