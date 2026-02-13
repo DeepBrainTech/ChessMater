@@ -1257,9 +1257,12 @@
           `;
         }).join("");
 
-        const title = isLevelMode && Number.isFinite(selectedLevel)
+        const myIndex = currentUserId ? leaderboardData.findIndex((entry) => entry.user_id === currentUserId) : -1;
+        const myRank = myIndex >= 0 ? myIndex + 1 : null;
+        let title = isLevelMode && Number.isFinite(selectedLevel)
           ? `Level ${selectedLevel} - Fewest Moves`
           : "Total Levels Unlocked";
+        if (myRank != null) title += ` · Your rank: ${myRank}`;
         leaderboardList.innerHTML = `<div class="leaderboard-loading" style="padding: 8px 0 16px; font-size: 1rem; text-align: left;">${title}</div><ul class="leaderboard-list">${html}</ul>`;
       }
 
