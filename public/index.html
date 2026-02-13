@@ -698,7 +698,7 @@
     🔄 Please rotate your device to landscape for the best experience!
   </div>
   <script>
-    // 解析 URL hash 参数
+    // Parse URL hash params
     function getHashParams() {
       const hash = window.location.hash.substring(1);
       const params = {};
@@ -711,14 +711,13 @@
       return params;
     }
 
-    // 从 URL hash 获取 token 和 locale
+    // Get token and locale from URL hash
     const hashParams = getHashParams();
     const gameToken = hashParams.token || null;
     const locale = hashParams.locale || 'en';
 
-    // 如果有新的 token，清除旧的本地数据（与 QuantumGo 流程一致）
+    // If new token in URL, clear old local data (QuantumGo-style)
     if (gameToken) {
-      // 优先使用 URL 中的新令牌，清除旧的本地数据
       localStorage.removeItem("access_token");
       localStorage.removeItem("userId");
       localStorage.removeItem("user_name");
@@ -726,22 +725,20 @@
       localStorage.removeItem("sso_token");
     }
 
-    // 保存 locale 到 localStorage
+    // Save locale to localStorage
     if (locale) {
       localStorage.setItem("cm_locale", locale);
     }
 
-    // 如果有 token，验证并保存
+    // If token present, verify and save
     let user = null;
     if (gameToken) {
       try {
-        // 解码 JWT payload（仅用于显示，实际验证在后端）
         const payload = gameToken.split(".")[1];
         user = JSON.parse(atob(payload));
         console.log("ChessMater user:", user);
         console.log("Locale:", locale);
 
-        // 验证新令牌（与 QuantumGo 流程一致）
         fetch('https://chessmater-production.up.railway.app/api/auth/verify', {
           method: 'POST',
           headers: {
@@ -752,15 +749,13 @@
         .then(response => response.json())
         .then(data => {
           if (data.success) {
-            console.log('用户验证成功:', data);
-            // 保存用户信息和 token 到 localStorage
+            console.log('User verified:', data);
             localStorage.setItem("cm_user", JSON.stringify(data.user));
             localStorage.setItem("cm_token", gameToken);
             updateCurrentUserName();
             if (typeof window.updateLoginPromptVisibility === 'function') window.updateLoginPromptVisibility();
           } else {
-            console.error('Token 验证失败:', data.message);
-            // 即使验证失败，也保存 token 以便后续重试
+            console.error('Token verification failed:', data.message);
             localStorage.setItem("cm_token", gameToken);
             localStorage.setItem("cm_user", JSON.stringify(user));
             updateCurrentUserName();
@@ -768,26 +763,25 @@
           }
         })
         .catch(err => {
-          console.error('Token 验证请求失败:', err);
-          // 网络错误时，仍然保存 token 以便后续使用
+          console.error('Token verify request failed:', err);
           localStorage.setItem("cm_token", gameToken);
           localStorage.setItem("cm_user", JSON.stringify(user));
           updateCurrentUserName();
           if (typeof window.updateLoginPromptVisibility === 'function') window.updateLoginPromptVisibility();
         });
 
-        // 清除 URL hash（保持 URL 清洁）
+        // Clear URL hash
         history.replaceState(null, null, window.location.pathname + window.location.search);
         
       } catch (err) {
-        console.error("JWT token 解析失败:", err);
+        console.error("JWT parse error:", err);
       }
     } else {
-      // 如果没有 token，尝试从 localStorage 恢复
+      // No token in URL: try localStorage
       const savedToken = localStorage.getItem("cm_token");
       const savedUser = localStorage.getItem("cm_user");
       if (savedToken && savedUser) {
-        console.log("使用已保存的 token");
+        console.log("Using saved token");
         user = JSON.parse(savedUser);
       }
     }

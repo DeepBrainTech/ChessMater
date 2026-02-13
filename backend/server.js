@@ -138,12 +138,11 @@ app.post('/api/auth/verify', async (req, res) => {
       );
 
       if (userResult.rows.length > 0) {
-        // 用户已存在
+        // User exists
         user = userResult.rows[0];
-        console.log(`用户已存在: username=${username}, id=${user.id}`);
+        console.log(`User exists: username=${username}, id=${user.id}`);
       } else {
-        // 用户不存在，自动创建
-        // 使用主门户用户ID作为密码的一部分（用户无需知道这个密码）
+        // Create user (portal_user_id used in temp password)
         const tempPassword = `portal_sso_${portalUserId}`;
         const createResult = await pool.query(
           `INSERT INTO users (username, password, portal_user_id)
@@ -152,10 +151,10 @@ app.post('/api/auth/verify', async (req, res) => {
           [username, tempPassword, portalUserId.toString()]
         );
         user = createResult.rows[0];
-        console.log(`自动创建用户: username=${username}, portal_user_id=${portalUserId}`);
+        console.log(`User created: username=${username}, portal_user_id=${portalUserId}`);
       }
     } catch (dbErr) {
-      console.error('数据库操作失败:', dbErr);
+      console.error('DB error:', dbErr);
       return res.status(500).json({
         success: false,
         message: `Failed to create user: ${dbErr.message}`
@@ -193,7 +192,7 @@ app.post('/api/auth/verify', async (req, res) => {
 
 app.get('/init', async (req, res) => {
   await pool.query(`
-    -- 用户表（带唯一性约束，确保用户唯一性）
+    -- Users (unique constraint)
     CREATE TABLE IF NOT EXISTS users (
       id SERIAL PRIMARY KEY,
       username VARCHAR(255) NOT NULL UNIQUE,
