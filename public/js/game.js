@@ -109,6 +109,7 @@ let risingPieces = [];
 let lastRiseTime = 0;
 const RISE_SPEED = 700; // pixels per second
 let currentLevelIndex = 0;
+let levelMoveCount = 0;
 
 
 // Transformer block variables
@@ -557,6 +558,7 @@ function loadPuzzle(puzzleData) {
     // ✅ Reset state so pieces can move again
     mode = "play";
     gameWon = false;
+    levelMoveCount = 0;
     visitedSquares.forEach(row => row.fill(false)); // Reset fog on load
     if (typeof enablePlayerControls === "function") {
         enablePlayerControls();
@@ -958,6 +960,7 @@ function syncProgressAfterWin() {
     ? LEVELS.findIndex(lvl => lvl.name === currentPuzzleData.name)
     : -1;
   const solvedIndex = Math.max(currentLevelIndex, byNameIndex);
+  const solvedLevel = solvedIndex + 1;
   const nextLevel = solvedIndex + 2;
   const mergedUnlocked = typeof window.mergeMaxUnlocked === "function"
     ? window.mergeMaxUnlocked(nextLevel)
@@ -983,7 +986,11 @@ function syncProgressAfterWin() {
     headers: {
       "Content-Type": "application/json"
     },
-    body: JSON.stringify({ maxUnlocked: mergedUnlocked })
+    body: JSON.stringify({
+      maxUnlocked: mergedUnlocked,
+      level: solvedLevel,
+      moves: levelMoveCount
+    })
   })
   .then(res => {
     if (res.ok) {
@@ -1144,6 +1151,8 @@ function movePlayer(playerIndex, newRow, newCol) {
     }
     return;
   }
+
+  levelMoveCount += 1;
 
   // ✅ NEW: Check if moving into a bomb BEFORE moving
   const isBombBlock = board[newRow][newCol] === CELL_TYPES.BOMB;

@@ -441,6 +441,31 @@
       transform: rotate(90deg);
     }
 
+    .leaderboard-filter {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .leaderboard-filter label {
+      font-weight: bold;
+    }
+
+    .leaderboard-filter select {
+      flex: 1;
+      max-width: 300px;
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.45);
+      background: rgba(255, 255, 255, 0.15);
+      color: #fff;
+    }
+
+    .leaderboard-filter select option {
+      color: #111;
+    }
+
     .leaderboard-list {
       list-style: none;
       padding: 0;
@@ -674,6 +699,15 @@
         min-width: 60px !important;
       }
 
+      .leaderboard-filter {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .leaderboard-filter select {
+        max-width: 100%;
+      }
+
       .start-screen-buttons {
         gap: 12px !important;
       }
@@ -901,6 +935,10 @@
         <h2>🏆 Leaderboard</h2>
         <button class="close-leaderboard" id="closeLeaderboard">&times;</button>
       </div>
+      <div class="leaderboard-filter">
+        <label for="leaderboardModeSelect">View:</label>
+        <select id="leaderboardModeSelect"></select>
+      </div>
       <div id="leaderboardList">
         <div class="leaderboard-loading">Loading leaderboard...</div>
       </div>
@@ -1087,6 +1125,45 @@
       const leaderboardModal = document.getElementById("leaderboardModal");
       const closeLeaderboard = document.getElementById("closeLeaderboard");
       const leaderboardList = document.getElementById("leaderboardList");
+      const leaderboardModeSelect = document.getElementById("leaderboardModeSelect");
+
+      function populateLeaderboardModes() {
+        if (!leaderboardModeSelect) return;
+        const levelCount = (typeof LEVELS !== "undefined" && Array.isArray(LEVELS)) ? LEVELS.length : 35;
+        const previous = leaderboardModeSelect.value;
+        leaderboardModeSelect.innerHTML = "";
+
+        const totalOption = document.createElement("option");
+        totalOption.value = "progress";
+        totalOption.textContent = "Total Levels Unlocked";
+        leaderboardModeSelect.appendChild(totalOption);
+
+        for (let i = 1; i <= levelCount; i++) {
+          const opt = document.createElement("option");
+          opt.value = `level:${i}`;
+          opt.textContent = `Level ${i} - Fewest Moves`;
+          leaderboardModeSelect.appendChild(opt);
+        }
+
+        if (previous && Array.from(leaderboardModeSelect.options).some(o => o.value === previous)) {
+          leaderboardModeSelect.value = previous;
+        } else {
+          leaderboardModeSelect.value = "progress";
+        }
+      }
+
+      function getLeaderboardRequestUrl() {
+        const raw = leaderboardModeSelect ? leaderboardModeSelect.value : "progress";
+        const base = "https://chessmater-production.up.railway.app/leaderboard";
+        if (!raw || raw === "progress") return base;
+        if (raw.startsWith("level:")) {
+          const level = Number.parseInt(raw.split(":")[1], 10);
+          if (Number.isFinite(level) && level > 0) {
+            return `${base}?mode=level&level=${level}`;
+          }
+        }
+        return base;
+      }
 
       if (leaderboardButton) {
         leaderboardButton.addEventListener("click", () => {
@@ -1094,6 +1171,7 @@
             alert("Please log in to view the leaderboard");
             return;
           }
+          populateLeaderboardModes();
           leaderboardModal.classList.add("active");
           loadLeaderboard();
         });
@@ -1125,7 +1203,7 @@
             return;
           }
           
-          const res = await fetch("https://chessmater-production.up.railway.app/leaderboard", {
+          const res = await fetch(getLeaderboardRequestUrl(), {
             credentials: 'include',
           });
 
@@ -1139,20 +1217,22 @@
           }
 
           const data = await res.json();
-          displayLeaderboard(data);
+          displayLeaderboard(data, leaderboardModeSelect ? leaderboardModeSelect.value : "progress");
         } catch (err) {
           console.error("Error loading leaderboard:", err);
           leaderboardList.innerHTML = '<div class="leaderboard-error">Failed to load leaderboard. Please try again later.</div>';
         }
       }
 
-      function displayLeaderboard(leaderboardData) {
+      function displayLeaderboard(leaderboardData, mode) {
         if (!leaderboardData || !Array.isArray(leaderboardData) || leaderboardData.length === 0) {
           leaderboardList.innerHTML = '<div class="leaderboard-loading">No leaderboard data available yet.</div>';
           return;
         }
 
         const currentUserId = window.cmUser ? (window.cmUser.user_id || window.cmUser.portal_user_id || window.cmUser.id) : null;
+        const isLevelMode = !!(mode && mode.startsWith("level:"));
+        const selectedLevel = isLevelMode ? Number.parseInt(mode.split(":")[1], 10) : null;
         const html = leaderboardData.map((entry, index) => {
           const rank = index + 1;
           let rankClass = "";
@@ -1164,17 +1244,31 @@
           // Format user_id to be more readable (show first 8 chars)
           const userId = entry.user_id || "";
           const displayName = entry.username || (userId.length > 8 ? userId.substring(0, 8) + "..." : userId) || "Anonymous";
+          const scoreText = isLevelMode
+            ? `${entry.best_moves || 0} moves`
+            : `Level ${entry.max_unlocked || 0}`;
           
           return `
             <div class="leaderboard-item" ${isCurrentUser ? 'style="background: rgba(255,255,255,0.2); border: 2px solid #ffd700;"' : ''}>
               <span class="leaderboard-rank ${rankClass}">${rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank}</span>
               <span class="leaderboard-user">${displayName}${isCurrentUser ? ' (You)' : ''}</span>
-              <span class="leaderboard-score">Level ${entry.max_unlocked || 0}</span>
+              <span class="leaderboard-score">${scoreText}</span>
             </div>
           `;
         }).join("");
 
-        leaderboardList.innerHTML = `<ul class="leaderboard-list">${html}</ul>`;
+        const title = isLevelMode && Number.isFinite(selectedLevel)
+          ? `Level ${selectedLevel} - Fewest Moves`
+          : "Total Levels Unlocked";
+        leaderboardList.innerHTML = `<div class="leaderboard-loading" style="padding: 8px 0 16px; font-size: 1rem; text-align: left;">${title}</div><ul class="leaderboard-list">${html}</ul>`;
+      }
+
+      if (leaderboardModeSelect) {
+        leaderboardModeSelect.addEventListener("change", () => {
+          if (leaderboardModal && leaderboardModal.classList.contains("active")) {
+            loadLeaderboard();
+          }
+        });
       }
     });
 

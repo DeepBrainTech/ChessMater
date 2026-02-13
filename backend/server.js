@@ -304,6 +304,13 @@ const initTablesSql = `
     level_data JSONB,
     created_at TIMESTAMP DEFAULT NOW()
   );
+  CREATE TABLE IF NOT EXISTS user_level_stats (
+    user_id TEXT NOT NULL,
+    level_index INT NOT NULL,
+    best_moves INT NOT NULL,
+    updated_at TIMESTAMP DEFAULT NOW(),
+    PRIMARY KEY (user_id, level_index)
+  );
 `;
 
 async function ensureTables() {
@@ -326,91 +333,130 @@ app.get('/init', async (req, res) => {
 });
 
 app.get('/progress', authenticate, async (req, res) => {
-  console.log('📥 GET /progress for user:', req.user.user_id);
+  console.log('GET /progress for user:', req.user.user_id);
   try {
     const result = await pool.query(
       'SELECT max_unlocked FROM user_progress WHERE user_id = $1',
       [req.user.user_id]
     );
     const maxUnlocked = result.rows[0]?.max_unlocked || 1;
-    console.log('✅ Returning maxUnlocked:', maxUnlocked);
+    console.log('Returning maxUnlocked:', maxUnlocked);
     res.json({ maxUnlocked });
   } catch (err) {
-    console.error('❌ Error fetching progress:', err);
+    console.error('Error fetching progress:', err);
     res.status(500).json({ error: 'Failed to fetch progress' });
   }
 });
 
 app.post('/progress', authenticate, async (req, res) => {
-    const parsed = Number.parseInt(req.body?.maxUnlocked, 10);
-    const maxUnlocked = Number.isFinite(parsed) ? parsed : 1;
-  
-    console.log("📥 POST /progress - user:", req.user.user_id, "maxUnlocked:", maxUnlocked);
-  
-    try {
+  const parsed = Number.parseInt(req.body?.maxUnlocked, 10);
+  const maxUnlocked = Number.isFinite(parsed) ? parsed : 1;
+  const parsedLevel = Number.parseInt(req.body?.level, 10);
+  const parsedMoves = Number.parseInt(req.body?.moves, 10);
+  const level = Number.isFinite(parsedLevel) ? parsedLevel : null;
+  const moves = Number.isFinite(parsedMoves) ? parsedMoves : null;
+
+  console.log('POST /progress - user:', req.user.user_id, 'maxUnlocked:', maxUnlocked, 'level:', level, 'moves:', moves);
+
+  try {
+    await pool.query(
+      `
+      INSERT INTO user_progress (user_id, max_unlocked)
+      VALUES ($1, $2)
+      ON CONFLICT (user_id)
+      DO UPDATE SET max_unlocked = GREATEST(user_progress.max_unlocked, EXCLUDED.max_unlocked)
+      `,
+      [req.user.user_id, maxUnlocked]
+    );
+
+    if (level && level > 0 && moves && moves > 0) {
       await pool.query(
         `
-        INSERT INTO user_progress (user_id, max_unlocked)
-        VALUES ($1, $2)
-        ON CONFLICT (user_id)
-        DO UPDATE SET max_unlocked = GREATEST(user_progress.max_unlocked, EXCLUDED.max_unlocked)
+        INSERT INTO user_level_stats (user_id, level_index, best_moves, updated_at)
+        VALUES ($1, $2, $3, NOW())
+        ON CONFLICT (user_id, level_index)
+        DO UPDATE SET
+          best_moves = LEAST(user_level_stats.best_moves, EXCLUDED.best_moves),
+          updated_at = NOW()
         `,
-        [req.user.user_id, maxUnlocked]
+        [req.user.user_id, level, moves]
       );
-      console.log("✅ Progress saved successfully");
-      res.json({ success: true });
-    } catch (err) {
-      console.error("❌ Error saving progress:", err);
-      res.status(500).json({ error: "Failed to save progress" });
     }
-  });
+
+    console.log('Progress saved successfully');
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error saving progress:', err);
+    res.status(500).json({ error: 'Failed to save progress' });
+  }
+});
 
 app.post('/saveLevel', authenticate, async (req, res) => {
   const { levelName, levelData } = req.body;
-  console.log('📥 POST /saveLevel for user:', req.user.user_id);
+  console.log('POST /saveLevel for user:', req.user.user_id);
   try {
     await pool.query(
       `INSERT INTO levels (user_id, level_name, level_data)
        VALUES ($1, $2, $3)`,
       [req.user.user_id, levelName, levelData]
     );
-    console.log('✅ Level saved successfully:', levelName);
+    console.log('Level saved successfully:', levelName);
     res.json({ success: true });
   } catch (err) {
-    console.error('❌ Error saving level:', err);
+    console.error('Error saving level:', err);
     res.status(500).json({ error: 'Failed to save level' });
   }
 });
 
 app.get('/loadLevels', authenticate, async (req, res) => {
-  console.log('📥 GET /loadLevels for user:', req.user.user_id);
+  console.log('GET /loadLevels for user:', req.user.user_id);
   try {
     const result = await pool.query(
       `SELECT level_name, level_data FROM levels WHERE user_id = $1
        ORDER BY created_at DESC`,
       [req.user.user_id]
     );
-    console.log('✅ Loaded levels:', result.rows.length);
+    console.log('Loaded levels:', result.rows.length);
     res.json(result.rows);
   } catch (err) {
-    console.error('❌ Error loading levels:', err);
+    console.error('Error loading levels:', err);
     res.status(500).json({ error: 'Failed to load levels' });
   }
 });
 
 app.get('/leaderboard', authenticate, async (req, res) => {
   try {
-    const result = await pool.query(
-      `SELECT up.user_id, up.max_unlocked, u.username
-       FROM user_progress up
-       LEFT JOIN users u ON u.portal_user_id = up.user_id
-       ORDER BY up.max_unlocked DESC, up.user_id ASC
-       LIMIT 100`
-    );
+    const mode = req.query.mode === 'level' ? 'level' : 'progress';
+    let result;
+
+    if (mode === 'level') {
+      const parsedLevel = Number.parseInt(req.query.level, 10);
+      if (!Number.isFinite(parsedLevel) || parsedLevel <= 0) {
+        return res.status(400).json({ error: 'Invalid level parameter' });
+      }
+      result = await pool.query(
+        `SELECT uls.user_id, uls.level_index, uls.best_moves, u.username
+         FROM user_level_stats uls
+         LEFT JOIN users u ON u.portal_user_id = uls.user_id
+         WHERE uls.level_index = $1
+         ORDER BY uls.best_moves ASC, uls.user_id ASC
+         LIMIT 100`,
+        [parsedLevel]
+      );
+    } else {
+      result = await pool.query(
+        `SELECT up.user_id, up.max_unlocked, u.username
+         FROM user_progress up
+         LEFT JOIN users u ON u.portal_user_id = up.user_id
+         ORDER BY up.max_unlocked DESC, up.user_id ASC
+         LIMIT 100`
+      );
+    }
+
     res.json(result.rows);
   } catch (err) {
-    console.error("Error fetching leaderboard:", err);
-    res.status(500).json({ error: "Failed to fetch leaderboard" });
+    console.error('Error fetching leaderboard:', err);
+    res.status(500).json({ error: 'Failed to fetch leaderboard' });
   }
 });
 
@@ -419,6 +465,6 @@ const PORT = process.env.PORT || 3000;
 (async () => {
   await ensureTables();
   app.listen(PORT, () => {
-    console.log(`🚀 Server running on port ${PORT}`);
+    console.log(`Server running on port ${PORT}`);
   });
 })();
