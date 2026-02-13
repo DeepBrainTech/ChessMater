@@ -1240,16 +1240,7 @@
 
     document.addEventListener("DOMContentLoaded", () => {
     updateLoginPromptVisibility();
-    // Load level buttons
-    loadLevels();
-
-    // Set to Play Mode
-    const modeSelect = document.getElementById("modeSelect");
-    if (modeSelect) {
-        modeSelect.value = "play";
-        modeSelect.dispatchEvent(new Event("change"));
-    }
-
+    
     // Portal Button Logic - Update based on start-screen visibility
     function updatePortalButton() {
       const portalButton = document.getElementById("portalButton");
@@ -1279,6 +1270,7 @@
         };
       }
     }
+    window.updatePortalButton = updatePortalButton;
 
     // Initialize portal button state
     updatePortalButton();
@@ -1294,6 +1286,16 @@
         attributes: true,
         attributeFilter: ['style']
       });
+    }
+
+    // Load level buttons
+    loadLevels();
+
+    // Set to Play Mode
+    const modeSelect = document.getElementById("modeSelect");
+    if (modeSelect) {
+        modeSelect.value = "play";
+        modeSelect.dispatchEvent(new Event("change"));
     }
 
     // Start Game Button Logic

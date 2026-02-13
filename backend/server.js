@@ -124,6 +124,8 @@ app.post('/api/auth/verify', async (req, res) => {
       issuer: CHESSMATER_ISS
     });
 
+    console.log('✅ JWT verified, decoded:', { username: decoded.username, user_id: decoded.user_id, sub: decoded.sub });
+
     // Extra expiry check
     const now = Math.floor(Date.now() / 1000);
     if (decoded.exp && decoded.exp < now) {
@@ -136,9 +138,18 @@ app.post('/api/auth/verify', async (req, res) => {
     const username = decoded.username;
     const portalUserId = decoded.user_id;
 
+    if (!username || !portalUserId) {
+      console.error('❌ Missing username or user_id in JWT payload:', decoded);
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid token payload: missing username or user_id'
+      });
+    }
+
     // Find or create user
     let user;
     try {
+      console.log(`🔍 Looking for user: username=${username}`);
       const userResult = await pool.query(
         'SELECT * FROM users WHERE username = $1',
         [username]
@@ -147,10 +158,11 @@ app.post('/api/auth/verify', async (req, res) => {
       if (userResult.rows.length > 0) {
         // User exists
         user = userResult.rows[0];
-        console.log(`User exists: username=${username}, id=${user.id}`);
+        console.log(`✅ User exists: username=${username}, id=${user.id}`);
       } else {
         // Create user (portal_user_id used in temp password)
         const tempPassword = `portal_sso_${portalUserId}`;
+        console.log(`➕ Creating new user: username=${username}, portal_user_id=${portalUserId}`);
         const createResult = await pool.query(
           `INSERT INTO users (username, password, portal_user_id)
            VALUES ($1, $2, $3)
@@ -158,10 +170,10 @@ app.post('/api/auth/verify', async (req, res) => {
           [username, tempPassword, portalUserId.toString()]
         );
         user = createResult.rows[0];
-        console.log(`User created: username=${username}, portal_user_id=${portalUserId}`);
+        console.log(`✅ User created: username=${username}, db_id=${user.id}, portal_user_id=${user.portal_user_id}`);
       }
     } catch (dbErr) {
-      console.error('DB error:', dbErr);
+      console.error('❌ DB error during user find/create:', dbErr);
       return res.status(500).json({
         success: false,
         message: `Failed to create user: ${dbErr.message}`
@@ -173,11 +185,12 @@ app.post('/api/auth/verify', async (req, res) => {
       user: {
         id: user.id,
         username: user.username,
-        portal_user_id: user.portal_user_id
+        portal_user_id: user.portal_user_id,
+        user_id: portalUserId  // 返回 JWT 里的 user_id，供前端使用
       }
     });
   } catch (err) {
-    console.error('Token verification failed:', err.message);
+    console.error('❌ Token verification failed:', err.name, err.message);
     if (err.name === 'TokenExpiredError') {
       return res.status(401).json({
         success: false,
