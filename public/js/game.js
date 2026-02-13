@@ -981,6 +981,7 @@ async function checkWinCondition() {
     }
     
     const nextLevel = currentLevelIndex + 2;
+    const newMaxUnlocked = Math.max(maxUnlocked, nextLevel);
 
     if (nextLevel > maxUnlocked) {
       const token = window.cmToken;
@@ -1009,7 +1010,9 @@ async function checkWinCondition() {
       localStorage.setItem("cm_maxUnlocked", nextLevel.toString());
     }
 
-    loadLevels();
+    if (typeof loadLevels === 'function') {
+      loadLevels(newMaxUnlocked);
+    }
 
     showNextLevelButton();
   }

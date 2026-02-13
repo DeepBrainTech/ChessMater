@@ -1171,12 +1171,13 @@
     }
 
     
-    // Load and display levels
-    async function loadLevels() {
+    // Load and display levels. Optional maxUnlocked avoids refetch when caller already has it (e.g. after winning).
+    async function loadLevels(optionalMaxUnlocked) {
       const levelGrid = document.getElementById("levelGrid");
+      if (!levelGrid) return;
       levelGrid.innerHTML = "";
 
-      const maxUnlocked = await fetchProgress();
+      const maxUnlocked = optionalMaxUnlocked != null ? optionalMaxUnlocked : await fetchProgress();
 
 
       LEVELS.forEach((level, index) => {

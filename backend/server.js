@@ -295,9 +295,10 @@ app.get('/loadLevels', authenticate, async (req, res) => {
 app.get('/leaderboard', authenticate, async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT user_id, max_unlocked
-       FROM user_progress 
-       ORDER BY max_unlocked DESC, user_id ASC 
+      `SELECT up.user_id, up.max_unlocked, u.username
+       FROM user_progress up
+       LEFT JOIN users u ON u.portal_user_id = up.user_id
+       ORDER BY up.max_unlocked DESC, up.user_id ASC
        LIMIT 100`
     );
     res.json(result.rows);
