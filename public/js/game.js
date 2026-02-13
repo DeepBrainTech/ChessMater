@@ -227,7 +227,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const tipBox = document.getElementById('blockDescriptionBox');
     if (tipBox && tipToggle) {
       tipToggle.addEventListener('click', () => {
-        tipBox.classList.toggle('hidden');
+        if (tipBox) tipBox.classList.toggle('hidden');
       });
     }
   } catch (e) {
@@ -967,6 +967,10 @@ async function checkWinCondition() {
         const data = await res.json();
         maxUnlocked = parseInt(data.maxUnlocked || "1");
       } else {
+        if (res.status === 401) {
+          localStorage.removeItem("cm_token");
+          localStorage.removeItem("cm_user");
+        }
         // Fallback to localStorage if API fails
         maxUnlocked = parseInt(localStorage.getItem("cm_maxUnlocked") || "1");
       }
@@ -995,6 +999,10 @@ async function checkWinCondition() {
           console.log("🔐 Progress updated:", data);
           localStorage.setItem("cm_maxUnlocked", nextLevel.toString());
         } else {
+          if (res.status === 401) {
+            localStorage.removeItem("cm_token");
+            localStorage.removeItem("cm_user");
+          }
           const errorData = await res.json().catch(() => ({}));
           console.error("❌ Failed to update progress:", res.status, errorData);
           // Still save to localStorage as fallback

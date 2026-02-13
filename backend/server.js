@@ -199,31 +199,44 @@ app.get('/health', (req, res) => {
   res.json({ ok: true });
 });
 
+const initTablesSql = `
+  CREATE TABLE IF NOT EXISTS users (
+    id SERIAL PRIMARY KEY,
+    username VARCHAR(255) NOT NULL UNIQUE,
+    password VARCHAR(255) NOT NULL,
+    portal_user_id TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT NOW()
+  );
+  CREATE TABLE IF NOT EXISTS user_progress (
+    user_id TEXT PRIMARY KEY,
+    max_unlocked INT
+  );
+  CREATE TABLE IF NOT EXISTS levels (
+    id SERIAL PRIMARY KEY,
+    user_id TEXT,
+    level_name TEXT,
+    level_data JSONB,
+    created_at TIMESTAMP DEFAULT NOW()
+  );
+`;
+
+async function ensureTables() {
+  try {
+    await pool.query(initTablesSql);
+    console.log('✅ DB tables ensured (users, user_progress, levels)');
+  } catch (err) {
+    console.error('❌ Failed to create tables:', err.message);
+  }
+}
+
 app.get('/init', async (req, res) => {
-  await pool.query(`
-    -- Users (unique constraint)
-    CREATE TABLE IF NOT EXISTS users (
-      id SERIAL PRIMARY KEY,
-      username VARCHAR(255) NOT NULL UNIQUE,
-      password VARCHAR(255) NOT NULL,
-      portal_user_id TEXT NOT NULL,
-      created_at TIMESTAMP DEFAULT NOW()
-    );
-
-    CREATE TABLE IF NOT EXISTS user_progress (
-      user_id TEXT PRIMARY KEY,
-      max_unlocked INT
-    );
-
-    CREATE TABLE IF NOT EXISTS levels (
-      id SERIAL PRIMARY KEY,
-      user_id TEXT,
-      level_name TEXT,
-      level_data JSONB,
-      created_at TIMESTAMP DEFAULT NOW()
-    );
-  `);
-  res.send('✅ Tables created');
+  try {
+    await pool.query(initTablesSql);
+    res.send('✅ Tables created');
+  } catch (err) {
+    console.error('Init failed:', err);
+    res.status(500).send('Failed to create tables: ' + err.message);
+  }
 });
 
 app.get('/progress', authenticate, async (req, res) => {
@@ -291,8 +304,10 @@ app.get('/leaderboard', authenticate, async (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-});
 
-// Forcing Railway Update v1
+(async () => {
+  await ensureTables();
+  app.listen(PORT, () => {
+    console.log(`🚀 Server running on port ${PORT}`);
+  });
+})();

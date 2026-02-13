@@ -1035,16 +1035,24 @@
 
       // Load leaderboard data
       async function loadLeaderboard() {
+        if (!leaderboardList) return;
         leaderboardList.innerHTML = '<div class="leaderboard-loading">Loading leaderboard...</div>';
         
         try {
+          const token = localStorage.getItem("cm_token");
           const res = await fetch("https://chessmater-production.up.railway.app/leaderboard", {
             credentials: 'include',
             headers: {
-              Authorization: `Bearer ${localStorage.getItem("cm_token")}`,
+              Authorization: token ? `Bearer ${token}` : '',
             },
           });
 
+          if (res.status === 401) {
+            localStorage.removeItem("cm_token");
+            localStorage.removeItem("cm_user");
+            leaderboardList.innerHTML = '<div class="leaderboard-error">Session expired. Please <a href="https://game.deepbraintechnology.com/" target="_blank">log in again</a> from the portal.</div>';
+            return;
+          }
           if (!res.ok) {
             throw new Error("Failed to fetch leaderboard");
           }
@@ -1106,31 +1114,36 @@
       // { name: "Level 10", file: "levels/level10.json" }
     ];
     
-    // Toggle between developer and consumer mode
-    document.getElementById('modeToggle').addEventListener('click', function() {
-      isDeveloperMode = !isDeveloperMode;
-      const container = document.getElementById('mainContainer');
-      const toggleButton = document.getElementById('modeToggle');
-      
-      if (isDeveloperMode) {
-        container.classList.remove('consumer-mode');
-        container.classList.add('developer-mode');
-        toggleButton.textContent = 'Switch to Consumer Mode';
-        document.getElementById('modeSelect').value = 'edit';
-        mode = 'edit';
-        updateStatus('Developer Mode: Full editing capabilities enabled');
-      } else {
-        container.classList.remove('developer-mode');
-        container.classList.add('consumer-mode');
-        toggleButton.textContent = 'Switch to Developer Mode';
-        document.getElementById('modeSelect').value = 'play';
-        mode = 'play';
-        updateStatus('Consumer Mode: Level selection enabled');
+    // Toggle between developer and consumer mode (guard for missing element)
+    const modeToggleEl = document.getElementById('modeToggle');
+    if (modeToggleEl) {
+      modeToggleEl.addEventListener('click', function() {
+        isDeveloperMode = !isDeveloperMode;
+        const container = document.getElementById('mainContainer');
+        const toggleButton = document.getElementById('modeToggle');
+        if (!container || !toggleButton) return;
+        if (isDeveloperMode) {
+          container.classList.remove('consumer-mode');
+          container.classList.add('developer-mode');
+          toggleButton.textContent = 'Switch to Consumer Mode';
+          const modeSelect = document.getElementById('modeSelect');
+          if (modeSelect) modeSelect.value = 'edit';
+          mode = 'edit';
+          updateStatus('Developer Mode: Full editing capabilities enabled');
+        } else {
+          container.classList.remove('developer-mode');
+          container.classList.add('consumer-mode');
+          toggleButton.textContent = 'Switch to Developer Mode';
+          const modeSelect = document.getElementById('modeSelect');
+          if (modeSelect) modeSelect.value = 'play';
+          mode = 'play';
+          updateStatus('Consumer Mode: Level selection enabled');
 
-        // 🟢 Load levels from levels.js when entering consumer mode
-        loadLevels();
-      }
-    });
+          // 🟢 Load levels from levels.js when entering consumer mode
+          loadLevels();
+        }
+      });
+    }
 
     async function fetchProgress() {
       try {
@@ -1144,6 +1157,10 @@
         if (!res.ok) {
           const errorText = await res.text();
           console.error("❌ Failed to fetch progress:", res.status, errorText);
+          if (res.status === 401) {
+            localStorage.removeItem("cm_token");
+            localStorage.removeItem("cm_user");
+          }
           // Fallback to localStorage
           const localProgress = parseInt(localStorage.getItem("cm_maxUnlocked") || "1");
           console.log("⚠️ Using localStorage fallback:", localProgress);
