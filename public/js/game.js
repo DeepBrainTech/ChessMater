@@ -987,15 +987,12 @@ function syncProgressAfterWin() {
   window.currentMaxUnlocked = mergedUnlocked;
   console.log("🔓 Unlocked level:", mergedUnlocked, "from solved level:", solvedLevel);
 
-  // 标记进度已更新,需要在返回首页时刷新
+  // 标记进度已更新
   window.progressNeedsRefresh = true;
 
-  // 只有在首页可见时才重新渲染关卡按钮
-  const startScreen = document.getElementById("startScreen");
-  if (startScreen && window.getComputedStyle(startScreen).display !== "none") {
-    if (typeof loadLevels === 'function') {
-      loadLevels(mergedUnlocked);
-    }
+  // 由前端决定：出现 Next Level ➡️ 时下一关即解锁，立刻更新关卡列表（回到首页时下一关已变蓝）
+  if (typeof loadLevels === 'function') {
+    loadLevels(mergedUnlocked);
   }
   console.log("✅ Progress updated to level", mergedUnlocked);
 
