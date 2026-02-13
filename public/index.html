@@ -730,7 +730,9 @@
       localStorage.setItem("cm_locale", locale);
     }
 
-    // If token present, verify and save
+    // 仅使用主站 URL 带来的 token，会话内用 window 保存，不使用 localStorage
+    window.cmToken = null;
+    window.cmUser = null;
     let user = null;
     if (gameToken) {
       try {
@@ -739,7 +741,7 @@
         console.log("ChessMater user:", user);
         console.log("Locale:", locale);
 
-        fetch('https://chessmater-production.up.railway.app/api/auth/verify', {
+        window.authReady = fetch('https://chessmater-production.up.railway.app/api/auth/verify', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -750,54 +752,42 @@
         .then(data => {
           if (data.success) {
             console.log('User verified:', data);
-            localStorage.setItem("cm_user", JSON.stringify(data.user));
-            localStorage.setItem("cm_token", gameToken);
+            window.cmToken = gameToken;
+            window.cmUser = data.user;
             updateCurrentUserName();
             if (typeof window.updateLoginPromptVisibility === 'function') window.updateLoginPromptVisibility();
           } else {
             console.error('Token verification failed:', data.message);
-            localStorage.setItem("cm_token", gameToken);
-            localStorage.setItem("cm_user", JSON.stringify(user));
+            window.cmToken = gameToken;
+            window.cmUser = user ? { id: user.sub, username: user.username, portal_user_id: user.user_id } : null;
             updateCurrentUserName();
             if (typeof window.updateLoginPromptVisibility === 'function') window.updateLoginPromptVisibility();
           }
+          history.replaceState(null, null, window.location.pathname + window.location.search);
+          return data;
         })
         .catch(err => {
           console.error('Token verify request failed:', err);
-          localStorage.setItem("cm_token", gameToken);
-          localStorage.setItem("cm_user", JSON.stringify(user));
+          window.cmToken = gameToken;
+          window.cmUser = user ? { id: user.sub, username: user.username, portal_user_id: user.user_id } : null;
           updateCurrentUserName();
           if (typeof window.updateLoginPromptVisibility === 'function') window.updateLoginPromptVisibility();
+          history.replaceState(null, null, window.location.pathname + window.location.search);
         });
-
-        // Clear URL hash
-        history.replaceState(null, null, window.location.pathname + window.location.search);
-        
       } catch (err) {
         console.error("JWT parse error:", err);
+        window.authReady = Promise.resolve();
       }
     } else {
-      // No token in URL: try localStorage
-      const savedToken = localStorage.getItem("cm_token");
-      const savedUser = localStorage.getItem("cm_user");
-      if (savedToken && savedUser) {
-        console.log("Using saved token");
-        user = JSON.parse(savedUser);
-      }
+      window.authReady = Promise.resolve();
     }
 
     function updateCurrentUserName() {
       const el1 = document.getElementById("startScreenUserName");
       const el2 = document.getElementById("mainContainerUserName");
       if (!el1 && !el2) return;
-      let text = "";
-      try {
-        const saved = localStorage.getItem("cm_user");
-        if (saved) {
-          const u = JSON.parse(saved);
-          text = u.username || u.user_id || (u.portal_user_id ? String(u.portal_user_id) : "") || "";
-        }
-      } catch (e) {}
+      const u = window.cmUser;
+      const text = u ? (u.username || u.user_id || (u.portal_user_id ? String(u.portal_user_id) : "") || "") : "";
       const display = text ? "current user: " + text : "";
       if (el1) el1.textContent = display;
       if (el2) el2.textContent = display;
@@ -1040,19 +1030,17 @@
       async function loadLeaderboard() {
         if (!leaderboardList) return;
         leaderboardList.innerHTML = '<div class="leaderboard-loading">Loading leaderboard...</div>';
-        
+        await (window.authReady || Promise.resolve());
         try {
-          const token = localStorage.getItem("cm_token");
+          const token = window.cmToken;
           const res = await fetch("https://chessmater-production.up.railway.app/leaderboard", {
             credentials: 'include',
-            headers: {
-              Authorization: token ? `Bearer ${token}` : '',
-            },
+            headers: { Authorization: token ? `Bearer ${token}` : '' },
           });
 
           if (res.status === 401) {
-            localStorage.removeItem("cm_token");
-            localStorage.removeItem("cm_user");
+            window.cmToken = null;
+            window.cmUser = null;
             leaderboardList.innerHTML = '<div class="leaderboard-error">Session expired. Please <a href="https://game.deepbraintechnology.com/" target="_blank">log in again</a> from the portal.</div>';
             return;
           }
@@ -1074,7 +1062,7 @@
           return;
         }
 
-        const currentUserId = JSON.parse(localStorage.getItem("cm_user") || "{}").user_id;
+        const currentUserId = window.cmUser ? (window.cmUser.user_id || window.cmUser.portal_user_id || window.cmUser.id) : null;
         const html = leaderboardData.map((entry, index) => {
           const rank = index + 1;
           let rankClass = "";
@@ -1150,38 +1138,35 @@
 
     async function fetchProgress() {
       try {
+        await (window.authReady || Promise.resolve());
+        const token = window.cmToken;
+        if (!token) {
+          return parseInt(localStorage.getItem("cm_maxUnlocked") || "1", 10);
+        }
         const res = await fetch("https://chessmater-production.up.railway.app/progress", {
           credentials: 'include',
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("cm_token")}`,
-          },
+          headers: { Authorization: `Bearer ${token}` },
         });
 
         if (!res.ok) {
           const errorText = await res.text();
           console.error("❌ Failed to fetch progress:", res.status, errorText);
           if (res.status === 401) {
-            localStorage.removeItem("cm_token");
-            localStorage.removeItem("cm_user");
+            window.cmToken = null;
+            window.cmUser = null;
           }
-          // Fallback to localStorage
-          const localProgress = parseInt(localStorage.getItem("cm_maxUnlocked") || "1");
-          console.log("⚠️ Using localStorage fallback:", localProgress);
-          return localProgress;
+          return parseInt(localStorage.getItem("cm_maxUnlocked") || "1", 10);
         }
 
         const data = await res.json();
-        const maxUnlocked = parseInt(data.maxUnlocked || "1");
+        const maxUnlocked = parseInt(data.maxUnlocked || "1", 10);
         console.log("✅ Fetched maxUnlocked:", maxUnlocked);
-        // Sync to localStorage
         localStorage.setItem("cm_maxUnlocked", maxUnlocked.toString());
         return maxUnlocked;
 
       } catch (err) {
-        console.warn("⚠️ Error in fetchProgress (CORS or network issue), using localStorage:", err);
-        // Fallback to localStorage if fetch fails
-        const localProgress = parseInt(localStorage.getItem("cm_maxUnlocked") || "1");
-        return localProgress;
+        console.warn("⚠️ Error in fetchProgress:", err);
+        return parseInt(localStorage.getItem("cm_maxUnlocked") || "1", 10);
       }
     }
 
@@ -1244,7 +1229,7 @@
     }
     
     function isLoggedIn() {
-      return !!(localStorage.getItem("cm_token") && localStorage.getItem("cm_user"));
+      return !!(window.cmToken && window.cmUser);
     }
     function updateLoginPromptVisibility() {
       const el = document.getElementById("loginPrompt");
