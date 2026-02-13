@@ -27,6 +27,13 @@
       font-size: 2.5em;
       text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
     }
+    .current-user-name {
+      text-align: center;
+      color: #7f8c8d;
+      font-size: 0.95rem;
+      margin: -10px 0 15px 0;
+      min-height: 1.2em;
+    }
     .game-area {
       display: flex;
       flex-direction: column;
@@ -248,6 +255,36 @@
       z-index: 10;
     }
     
+    .portal-button {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      background: #f5f5f5;
+      color: #333;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 25px;
+      cursor: pointer;
+      font-weight: bold;
+      font-size: 14px;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+      z-index: 10000;
+      display: inline-block;
+      transition: all 0.3s ease;
+    }
+    
+    .portal-button:hover {
+      background: #e8e8e8;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      transform: translateY(-1px);
+    }
+    
+    .portal-button:active {
+      transform: translateY(0);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+    }
+    
     .developer-only {
       display: none;
     }
@@ -304,6 +341,146 @@
 
     #startButton:hover {
       background-color: #0d8ddb;
+    }
+
+    .start-screen-buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      align-items: center;
+    }
+
+    #leaderboardButton {
+      padding: 12px 24px;
+      font-size: 1.2rem;
+      font-weight: bold;
+      background-color: #9b59b6;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      box-shadow: 2px 2px 10px rgba(0,0,0,0.3);
+    }
+
+    #leaderboardButton:hover {
+      background-color: #8e44ad;
+    }
+
+    .leaderboard-modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.8);
+      z-index: 10001;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .leaderboard-modal.active {
+      display: flex;
+    }
+
+    .leaderboard-content {
+      background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d);
+      padding: 30px;
+      border-radius: 15px;
+      max-width: 600px;
+      width: 90%;
+      max-height: 80vh;
+      overflow-y: auto;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+      color: #fff;
+    }
+
+    .leaderboard-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    .leaderboard-header h2 {
+      margin: 0;
+      font-size: 2rem;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+    }
+
+    .close-leaderboard {
+      background: rgba(255,255,255,0.2);
+      border: none;
+      color: white;
+      font-size: 1.5rem;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+
+    .close-leaderboard:hover {
+      background: rgba(255,255,255,0.3);
+      transform: rotate(90deg);
+    }
+
+    .leaderboard-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .leaderboard-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 15px;
+      margin-bottom: 10px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 8px;
+      backdrop-filter: blur(10px);
+    }
+
+    .leaderboard-rank {
+      font-size: 1.5rem;
+      font-weight: bold;
+      min-width: 50px;
+    }
+
+    .leaderboard-rank.gold {
+      color: #ffd700;
+    }
+
+    .leaderboard-rank.silver {
+      color: #c0c0c0;
+    }
+
+    .leaderboard-rank.bronze {
+      color: #cd7f32;
+    }
+
+    .leaderboard-user {
+      flex: 1;
+      margin-left: 15px;
+      font-size: 1.1rem;
+    }
+
+    .leaderboard-score {
+      font-size: 1.2rem;
+      font-weight: bold;
+      min-width: 80px;
+      text-align: right;
+    }
+
+    .leaderboard-loading {
+      text-align: center;
+      padding: 40px;
+      font-size: 1.2rem;
+    }
+
+    .leaderboard-error {
+      text-align: center;
+      padding: 40px;
+      color: #ff6b6b;
+      font-size: 1.1rem;
     }
 
     .canvas-container {
@@ -440,6 +617,52 @@
         z-index: 9999; /* Just behind the buttons */
         pointer-events: none; /* Let clicks pass through if needed */
       }
+
+      /* Portal button mobile styles */
+      .portal-button {
+        top: 10px !important;
+        left: 10px !important;
+        padding: 8px 16px !important;
+        font-size: 12px !important;
+      }
+
+      /* Leaderboard mobile styles */
+      .leaderboard-content {
+        padding: 20px !important;
+        max-width: 95% !important;
+      }
+
+      .leaderboard-header h2 {
+        font-size: 1.5rem !important;
+      }
+
+      .leaderboard-item {
+        padding: 12px !important;
+        font-size: 0.9rem !important;
+      }
+
+      .leaderboard-rank {
+        font-size: 1.2rem !important;
+        min-width: 40px !important;
+      }
+
+      .leaderboard-user {
+        font-size: 1rem !important;
+      }
+
+      .leaderboard-score {
+        font-size: 1rem !important;
+        min-width: 60px !important;
+      }
+
+      .start-screen-buttons {
+        gap: 12px !important;
+      }
+
+      #startButton, #leaderboardButton {
+        padding: 10px 20px !important;
+        font-size: 1rem !important;
+      }
     }
 
 
@@ -449,44 +672,149 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 <body class="consumer-mode">
+  <button id="portalButton" class="portal-button">
+    Back to Main Portal
+  </button>
   <div id="rotateNotice">
     🔄 Please rotate your device to landscape for the best experience!
   </div>
   <script>
-    // Read token from URL hash
-    const hash = window.location.hash;
-    const token = hash.startsWith("#token=")
-    ? hash.replace("#token=", "").split("&")[0] // <--- Add .split("&")[0]
-    : null;
+    // 解析 URL hash 参数
+    function getHashParams() {
+      const hash = window.location.hash.substring(1);
+      const params = {};
+      hash.split('&').forEach(param => {
+        const [key, value] = param.split('=');
+        if (key && value) {
+          params[key] = decodeURIComponent(value);
+        }
+      });
+      return params;
+    }
 
-    // Decode JWT
+    // 从 URL hash 获取 token 和 locale
+    const hashParams = getHashParams();
+    const gameToken = hashParams.token || null;
+    const locale = hashParams.locale || 'en';
+
+    // 如果有新的 token，清除旧的本地数据（与 QuantumGo 流程一致）
+    if (gameToken) {
+      // 优先使用 URL 中的新令牌，清除旧的本地数据
+      localStorage.removeItem("access_token");
+      localStorage.removeItem("userId");
+      localStorage.removeItem("user_name");
+      localStorage.removeItem("user_password");
+      localStorage.removeItem("sso_token");
+    }
+
+    // 保存 locale 到 localStorage
+    if (locale) {
+      localStorage.setItem("cm_locale", locale);
+    }
+
+    // 如果有 token，验证并保存
     let user = null;
-    if (token) {
+    if (gameToken) {
       try {
-        user = JSON.parse(atob(token.split(".")[1]));
+        // 解码 JWT payload（仅用于显示，实际验证在后端）
+        const payload = gameToken.split(".")[1];
+        user = JSON.parse(atob(payload));
         console.log("ChessMater user:", user);
+        console.log("Locale:", locale);
 
-        // Save user + token for the game
-        localStorage.setItem("cm_user", JSON.stringify(user));
-        localStorage.setItem("cm_token", token);
+        // 验证新令牌（与 QuantumGo 流程一致）
+        fetch('https://chessmater-production.up.railway.app/api/auth/verify', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${gameToken}`
+          }
+        })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            console.log('用户验证成功:', data);
+            // 保存用户信息和 token 到 localStorage
+            localStorage.setItem("cm_user", JSON.stringify(data.user));
+            localStorage.setItem("cm_token", gameToken);
+            updateCurrentUserName();
+          } else {
+            console.error('Token 验证失败:', data.message);
+            // 即使验证失败，也保存 token 以便后续重试
+            localStorage.setItem("cm_token", gameToken);
+            localStorage.setItem("cm_user", JSON.stringify(user));
+            updateCurrentUserName();
+          }
+        })
+        .catch(err => {
+          console.error('Token 验证请求失败:', err);
+          // 网络错误时，仍然保存 token 以便后续使用
+          localStorage.setItem("cm_token", gameToken);
+          localStorage.setItem("cm_user", JSON.stringify(user));
+          updateCurrentUserName();
+        });
 
+        // 清除 URL hash（保持 URL 清洁）
         history.replaceState(null, null, window.location.pathname + window.location.search);
         
       } catch (err) {
-        console.error("Invalid JWT token:", err);
+        console.error("JWT token 解析失败:", err);
+      }
+    } else {
+      // 如果没有 token，尝试从 localStorage 恢复
+      const savedToken = localStorage.getItem("cm_token");
+      const savedUser = localStorage.getItem("cm_user");
+      if (savedToken && savedUser) {
+        console.log("使用已保存的 token");
+        user = JSON.parse(savedUser);
       }
     }
+
+    function updateCurrentUserName() {
+      const el1 = document.getElementById("startScreenUserName");
+      const el2 = document.getElementById("mainContainerUserName");
+      if (!el1 && !el2) return;
+      let text = "";
+      try {
+        const saved = localStorage.getItem("cm_user");
+        if (saved) {
+          const u = JSON.parse(saved);
+          text = u.username || u.user_id || (u.portal_user_id ? String(u.portal_user_id) : "") || "";
+        }
+      } catch (e) {}
+      const display = text ? "当前用户: " + text : "";
+      if (el1) el1.textContent = display;
+      if (el2) el2.textContent = display;
+    }
+    document.addEventListener("DOMContentLoaded", updateCurrentUserName);
   </script>
   <button class="mode-toggle" id="modeToggle">Switch to Consumer Mode</button>
 
   <div id="startScreen" class="start-screen">
     <h1>ChessMater</h1>
-    <button id="startButton">Start Game</button>
+    <p id="startScreenUserName" class="current-user-name"></p>
+    <div class="start-screen-buttons">
+      <button id="startButton">Start Game</button>
+      <button id="leaderboardButton">🏆 Leaderboard</button>
+    </div>
+  </div>
+
+  <!-- Leaderboard Modal -->
+  <div id="leaderboardModal" class="leaderboard-modal">
+    <div class="leaderboard-content">
+      <div class="leaderboard-header">
+        <h2>🏆 Leaderboard</h2>
+        <button class="close-leaderboard" id="closeLeaderboard">&times;</button>
+      </div>
+      <div id="leaderboardList">
+        <div class="leaderboard-loading">Loading leaderboard...</div>
+      </div>
+    </div>
   </div>
   
   <div class="container consumer-mode" id="mainContainer">
     <h1>ChessMater</h1>
-    
+    <p id="mainContainerUserName" class="current-user-name"></p>
     <div class="game-area">
       <div style="display: flex; gap: 20px;">
         <div class="canvas-container">
@@ -655,6 +983,89 @@
           }
         });
       }
+
+      // Leaderboard functionality
+      const leaderboardButton = document.getElementById("leaderboardButton");
+      const leaderboardModal = document.getElementById("leaderboardModal");
+      const closeLeaderboard = document.getElementById("closeLeaderboard");
+      const leaderboardList = document.getElementById("leaderboardList");
+
+      if (leaderboardButton) {
+        leaderboardButton.addEventListener("click", () => {
+          leaderboardModal.classList.add("active");
+          loadLeaderboard();
+        });
+      }
+
+      if (closeLeaderboard) {
+        closeLeaderboard.addEventListener("click", () => {
+          leaderboardModal.classList.remove("active");
+        });
+      }
+
+      // Close modal when clicking outside
+      if (leaderboardModal) {
+        leaderboardModal.addEventListener("click", (e) => {
+          if (e.target === leaderboardModal) {
+            leaderboardModal.classList.remove("active");
+          }
+        });
+      }
+
+      // Load leaderboard data
+      async function loadLeaderboard() {
+        leaderboardList.innerHTML = '<div class="leaderboard-loading">Loading leaderboard...</div>';
+        
+        try {
+          const res = await fetch("https://chessmater-production.up.railway.app/leaderboard", {
+            credentials: 'include',
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("cm_token")}`,
+            },
+          });
+
+          if (!res.ok) {
+            throw new Error("Failed to fetch leaderboard");
+          }
+
+          const data = await res.json();
+          displayLeaderboard(data);
+        } catch (err) {
+          console.error("Error loading leaderboard:", err);
+          leaderboardList.innerHTML = '<div class="leaderboard-error">Failed to load leaderboard. Please try again later.</div>';
+        }
+      }
+
+      function displayLeaderboard(leaderboardData) {
+        if (!leaderboardData || !Array.isArray(leaderboardData) || leaderboardData.length === 0) {
+          leaderboardList.innerHTML = '<div class="leaderboard-loading">No leaderboard data available yet.</div>';
+          return;
+        }
+
+        const currentUserId = JSON.parse(localStorage.getItem("cm_user") || "{}").user_id;
+        const html = leaderboardData.map((entry, index) => {
+          const rank = index + 1;
+          let rankClass = "";
+          if (rank === 1) rankClass = "gold";
+          else if (rank === 2) rankClass = "silver";
+          else if (rank === 3) rankClass = "bronze";
+
+          const isCurrentUser = entry.user_id === currentUserId;
+          // Format user_id to be more readable (show first 8 chars)
+          const userId = entry.user_id || "";
+          const displayName = entry.username || (userId.length > 8 ? userId.substring(0, 8) + "..." : userId) || "Anonymous";
+          
+          return `
+            <div class="leaderboard-item" ${isCurrentUser ? 'style="background: rgba(255,255,255,0.2); border: 2px solid #ffd700;"' : ''}>
+              <span class="leaderboard-rank ${rankClass}">${rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank}</span>
+              <span class="leaderboard-user">${displayName}${isCurrentUser ? ' (You)' : ''}</span>
+              <span class="leaderboard-score">Level ${entry.max_unlocked || 0}</span>
+            </div>
+          `;
+        }).join("");
+
+        leaderboardList.innerHTML = `<ul class="leaderboard-list">${html}</ul>`;
+      }
     });
 
     // Mode management
@@ -703,7 +1114,7 @@
     async function fetchProgress() {
       try {
         const res = await fetch("https://chessmater-production.up.railway.app/progress", {
-          credentials: 'include', // <== add this line
+          credentials: 'include',
           headers: {
             Authorization: `Bearer ${localStorage.getItem("cm_token")}`,
           },
@@ -712,16 +1123,24 @@
         if (!res.ok) {
           const errorText = await res.text();
           console.error("❌ Failed to fetch progress:", res.status, errorText);
-          return 1;
+          // Fallback to localStorage
+          const localProgress = parseInt(localStorage.getItem("cm_maxUnlocked") || "1");
+          console.log("⚠️ Using localStorage fallback:", localProgress);
+          return localProgress;
         }
 
         const data = await res.json();
-        console.log("✅ Fetched maxUnlocked:", data.maxUnlocked);
-        return parseInt(data.maxUnlocked || "1");
+        const maxUnlocked = parseInt(data.maxUnlocked || "1");
+        console.log("✅ Fetched maxUnlocked:", maxUnlocked);
+        // Sync to localStorage
+        localStorage.setItem("cm_maxUnlocked", maxUnlocked.toString());
+        return maxUnlocked;
 
       } catch (err) {
-        console.error("❌ Error in fetchProgress:", err);
-        return 1;
+        console.warn("⚠️ Error in fetchProgress (CORS or network issue), using localStorage:", err);
+        // Fallback to localStorage if fetch fails
+        const localProgress = parseInt(localStorage.getItem("cm_maxUnlocked") || "1");
+        return localProgress;
       }
     }
 
@@ -757,6 +1176,12 @@
             // Level is playable
             button.addEventListener("click", () => {
                 currentLevelIndex = index;
+                // Hide start screen when loading a level
+                const startScreen = document.getElementById("startScreen");
+                if (startScreen) {
+                    startScreen.style.display = "none";
+                    updatePortalButton(); // Update button state
+                }
                 loadPuzzle(level);
             });
         }
@@ -788,6 +1213,52 @@
         modeSelect.dispatchEvent(new Event("change"));
     }
 
+    // Portal Button Logic - Update based on start-screen visibility
+    function updatePortalButton() {
+      const portalButton = document.getElementById("portalButton");
+      const startScreen = document.getElementById("startScreen");
+      
+      if (!portalButton || !startScreen) return;
+      
+      // Check if start-screen is visible
+      const computedStyle = window.getComputedStyle(startScreen);
+      const isStartScreenVisible = computedStyle.display !== "none";
+      
+      if (isStartScreenVisible) {
+        // On home page: show "Back to Main Portal" and link to external site
+        portalButton.textContent = "Back to Main Portal";
+        portalButton.onclick = () => {
+          window.open("https://game.deepbraintechnology.com/", "_blank");
+        };
+      } else {
+        // In game: show "Back to Home" and return to start screen
+        portalButton.textContent = "Back to Home";
+        portalButton.onclick = () => {
+          const startScreen = document.getElementById("startScreen");
+          if (startScreen) {
+            startScreen.style.display = "flex";
+            updatePortalButton(); // Update button state
+          }
+        };
+      }
+    }
+
+    // Initialize portal button state
+    updatePortalButton();
+
+    // Monitor start-screen visibility changes
+    const startScreenObserver = new MutationObserver(() => {
+      updatePortalButton();
+    });
+    
+    const startScreen = document.getElementById("startScreen");
+    if (startScreen) {
+      startScreenObserver.observe(startScreen, {
+        attributes: true,
+        attributeFilter: ['style']
+      });
+    }
+
     // Start Game Button Logic
     const startButton = document.getElementById("startButton");
     if (startButton) {
@@ -795,6 +1266,7 @@
         const startScreen = document.getElementById("startScreen");
         if (startScreen) {
             startScreen.style.display = "none";
+            updatePortalButton(); // Update button when game starts
         }
 
         // Load Level 1 and force play mode

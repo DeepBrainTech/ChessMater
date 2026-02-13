@@ -225,9 +225,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const tipToggle = document.getElementById('blockTipToggle');
   const tipBox = document.getElementById('blockDescriptionBox');
 
-  tipToggle.addEventListener('click', () => {
-    tipBox.classList.toggle('hidden');
-  });
+  if (tipToggle && tipBox) {
+    tipToggle.addEventListener('click', () => {
+      tipBox.classList.toggle('hidden');
+    });
+  }
 });
 
 // Function to resize the board
@@ -949,14 +951,28 @@ function checkGravityTeleportation() {
 async function checkWinCondition() {
   if (gameWon) {
     // Unlock next level
-    const res = await fetch("https://chessmater-production.up.railway.app/progress", {
-      credentials: 'include',
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem("cm_token")}`
+    let maxUnlocked = 1;
+    try {
+      const res = await fetch("https://chessmater-production.up.railway.app/progress", {
+        credentials: 'include',
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("cm_token")}`
+        }
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        maxUnlocked = parseInt(data.maxUnlocked || "1");
+      } else {
+        // Fallback to localStorage if API fails
+        maxUnlocked = parseInt(localStorage.getItem("cm_maxUnlocked") || "1");
       }
-    });
-    const data = await res.json();
-    const maxUnlocked = parseInt(data.maxUnlocked || "1");
+    } catch (err) {
+      // Fallback to localStorage if fetch fails (CORS, network error, etc.)
+      console.warn("⚠️ Could not fetch progress from server, using localStorage:", err);
+      maxUnlocked = parseInt(localStorage.getItem("cm_maxUnlocked") || "1");
+    }
+    
     const nextLevel = currentLevelIndex + 2;
 
     if (nextLevel > maxUnlocked) {
@@ -971,20 +987,21 @@ async function checkWinCondition() {
           body: JSON.stringify({ maxUnlocked: nextLevel })
         });
 
-        const data = await res.json();
-        console.log("🔐 Progress updated:", data);
-    
-        if (!res.ok) {
-          // Use 'data' because you already read the error message into it
-          console.error("❌ Failed to update progress:", res.status, data);
+        if (res.ok) {
+          const data = await res.json();
+          console.log("🔐 Progress updated:", data);
+          localStorage.setItem("cm_maxUnlocked", nextLevel.toString());
         } else {
-          console.log("✅ Progress updated to level", nextLevel);
+          const errorData = await res.json().catch(() => ({}));
+          console.error("❌ Failed to update progress:", res.status, errorData);
+          // Still save to localStorage as fallback
+          localStorage.setItem("cm_maxUnlocked", nextLevel.toString());
         }
-    
-        localStorage.setItem("cm_maxUnlocked", nextLevel.toString());
     
       } catch (err) {
         console.error("❌ Error sending POST /progress:", err);
+        // Still save to localStorage as fallback
+        localStorage.setItem("cm_maxUnlocked", nextLevel.toString());
       }
     }
 
