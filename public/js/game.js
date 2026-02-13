@@ -985,6 +985,28 @@ async function checkWinCondition() {
         return;
       }
       
+      // 诊断日志：检查token状态
+      console.log("🔐 Syncing progress to server:");
+      console.log("  - Token exists:", !!token);
+      console.log("  - Token length:", token ? token.length : 0);
+      console.log("  - Token preview:", token ? token.substring(0, 20) + "..." : "null");
+      
+      // 检查token是否过期
+      try {
+        const parts = token.split('.');
+        if (parts.length === 3) {
+          const payload = JSON.parse(atob(parts[1]));
+          const now = Math.floor(Date.now() / 1000);
+          const timeLeft = payload.exp - now;
+          console.log("  - Token expires in:", Math.floor(timeLeft / 60), "minutes");
+          if (timeLeft < 0) {
+            console.error("  ❌ Token已过期！");
+          }
+        }
+      } catch (e) {
+        console.warn("  ⚠️ Could not parse token:", e.message);
+      }
+      
       // 已登录用户：静默同步到服务器（不等待结果，不影响游戏流程）
       fetch("https://chessmater-production.up.railway.app/progress", {
         method: "POST",
@@ -1000,6 +1022,12 @@ async function checkWinCondition() {
           console.log("✅ Progress synced to server");
         } else {
           console.warn(`⚠️ Server sync failed (${res.status}), but progress saved in memory`);
+          // 获取错误详情
+          return res.json().then(data => {
+            console.error("  Error details:", data);
+          }).catch(() => {
+            console.error("  Could not parse error response");
+          });
         }
       })
       .catch(err => {

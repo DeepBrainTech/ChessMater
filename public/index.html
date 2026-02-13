@@ -796,14 +796,44 @@
           console.log("  - Issued at:", new Date(payload.iat * 1000).toLocaleString());
           console.log("  - Expires at:", new Date(payload.exp * 1000).toLocaleString());
           const now = Math.floor(Date.now() / 1000);
-          console.log("  - Time until expiry:", Math.floor((payload.exp - now) / 60), "minutes");
-          console.log("  - Token is valid:", payload.exp > now);
+          const timeLeft = payload.exp - now;
+          console.log("  - Time until expiry:", Math.floor(timeLeft / 60), "minutes");
+          console.log("  - Token is valid:", payload.exp > now ? "✅ YES" : "❌ NO (EXPIRED)");
+          
+          // 显示完整的payload
+          console.log("  - Full payload:", payload);
         } catch (err) {
           console.error("  - Error parsing token:", err);
         }
+      } else {
+        console.log("  ❌ No token found");
       }
       if (window.cmUser) {
         console.log("  - Current user:", window.cmUser);
+      }
+      
+      // 测试发送一个请求
+      console.log("\n🧪 Testing token with server...");
+      if (window.cmToken) {
+        fetch("https://chessmater-production.up.railway.app/progress", {
+          credentials: 'include',
+          headers: { Authorization: `Bearer ${window.cmToken}` }
+        })
+        .then(res => {
+          console.log("  - Server response:", res.status, res.statusText);
+          if (res.status === 401) {
+            console.error("  ❌ Token rejected by server (401)");
+          } else if (res.ok) {
+            console.log("  ✅ Token accepted by server");
+          }
+          return res.json();
+        })
+        .then(data => {
+          console.log("  - Response data:", data);
+        })
+        .catch(err => {
+          console.error("  - Request failed:", err);
+        });
       }
     };
 
