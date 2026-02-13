@@ -951,90 +951,81 @@ function checkGravityTeleportation() {
 }
 
 // Check if any player has reached the goal
-let isCheckingWinCondition = false; // 防止重复调用
+let isCheckingWinCondition = false; // prevent duplicate checks
+
+function syncProgressAfterWin() {
+  const nextLevel = currentLevelIndex + 2;
+
+  if (nextLevel > window.currentMaxUnlocked) {
+    window.currentMaxUnlocked = nextLevel;
+    console.log("?? Unlocked level:", nextLevel);
+  }
+
+  if (typeof loadLevels === 'function') {
+    loadLevels(window.currentMaxUnlocked);
+  }
+
+  if (!window.cmUser || !window.cmSessionReady) {
+    console.log("?? Not logged in, progress not synced to server");
+    return;
+  }
+
+  console.log("?? Syncing progress to server via session cookie");
+
+  fetch("https://chessmater-production.up.railway.app/progress", {
+    method: "POST",
+    credentials: 'include',
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ maxUnlocked: nextLevel })
+  })
+  .then(res => {
+    if (res.ok) {
+      console.log("? Progress synced to server");
+    } else {
+      console.warn(`?? Server sync failed (${res.status}), but progress saved in memory`);
+      return res.json().then(data => {
+        console.error("  Error details:", data);
+      }).catch(() => {
+        console.error("  Could not parse error response");
+      });
+    }
+  })
+  .catch(err => {
+    console.warn("?? Network error syncing progress:", err.message);
+  });
+}
 
 async function checkWinCondition() {
   if (isCheckingWinCondition) {
-    console.log("⏳ Win condition check already in progress, skipping...");
     return;
   }
-  
-  if (gameWon) {
-    if (isCheckingWinCondition) return; // 双重检查
-    isCheckingWinCondition = true;
-    
-    try {
-      const nextLevel = currentLevelIndex + 2;
-      
-      // 更新内存中的进度（立即解锁下一关）
-      if (nextLevel > window.currentMaxUnlocked) {
-        window.currentMaxUnlocked = nextLevel;
-        console.log("🔓 Unlocked level:", nextLevel);
-      }
-      
-      // 刷新关卡列表（使用内存中的进度，不需要等待服务器）
-      if (typeof loadLevels === 'function') {
-        loadLevels(window.currentMaxUnlocked);
-      }
-      
-      // 未登录用户无法同步到服务器
-      if (!window.cmUser || !window.cmSessionReady) {
-        console.log("📝 Not logged in, progress not synced to server");
+
+  isCheckingWinCondition = true;
+  try {
+    if (gameWon || !goal) return;
+
+    // Counter goal locked?
+    if (goal.type === "counter" && goal.counter <= 0) return;
+
+    // Check if all objectives are completed first
+    if (!areAllObjectivesCompleted()) {
+      return;
+    }
+
+    for (const player of players) {
+      if (player.row === goal.row && player.col === goal.col) {
+        gameWon = true;
+        updateStatus("?? Puzzle solved! All objectives completed and goal reached!");
+        triggerConfetti();
         showNextLevelButton();
-        return;
+        syncProgressAfterWin();
+        break;
       }
-      
-      console.log("🔐 Syncing progress to server via session cookie");
-      
-      // 已登录用户：静默同步到服务器（使用会话 cookie）
-      fetch("https://chessmater-production.up.railway.app/progress", {
-        method: "POST",
-        credentials: 'include',
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ maxUnlocked: nextLevel })
-      })
-      .then(res => {
-        if (res.ok) {
-          console.log("✅ Progress synced to server");
-        } else {
-          console.warn(`⚠️ Server sync failed (${res.status}), but progress saved in memory`);
-          // 获取错误详情
-          return res.json().then(data => {
-            console.error("  Error details:", data);
-          }).catch(() => {
-            console.error("  Could not parse error response");
-          });
-        }
-      })
-      .catch(err => {
-        console.warn("⚠️ Network error syncing progress:", err.message);
-      });
-
-      showNextLevelButton();
-    } finally {
-      isCheckingWinCondition = false;
     }
-  }
-  if (gameWon || !goal) return;
-
-  // Counter goal locked?
-  if (goal.type === "counter" && goal.counter <= 0) return;
-  
-  // Check if all objectives are completed first
-  if (!areAllObjectivesCompleted()) {
-    return;
-  }
-  
-  for (const player of players) {
-    if (player.row === goal.row && player.col === goal.col) {
-      gameWon = true;
-      updateStatus("🎉 Puzzle solved! All objectives completed and goal reached!");
-      triggerConfetti();
-      showNextLevelButton();
-      break;
-    }
+  } finally {
+    isCheckingWinCondition = false;
   }
 }
 
