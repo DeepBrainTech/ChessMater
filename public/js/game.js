@@ -954,23 +954,28 @@ function checkGravityTeleportation() {
 let isCheckingWinCondition = false; // prevent duplicate checks
 
 function syncProgressAfterWin() {
-  const nextLevel = currentLevelIndex + 2;
+  const byNameIndex = (typeof LEVELS !== "undefined" && currentPuzzleData && currentPuzzleData.name)
+    ? LEVELS.findIndex(lvl => lvl.name === currentPuzzleData.name)
+    : -1;
+  const solvedIndex = Math.max(currentLevelIndex, byNameIndex);
+  const nextLevel = solvedIndex + 2;
+  const mergedUnlocked = typeof window.mergeMaxUnlocked === "function"
+    ? window.mergeMaxUnlocked(nextLevel)
+    : Math.max(window.currentMaxUnlocked || 1, nextLevel);
 
-  if (nextLevel > window.currentMaxUnlocked) {
-    window.currentMaxUnlocked = nextLevel;
-    console.log("?? Unlocked level:", nextLevel);
-  }
+  window.currentMaxUnlocked = mergedUnlocked;
+  console.log("Unlocked level:", mergedUnlocked, "from solved index:", solvedIndex);
 
   if (typeof loadLevels === 'function') {
-    loadLevels(window.currentMaxUnlocked);
+    loadLevels(mergedUnlocked);
   }
 
   if (!window.cmUser || !window.cmSessionReady) {
-    console.log("?? Not logged in, progress not synced to server");
+    console.log("Not logged in, progress not synced to server");
     return;
   }
 
-  console.log("?? Syncing progress to server via session cookie");
+  console.log("Syncing progress to server via session cookie");
 
   fetch("https://chessmater-production.up.railway.app/progress", {
     method: "POST",
@@ -978,7 +983,7 @@ function syncProgressAfterWin() {
     headers: {
       "Content-Type": "application/json"
     },
-    body: JSON.stringify({ maxUnlocked: nextLevel })
+    body: JSON.stringify({ maxUnlocked: mergedUnlocked })
   })
   .then(res => {
     if (res.ok) {
@@ -1017,7 +1022,7 @@ async function checkWinCondition() {
     for (const player of players) {
       if (player.row === goal.row && player.col === goal.col) {
         gameWon = true;
-        updateStatus("?? Puzzle solved! All objectives completed and goal reached!");
+        updateStatus("Puzzle solved! All objectives completed and goal reached!");
         triggerConfetti();
         showNextLevelButton();
         syncProgressAfterWin();
