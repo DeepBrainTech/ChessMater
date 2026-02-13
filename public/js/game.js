@@ -990,7 +990,7 @@ function syncProgressAfterWin() {
   // 标记进度已更新
   window.progressNeedsRefresh = true;
 
-  // 由前端决定：出现 Next Level ➡️ 时下一关即解锁，立刻更新关卡列表（回到首页时下一关已变蓝）
+  // 由前端决定：出现 Next Level ➡️ 时下一关即解锁，立刻刷新游戏页上的关卡列表，下一关直接变蓝（无需点 Back to Home）
   if (typeof loadLevels === 'function') {
     loadLevels(mergedUnlocked);
   }
