@@ -956,30 +956,65 @@ function checkGravityTeleportation() {
 let isCheckingWinCondition = false; // prevent duplicate checks
 
 function syncProgressAfterWin() {
-  const byNameIndex = (typeof LEVELS !== "undefined" && currentPuzzleData && currentPuzzleData.name)
-    ? LEVELS.findIndex(lvl => lvl.name === currentPuzzleData.name)
-    : -1;
-  const solvedIndex = Math.max(currentLevelIndex, byNameIndex);
-  const solvedLevel = solvedIndex + 1;
-  const nextLevel = solvedIndex + 2;
+  console.log("🎯 syncProgressAfterWin called");
+  console.log("  📝 currentLevelIndex:", currentLevelIndex);
+  console.log("  📝 levelMoveCount:", levelMoveCount);
+  console.log("  📝 currentPuzzleData:", currentPuzzleData);
+  
+  // 如果currentLevelIndex是-1(未找到),尝试通过名称查找
+  let actualLevelIndex = currentLevelIndex;
+  if (actualLevelIndex < 0 && typeof LEVELS !== "undefined" && currentPuzzleData && currentPuzzleData.name) {
+    actualLevelIndex = LEVELS.findIndex(lvl => lvl.name === currentPuzzleData.name);
+    console.log("  🔍 Re-searched level by name, found index:", actualLevelIndex);
+  }
+  
+  // 如果还是找不到,使用0作为默认值
+  if (actualLevelIndex < 0) {
+    actualLevelIndex = 0;
+    console.warn("  ⚠️ Could not determine level index, defaulting to 0");
+  }
+  
+  const solvedIndex = actualLevelIndex;
+  const solvedLevel = solvedIndex + 1;  // 关卡编号从1开始
+  const nextLevel = solvedIndex + 2;    // 下一个解锁的关卡
+  
+  console.log("  🔢 solvedIndex:", solvedIndex, "solvedLevel:", solvedLevel, "nextLevel:", nextLevel);
+  
   const mergedUnlocked = typeof window.mergeMaxUnlocked === "function"
     ? window.mergeMaxUnlocked(nextLevel)
     : Math.max(window.currentMaxUnlocked || 1, nextLevel);
 
   window.currentMaxUnlocked = mergedUnlocked;
-  console.log("Unlocked level:", mergedUnlocked, "from solved index:", solvedIndex);
+  console.log("🔓 Unlocked level:", mergedUnlocked, "from solved level:", solvedLevel);
 
-  if (typeof loadLevels === 'function') {
-    loadLevels(mergedUnlocked);
+  // 标记进度已更新,需要在返回首页时刷新
+  window.progressNeedsRefresh = true;
+
+  // 只有在首页可见时才重新渲染关卡按钮
+  const startScreen = document.getElementById("startScreen");
+  if (startScreen && window.getComputedStyle(startScreen).display !== "none") {
+    if (typeof loadLevels === 'function') {
+      loadLevels(mergedUnlocked);
+    }
   }
-  console.log("Progress updated to level", mergedUnlocked);
+  console.log("✅ Progress updated to level", mergedUnlocked);
 
   if (!window.cmUser || !window.cmSessionReady) {
     console.log("Not logged in, progress not synced to server");
     return;
   }
 
-  console.log("Syncing progress to server via session cookie");
+  console.log("📤 Syncing progress to server via session cookie");
+  
+  const progressData = {
+    maxUnlocked: mergedUnlocked,
+    level: solvedLevel,
+    moves: levelMoveCount
+  };
+  
+  console.log("📊 Progress data (before stringify):", progressData);
+  const jsonBody = JSON.stringify(progressData);
+  console.log("📊 JSON body to send:", jsonBody);
 
   fetch("https://chessmater-production.up.railway.app/progress", {
     method: "POST",
@@ -987,26 +1022,28 @@ function syncProgressAfterWin() {
     headers: {
       "Content-Type": "application/json"
     },
-    body: JSON.stringify({
-      maxUnlocked: mergedUnlocked,
-      level: solvedLevel,
-      moves: levelMoveCount
-    })
+    body: jsonBody
   })
   .then(res => {
     if (res.ok) {
-      console.log("? Progress synced to server");
+      console.log("✅ Progress synced to server successfully");
+      return res.json();
     } else {
-      console.warn(`?? Server sync failed (${res.status}), but progress saved in memory`);
+      console.warn(`⚠️ Server sync failed (${res.status}), but progress saved in memory`);
       return res.json().then(data => {
-        console.error("  Error details:", data);
+        console.error("📛 Error details:", data);
       }).catch(() => {
-        console.error("  Could not parse error response");
+        console.error("📛 Could not parse error response");
       });
     }
   })
+  .then(data => {
+    if (data && data.success) {
+      console.log("🎉 Progress confirmed by server");
+    }
+  })
   .catch(err => {
-    console.warn("?? Network error syncing progress:", err.message);
+    console.warn("⚠️ Network error syncing progress:", err.message);
   });
 }
 

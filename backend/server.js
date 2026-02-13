@@ -369,7 +369,9 @@ app.post('/progress', authenticate, async (req, res) => {
       [req.user.user_id, maxUnlocked]
     );
 
-    if (level && level > 0 && moves && moves > 0) {
+    // 只要有关卡编号和moves数据(即使是0),都记录到stats表
+    if (level && level > 0 && moves !== null && moves !== undefined && moves >= 0) {
+      console.log('Saving level stats for level:', level, 'with moves:', moves);
       await pool.query(
         `
         INSERT INTO user_level_stats (user_id, level_index, best_moves, updated_at)
@@ -381,6 +383,9 @@ app.post('/progress', authenticate, async (req, res) => {
         `,
         [req.user.user_id, level, moves]
       );
+      console.log('Level stats saved successfully');
+    } else {
+      console.log('Level stats not saved - insufficient data:', { level, moves });
     }
 
     console.log('Progress saved successfully');

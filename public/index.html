@@ -1371,15 +1371,18 @@
       if (!levelGrid) return;
       levelGrid.innerHTML = "";
 
-      // 使用传入的进度，或使用缓存的进度，或从服务器获取
+      // 使用传入的进度,或使用缓存的进度,或从服务器获取
       let maxUnlocked;
       if (optionalMaxUnlocked !== undefined) {
         maxUnlocked = mergeMaxUnlocked(optionalMaxUnlocked);
+        console.log("🔵 loadLevels called with explicit progress:", optionalMaxUnlocked, "merged to:", maxUnlocked);
       } else if (window.currentMaxUnlocked > 1) {
-        // 使用缓存的进度（通关后更新的）
+        // 使用缓存的进度(通关后更新的)
         maxUnlocked = mergeMaxUnlocked(window.currentMaxUnlocked);
+        console.log("🟡 loadLevels using cached progress:", maxUnlocked);
       } else {
-        // 首次加载，从服务器获取
+        // 首次加载,从服务器获取
+        console.log("🟢 loadLevels fetching from server...");
         maxUnlocked = await fetchProgress();
       }
 
@@ -1404,7 +1407,8 @@
                 updateStatus("This level is locked. Complete earlier levels first!");
             });
         } else {
-            // Level is playable
+            // Level is playable - 使用蓝色表示已解锁
+            button.style.background = "linear-gradient(145deg, #4a90e2, #357abd)";
             button.addEventListener("click", () => {
                 currentLevelIndex = index;
                 // Hide start screen when loading a level
@@ -1419,6 +1423,8 @@
 
         levelGrid.appendChild(button);
       });
+      
+      console.log("🎮 Loaded", LEVELS.length, "levels, unlocked up to level", maxUnlocked);
     }
 
 
@@ -1492,7 +1498,11 @@
         const computedStyle = window.getComputedStyle(startScreenEl);
         const isVisible = computedStyle.display !== "none";
         if (isVisible && typeof loadLevels === "function") {
+          console.log("🏠 Returned to home page, refreshing levels with progress:", window.currentMaxUnlocked);
+          // 重新加载关卡列表,使用最新的进度
           loadLevels(window.currentMaxUnlocked);
+          // 清除刷新标记
+          window.progressNeedsRefresh = false;
         }
       }
       updatePortalButton();
