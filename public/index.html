@@ -1158,9 +1158,15 @@
             leaderboardList.innerHTML = '<div class="leaderboard-error">Please log in to view the leaderboard</div>';
             return;
           }
-          
+
+          const headers = {};
+          if (window.cmToken) {
+            headers.Authorization = `Bearer ${window.cmToken}`;
+          }
+
           const res = await fetch(getLeaderboardRequestUrl(), {
             credentials: 'include',
+            headers,
           });
 
           if (res.status === 401) {
