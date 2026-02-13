@@ -1229,6 +1229,14 @@
     // 全局变量：缓存当前会话的最大解锁关卡（只在首页加载时获取一次）
     window.currentMaxUnlocked = 1;
 
+    function mergeMaxUnlocked(value) {
+      const parsed = Number.parseInt(value, 10);
+      const candidate = Number.isFinite(parsed) ? parsed : 1;
+      const merged = Math.max(window.currentMaxUnlocked || 1, candidate);
+      window.currentMaxUnlocked = merged;
+      return merged;
+    }
+
     async function fetchProgress() {
       try {
         // 等待 token 验证完成
@@ -1237,8 +1245,7 @@
         // 未登录用户：只能玩第一关
         if (!window.cmUser || !window.cmSessionReady) {
           console.log("📝 Not logged in, only level 1 available");
-          window.currentMaxUnlocked = 1;
-          return 1;
+          return mergeMaxUnlocked(1);
         }
         
         // 已登录用户：从服务器获取进度（使用会话 cookie）
@@ -1248,20 +1255,17 @@
 
         if (!res.ok) {
           console.warn(`⚠️ Failed to fetch progress (${res.status}), defaulting to level 1`);
-          window.currentMaxUnlocked = 1;
-          return 1;
+          return mergeMaxUnlocked(1);
         }
 
         const data = await res.json();
         const maxUnlocked = parseInt(data.maxUnlocked || "1", 10);
         console.log("✅ Fetched progress from server:", maxUnlocked);
-        window.currentMaxUnlocked = maxUnlocked;
-        return maxUnlocked;
+        return mergeMaxUnlocked(maxUnlocked);
 
       } catch (err) {
         console.warn("⚠️ Error fetching progress:", err);
-        window.currentMaxUnlocked = 1;
-        return 1;
+        return mergeMaxUnlocked(1);
       }
     }
 
@@ -1275,10 +1279,10 @@
       // 使用传入的进度，或使用缓存的进度，或从服务器获取
       let maxUnlocked;
       if (optionalMaxUnlocked !== undefined) {
-        maxUnlocked = optionalMaxUnlocked;
+        maxUnlocked = mergeMaxUnlocked(optionalMaxUnlocked);
       } else if (window.currentMaxUnlocked > 1) {
         // 使用缓存的进度（通关后更新的）
-        maxUnlocked = window.currentMaxUnlocked;
+        maxUnlocked = mergeMaxUnlocked(window.currentMaxUnlocked);
       } else {
         // 首次加载，从服务器获取
         maxUnlocked = await fetchProgress();
