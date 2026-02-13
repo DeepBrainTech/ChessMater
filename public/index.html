@@ -838,9 +838,12 @@
           <canvas id="gameCanvas" width="1280" height="800"></canvas>
         </div>
       
-        <div id="blockDescriptionBox" class="hidden">
+        <div style="display:flex;flex-direction:column;gap:4px;">
+          <button type="button" id="blockTipToggle" class="control-group" style="align-self:flex-start;">Block Tip</button>
+          <div id="blockDescriptionBox" class="hidden">
           <h3>Block Tip</h3>
           <p id="blockDescription">Welcome! Start the first level to learn about blocks.</p>
+          </div>
         </div>
       </div>
       

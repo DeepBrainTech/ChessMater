@@ -225,7 +225,7 @@ document.addEventListener('DOMContentLoaded', () => {
   try {
     const tipToggle = document.getElementById('blockTipToggle');
     const tipBox = document.getElementById('blockDescriptionBox');
-    if (tipBox && tipToggle) {
+    if (tipBox && tipToggle && typeof tipToggle.addEventListener === 'function') {
       tipToggle.addEventListener('click', () => {
         if (tipBox) tipBox.classList.toggle('hidden');
       });

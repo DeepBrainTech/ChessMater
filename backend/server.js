@@ -6,8 +6,8 @@ const pool = require('./db');
 
 const app = express();
 
-// ChessMater JWT config (must match main portal)
-const CHESSMATER_SECRET = process.env.CHESSMATER_JWT_SECRET || 'change-this-chessmater-secret';
+// ChessMater JWT config — must match main portal (same secret, aud, iss) or verify returns 401 invalid signature
+const CHESSMATER_SECRET = process.env.CHESSMATER_JWT_SECRET || 'CHESSMATER';
 const CHESSMATER_ALG = process.env.CHESSMATER_JWT_ALG || 'HS256';
 const CHESSMATER_AUD = process.env.CHESSMATER_JWT_AUD || 'chessmater';
 const CHESSMATER_ISS = process.env.CHESSMATER_JWT_ISS || 'main-portal';
@@ -89,11 +89,15 @@ function authenticate(req, res, next) {
     };
     next();
   } catch (err) {
-    console.error('Token verification failed:', err.message);
+    console.error('Token verification failed:', err.name, err.message);
     if (err.name === 'TokenExpiredError') {
       return res.status(401).json({ error: 'Token expired' });
     } else if (err.name === 'JsonWebTokenError') {
-      return res.status(401).json({ error: 'Invalid token' });
+      // invalid signature = CHESSMATER_JWT_SECRET does not match main portal secret
+      return res.status(401).json({
+        error: 'Invalid token',
+        hint: err.message.includes('signature') ? 'JWT secret mismatch: set CHESSMATER_JWT_SECRET to the same value as the main portal.' : undefined
+      });
     } else {
       return res.status(401).json({ error: 'Token verification failed' });
     }
