@@ -964,78 +964,47 @@ async function checkWinCondition() {
     isCheckingWinCondition = true;
     
     try {
-      // 等待 token 验证完成
-      await (window.authReady || Promise.resolve());
-      
-      // Unlock next level
-      let maxUnlocked = 1;
-      try {
-        const token = window.cmToken;
-        if (!token) {
-          maxUnlocked = parseInt(localStorage.getItem("cm_maxUnlocked") || "1", 10);
-        } else {
-          const res = await fetch("https://chessmater-production.up.railway.app/progress", {
-            credentials: 'include',
-            headers: { Authorization: `Bearer ${token}` }
-          });
-          if (res.ok) {
-            const data = await res.json();
-            maxUnlocked = parseInt(data.maxUnlocked || "1", 10);
-          } else {
-            // GET 失败时不清空 token（可能是临时网络问题），仅记录并使用本地进度
-            const errorData = await res.json().catch(() => ({}));
-            console.warn(`⚠️ GET /progress failed with ${res.status}`, errorData);
-            maxUnlocked = parseInt(localStorage.getItem("cm_maxUnlocked") || "1", 10);
-          }
-        }
-      } catch (err) {
-        console.warn("⚠️ Could not fetch progress from server:", err);
-        maxUnlocked = parseInt(localStorage.getItem("cm_maxUnlocked") || "1", 10);
-      }
-      
+      const token = window.cmToken;
       const nextLevel = currentLevelIndex + 2;
-      const newMaxUnlocked = Math.max(maxUnlocked, nextLevel);
-
-      if (nextLevel > maxUnlocked) {
-        const token = window.cmToken;
-        if (token) {
-          try {
-            console.log("📤 Sending progress update:", { maxUnlocked: nextLevel });
-            const res = await fetch("https://chessmater-production.up.railway.app/progress", {
-              method: "POST",
-              credentials: 'include',
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`,
-              },
-              body: JSON.stringify({ maxUnlocked: nextLevel })
-            });
-            if (res.ok) {
-              const data = await res.json();
-              console.log("🔐 Progress updated:", data);
-            } else {
-              const errorData = await res.json().catch(() => ({}));
-              console.error(`❌ Failed to update progress: ${res.status}`, errorData);
-              if (res.status === 401) {
-                console.error('Token was rejected. Error:', errorData.error);
-                window.cmToken = null;
-                window.cmUser = null;
-                // 可选：提示用户重新登录
-                if (typeof updateLoginPromptVisibility === 'function') {
-                  updateLoginPromptVisibility();
-                }
-              }
-            }
-          } catch (err) {
-            console.error("❌ Error sending POST /progress:", err);
-          }
-        }
-        localStorage.setItem("cm_maxUnlocked", nextLevel.toString());
+      
+      // 更新内存中的进度（立即解锁下一关）
+      if (nextLevel > window.currentMaxUnlocked) {
+        window.currentMaxUnlocked = nextLevel;
+        console.log("🔓 Unlocked level:", nextLevel);
       }
-
+      
+      // 刷新关卡列表（使用内存中的进度，不需要等待服务器）
       if (typeof loadLevels === 'function') {
-        loadLevels(newMaxUnlocked);
+        loadLevels(window.currentMaxUnlocked);
       }
+      
+      // 未登录用户无法同步到服务器
+      if (!token) {
+        console.log("📝 Not logged in, progress not synced to server");
+        showNextLevelButton();
+        return;
+      }
+      
+      // 已登录用户：静默同步到服务器（不等待结果，不影响游戏流程）
+      fetch("https://chessmater-production.up.railway.app/progress", {
+        method: "POST",
+        credentials: 'include',
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ maxUnlocked: nextLevel })
+      })
+      .then(res => {
+        if (res.ok) {
+          console.log("✅ Progress synced to server");
+        } else {
+          console.warn(`⚠️ Server sync failed (${res.status}), but progress saved in memory`);
+        }
+      })
+      .catch(err => {
+        console.warn("⚠️ Network error syncing progress:", err.message);
+      });
 
       showNextLevelButton();
     } finally {

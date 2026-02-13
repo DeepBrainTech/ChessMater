@@ -1085,15 +1085,20 @@
         await (window.authReady || Promise.resolve());
         try {
           const token = window.cmToken;
+          
+          if (!token) {
+            leaderboardList.innerHTML = '<div class="leaderboard-error">Please log in to view the leaderboard</div>';
+            return;
+          }
+          
           const res = await fetch("https://chessmater-production.up.railway.app/leaderboard", {
             credentials: 'include',
             headers: { Authorization: token ? `Bearer ${token}` : '' },
           });
 
           if (res.status === 401) {
-            window.cmToken = null;
-            window.cmUser = null;
-            leaderboardList.innerHTML = '<div class="leaderboard-error">Session expired. Please <a href="https://game.deepbraintechnology.com/" target="_blank">log in again</a> from the portal.</div>';
+            // 游戏中不清除token，只显示友好提示
+            leaderboardList.innerHTML = '<div class="leaderboard-error">Session expired. Please <a href="https://game.deepbraintechnology.com/" target="_blank">refresh from the portal</a> to view leaderboard.</div>';
             return;
           }
           if (!res.ok) {
@@ -1188,48 +1193,63 @@
       });
     }
 
+    // 全局变量：缓存当前会话的最大解锁关卡（只在首页加载时获取一次）
+    window.currentMaxUnlocked = 1;
+
     async function fetchProgress() {
       try {
-        await (window.authReady || Promise.resolve());
         const token = window.cmToken;
+        
+        // 未登录用户：只能玩第一关
         if (!token) {
-          return parseInt(localStorage.getItem("cm_maxUnlocked") || "1", 10);
+          console.log("📝 Not logged in, only level 1 available");
+          window.currentMaxUnlocked = 1;
+          return 1;
         }
+        
+        // 已登录用户：从服务器获取进度（只在首页加载时调用一次）
         const res = await fetch("https://chessmater-production.up.railway.app/progress", {
           credentials: 'include',
           headers: { Authorization: `Bearer ${token}` },
         });
 
         if (!res.ok) {
-          const errorText = await res.text();
-          console.error("❌ Failed to fetch progress:", res.status, errorText);
-          if (res.status === 401) {
-            window.cmToken = null;
-            window.cmUser = null;
-          }
-          return parseInt(localStorage.getItem("cm_maxUnlocked") || "1", 10);
+          console.warn(`⚠️ Failed to fetch progress (${res.status}), defaulting to level 1`);
+          window.currentMaxUnlocked = 1;
+          return 1;
         }
 
         const data = await res.json();
         const maxUnlocked = parseInt(data.maxUnlocked || "1", 10);
-        console.log("✅ Fetched maxUnlocked:", maxUnlocked);
-        localStorage.setItem("cm_maxUnlocked", maxUnlocked.toString());
+        console.log("✅ Fetched progress from server:", maxUnlocked);
+        window.currentMaxUnlocked = maxUnlocked;
         return maxUnlocked;
 
       } catch (err) {
-        console.warn("⚠️ Error in fetchProgress:", err);
-        return parseInt(localStorage.getItem("cm_maxUnlocked") || "1", 10);
+        console.warn("⚠️ Error fetching progress:", err);
+        window.currentMaxUnlocked = 1;
+        return 1;
       }
     }
 
     
-    // Load and display levels. Optional maxUnlocked avoids refetch when caller already has it (e.g. after winning).
+    // Load and display levels using cached progress
     async function loadLevels(optionalMaxUnlocked) {
       const levelGrid = document.getElementById("levelGrid");
       if (!levelGrid) return;
       levelGrid.innerHTML = "";
 
-      const maxUnlocked = optionalMaxUnlocked != null ? optionalMaxUnlocked : await fetchProgress();
+      // 使用传入的进度，或使用缓存的进度，或从服务器获取
+      let maxUnlocked;
+      if (optionalMaxUnlocked !== undefined) {
+        maxUnlocked = optionalMaxUnlocked;
+      } else if (window.currentMaxUnlocked > 1) {
+        // 使用缓存的进度（通关后更新的）
+        maxUnlocked = window.currentMaxUnlocked;
+      } else {
+        // 首次加载，从服务器获取
+        maxUnlocked = await fetchProgress();
+      }
 
 
       LEVELS.forEach((level, index) => {
