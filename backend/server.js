@@ -22,6 +22,7 @@ const corsOptions = {
       // Allow production domains
       const isProduction = origin === 'https://chessmater.pages.dev' ||
                           origin === 'https://chessmater-production.up.railway.app' ||
+                          origin === 'https://chessmaster.deepbraintechnology.com' ||
                           origin.includes('pages.dev') ||
                           origin.includes('deepbraintechnology.com');
       

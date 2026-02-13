@@ -782,7 +782,7 @@
           text = u.username || u.user_id || (u.portal_user_id ? String(u.portal_user_id) : "") || "";
         }
       } catch (e) {}
-      const display = text ? "当前用户: " + text : "";
+      const display = text ? "current user: " + text : "";
       if (el1) el1.textContent = display;
       if (el2) el2.textContent = display;
     }
