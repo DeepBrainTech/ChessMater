@@ -222,13 +222,16 @@ if (eraseBoardBtn) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  const tipToggle = document.getElementById('blockTipToggle');
-  const tipBox = document.getElementById('blockDescriptionBox');
-
-  if (tipBox && tipToggle) {
-    tipToggle.addEventListener('click', () => {
-      tipBox.classList.toggle('hidden');
-    });
+  try {
+    const tipToggle = document.getElementById('blockTipToggle');
+    const tipBox = document.getElementById('blockDescriptionBox');
+    if (tipBox && tipToggle) {
+      tipToggle.addEventListener('click', () => {
+        tipBox.classList.toggle('hidden');
+      });
+    }
+  } catch (e) {
+    console.warn('Block tip toggle init skipped:', e);
   }
 });
 

@@ -33,8 +33,12 @@ function isOriginAllowed(origin) {
 // Handle preflight first: OPTIONS returns CORS headers without auth
 app.use((req, res, next) => {
   const origin = req.headers.origin;
-  if (isOriginAllowed(origin)) {
-    res.setHeader('Access-Control-Allow-Origin', origin || '*');
+  const allowed = origin && isOriginAllowed(origin);
+  // For OPTIONS preflight, echo Origin back so browser always gets Allow-Origin (avoids CORS block)
+  if (req.method === 'OPTIONS' && origin) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  } else if (allowed) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
   }
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -57,7 +61,6 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
-app.options('*', cors(corsOptions));
 
 app.use(express.json());
 
@@ -188,6 +191,12 @@ app.post('/api/auth/verify', async (req, res) => {
       });
     }
   }
+});
+
+// Health check (no DB, no auth) - use to verify server and CORS
+app.get('/health', (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
+  res.json({ ok: true });
 });
 
 app.get('/init', async (req, res) => {
