@@ -968,10 +968,8 @@ async function checkWinCondition() {
           const data = await res.json();
           maxUnlocked = parseInt(data.maxUnlocked || "1", 10);
         } else {
-          if (res.status === 401) {
-            window.cmToken = null;
-            window.cmUser = null;
-          }
+          // GET 失败时不清空 token（可能是临时网络问题），仅记录并使用本地进度
+          console.warn(`⚠️ GET /progress failed with ${res.status}, using local progress`);
           maxUnlocked = parseInt(localStorage.getItem("cm_maxUnlocked") || "1", 10);
         }
       }
@@ -999,9 +997,13 @@ async function checkWinCondition() {
           if (res.ok) {
             const data = await res.json();
             console.log("🔐 Progress updated:", data);
-          } else if (res.status === 401) {
-            window.cmToken = null;
-            window.cmUser = null;
+          } else {
+            console.error(`❌ Failed to update progress: ${res.status}`);
+            if (res.status === 401) {
+              console.error('Token was rejected. Clearing session.');
+              window.cmToken = null;
+              window.cmUser = null;
+            }
           }
         } catch (err) {
           console.error("❌ Error sending POST /progress:", err);
