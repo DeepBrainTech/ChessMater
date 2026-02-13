@@ -342,7 +342,8 @@ app.get('/progress', authenticate, async (req, res) => {
 });
 
 app.post('/progress', authenticate, async (req, res) => {
-    const { maxUnlocked } = req.body;
+    const parsed = Number.parseInt(req.body?.maxUnlocked, 10);
+    const maxUnlocked = Number.isFinite(parsed) ? parsed : 1;
   
     console.log("📥 POST /progress - user:", req.user.user_id, "maxUnlocked:", maxUnlocked);
   
@@ -352,7 +353,7 @@ app.post('/progress', authenticate, async (req, res) => {
         INSERT INTO user_progress (user_id, max_unlocked)
         VALUES ($1, $2)
         ON CONFLICT (user_id)
-        DO UPDATE SET max_unlocked = EXCLUDED.max_unlocked
+        DO UPDATE SET max_unlocked = GREATEST(user_progress.max_unlocked, EXCLUDED.max_unlocked)
         `,
         [req.user.user_id, maxUnlocked]
       );
