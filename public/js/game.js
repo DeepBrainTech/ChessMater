@@ -972,6 +972,7 @@ function syncProgressAfterWin() {
   if (typeof loadLevels === 'function') {
     loadLevels(mergedUnlocked);
   }
+  console.log("Progress updated to level", mergedUnlocked);
 
   if (!window.cmUser || !window.cmSessionReady) {
     console.log("Not logged in, progress not synced to server");

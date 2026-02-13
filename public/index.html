@@ -1472,6 +1472,9 @@
           const startScreen = document.getElementById("startScreen");
           if (startScreen) {
             startScreen.style.display = "flex";
+            if (typeof loadLevels === "function") {
+              loadLevels(window.currentMaxUnlocked);
+            }
             updatePortalButton(); // Update button state
           }
         };
@@ -1484,6 +1487,14 @@
 
     // Monitor start-screen visibility changes
     const startScreenObserver = new MutationObserver(() => {
+      const startScreenEl = document.getElementById("startScreen");
+      if (startScreenEl) {
+        const computedStyle = window.getComputedStyle(startScreenEl);
+        const isVisible = computedStyle.display !== "none";
+        if (isVisible && typeof loadLevels === "function") {
+          loadLevels(window.currentMaxUnlocked);
+        }
+      }
       updatePortalButton();
     });
     
