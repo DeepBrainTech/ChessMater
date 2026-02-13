@@ -1198,6 +1198,9 @@
 
     async function fetchProgress() {
       try {
+        // 等待 token 验证完成
+        await (window.authReady || Promise.resolve());
+        
         const token = window.cmToken;
         
         // 未登录用户：只能玩第一关
@@ -1310,7 +1313,10 @@
     }
     window.updateLoginPromptVisibility = updateLoginPromptVisibility;
 
-    document.addEventListener("DOMContentLoaded", () => {
+    document.addEventListener("DOMContentLoaded", async () => {
+    // 等待 token 验证完成后再继续
+    await (window.authReady || Promise.resolve());
+    
     updateLoginPromptVisibility();
     
     // Portal Button Logic - Update based on start-screen visibility
