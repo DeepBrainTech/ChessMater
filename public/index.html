@@ -877,7 +877,7 @@
   <div id="startScreen" class="start-screen">
     <h1>ChessMater</h1>
     <p id="startScreenUserName" class="current-user-name"></p>
-    <p id="loginPrompt" class="login-prompt" style="display: none;">Please log in to play. <a href="https://game.deepbraintechnology.com/" target="_blank">Go to main portal to log in</a></p>
+    <p id="loginPrompt" class="login-prompt" style="display: none;">Please log in to play. <a href="https://deepbraintechnology.com/" target="_blank">Go to main portal to log in</a></p>
     <div class="start-screen-buttons">
       <button id="startButton">Start Game</button>
       <button id="leaderboardButton">🏆 Leaderboard</button>
@@ -1171,7 +1171,7 @@
 
           if (res.status === 401) {
             // 游戏中不清除token，只显示友好提示
-            leaderboardList.innerHTML = '<div class="leaderboard-error">Session expired. Please <a href="https://game.deepbraintechnology.com/" target="_blank">refresh from the portal</a> to view leaderboard.</div>';
+            leaderboardList.innerHTML = '<div class="leaderboard-error">Session expired. Please <a href="https://deepbraintechnology.com/" target="_blank">refresh from the portal</a> to view leaderboard.</div>';
             return;
           }
           if (!res.ok) {
@@ -1424,7 +1424,7 @@
         // On home page: show "Back to Main Portal" and link to external site
         portalButton.textContent = "Back to Main Portal";
         portalButton.onclick = () => {
-          window.open("https://game.deepbraintechnology.com/", "_blank");
+          window.open("https://deepbraintechnology.com/", "_blank");
         };
       } else {
         // In game: show "Back to Home" and return to start screen
