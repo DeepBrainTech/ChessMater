@@ -1214,6 +1214,24 @@ function checkGravityTeleportation() {
 // Check if any player has reached the goal
 let isCheckingWinCondition = false; // prevent duplicate checks
 
+if (CM_EDITOR_PAGE) {
+  window.cmResetEditorAfterPlaytest = function () {
+    levelMoveCount = 0;
+    moveHistorySnapshots = [];
+    pendingMoveCounter = false;
+    shakeAmount = 0;
+    shakeX = 0;
+    shakeY = 0;
+    playerTeleportCooldowns.clear();
+    risingPieces = [];
+    isCheckingWinCondition = false;
+    if (levelCompleteModal) levelCompleteModal.classList.remove("active");
+    gameWon = false;
+    updateMoveCountDisplay();
+    updateUndoButtonLabel();
+  };
+}
+
 function syncProgressAfterWin() {
   let actualLevelIndex = currentLevelIndex;
   if (actualLevelIndex < 0 && typeof LEVELS !== "undefined" && currentPuzzleData && currentPuzzleData.name) {

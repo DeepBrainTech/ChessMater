@@ -22,6 +22,8 @@
 
   const editorUndoStack = [];
   const MAX_EDITOR_UNDO = 80;
+  /** Snapshot taken when leaving Edit for Play test; restored when returning to Edit. */
+  let playTestBaseline = null;
 
   function cloneEditorState() {
     return {
@@ -33,7 +35,8 @@
       totalObjectives,
       bombs: JSON.parse(JSON.stringify(bombs)),
       teleportBlocks: JSON.parse(JSON.stringify(teleportBlocks)),
-      phaseBlockStates: JSON.parse(JSON.stringify(phaseBlockStates))
+      phaseBlockStates: JSON.parse(JSON.stringify(phaseBlockStates)),
+      fogEnabled
     };
   }
 
@@ -67,6 +70,11 @@
         visitedSquares[p.row][p.col] = true;
       }
     }
+    if (s.fogEnabled !== undefined) {
+      fogEnabled = s.fogEnabled;
+      const fogToggleBtn = document.getElementById("levelFogToggle");
+      if (fogToggleBtn) fogToggleBtn.checked = fogEnabled;
+    }
     updatePlayerCount();
     updateObjectiveCount();
   }
@@ -92,6 +100,7 @@
   }
 
   function eraseBoard() {
+    playTestBaseline = null;
     pushEditorUndoCheckpoint();
     board = Array.from({ length: ROWS }, () => Array(COLS).fill(CELL_TYPES.EMPTY));
     players = [];
@@ -219,6 +228,7 @@
 
   function loadLevelIntoEditor(puzzleData) {
     if (!puzzleData) return;
+    playTestBaseline = null;
     editorUndoStack.length = 0;
     updateEditorUndoButton();
     const clone = JSON.parse(JSON.stringify(puzzleData));
@@ -438,11 +448,29 @@
   const modeSelect = document.getElementById("modeSelect");
   if (modeSelect) {
     modeSelect.addEventListener("change", (e) => {
-      mode = e.target.value;
+      const newMode = e.target.value;
+      const prevMode = mode;
+      let skipResetPhaseBlocks = false;
+
+      if (newMode === "play" && prevMode === "edit") {
+        playTestBaseline = cloneEditorState();
+      }
+
+      if (newMode === "edit" && prevMode === "play" && playTestBaseline) {
+        restoreEditorState(playTestBaseline);
+        if (typeof window.cmResetEditorAfterPlaytest === "function") {
+          window.cmResetEditorAfterPlaytest();
+        }
+        playTestBaseline = null;
+        skipResetPhaseBlocks = true;
+        if (typeof drawBoard === "function") drawBoard();
+      }
+
+      mode = newMode;
       selectedPlayerIndex = -1;
       updateStatus(`Mode: ${mode === "edit" ? "Edit Mode" : "Play Mode"}`);
 
-      if (mode === "edit") {
+      if (mode === "edit" && !skipResetPhaseBlocks) {
         resetPhaseBlocks();
       }
 
