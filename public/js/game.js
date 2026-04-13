@@ -877,7 +877,7 @@ function loadPuzzle(puzzleData) {
 
 function decrementCounterAfterMove() {
   // If landing on goal won the game, do nothing
-  checkWinCondition(); // async function, will run in background
+  checkWinCondition();
   if (gameWon) return;
 
   if (goal && goal.type === "counter" && goal.counter > 0) {
@@ -1279,7 +1279,7 @@ function syncProgressAfterWin() {
   }).then(() => {}).catch(() => {});
 }
 
-async function checkWinCondition() {
+function checkWinCondition() {
   if (isCheckingWinCondition) {
     return;
   }
@@ -1299,11 +1299,12 @@ async function checkWinCondition() {
     for (const player of players) {
       if (player.row === goal.row && player.col === goal.col) {
         gameWon = true;
-        await grantUndoCredit(1);
         updateStatus("Puzzle solved! All objectives completed and goal reached!");
         triggerConfetti();
         showLevelCompleteModal();
         syncProgressAfterWin();
+        // Do not await: network grant would delay the modal by ~1–2s
+        void grantUndoCredit(1);
         break;
       }
     }
