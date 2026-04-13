@@ -874,25 +874,65 @@
       overflow: hidden; /* <--- Fix */
     }
 
+    /* Pixel width/height come from game.js resizeCanvas(); avoid width:100%+height:auto (collapses in flex). */
     canvas {
-      width: 100%;
-      height: auto;
       max-width: 100%;
       display: block;
     }
 
+    /* 竖屏时提示横屏（由下方脚本切换 display） */
     #rotateNotice {
       display: none;
       position: fixed;
-      top: 0;
-      left: 0;
-      background: #e74c3c;
-      color: white;
-      width: 100%;
-      padding: 12px;
+      inset: 0;
+      z-index: 100002;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 12px;
+      padding: 24px;
+      box-sizing: border-box;
+      background: rgba(15, 23, 42, 0.88);
+      color: #f8fafc;
       text-align: center;
-      font-weight: bold;
-      z-index: 10000;
+      font-weight: 600;
+      font-size: 1.1rem;
+      line-height: 1.5;
+    }
+    #rotateNotice.is-visible {
+      display: flex;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    #rotateNotice .rotate-notice-icon {
+      font-size: 2.5rem;
+      line-height: 1;
+    }
+    #rotateNotice .rotate-notice-sub {
+      font-weight: 400;
+      font-size: 0.95rem;
+      color: #cbd5e1;
+      max-width: 20rem;
+    }
+    #rotateNotice .rotate-notice-dismiss {
+      margin-top: 20px;
+      padding: 12px 28px;
+      font-size: 1rem;
+      font-weight: 700;
+      border: none;
+      border-radius: 10px;
+      background: #3b82f6;
+      color: #fff;
+      cursor: pointer;
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
+    }
+    #rotateNotice .rotate-notice-dismiss:hover,
+    #rotateNotice .rotate-notice-dismiss:focus-visible {
+      background: #2563eb;
+      outline: none;
+    }
+    #rotateNotice .rotate-notice-dismiss:focus-visible {
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.5);
     }
 
     /* --- MOBILE LAYOUT --- */
@@ -910,20 +950,30 @@
         align-items: center;
       }
 
-      /* 2. Center and resize the Canvas */
+      /* 2. Center and resize the Canvas — must reset flex (desktop flex:4 1 0 + basis 0 collapses
+         to zero height in column layout when parent height is auto; iPhone Safari). */
       .canvas-container {
+        flex: none !important;
+        flex-grow: 0 !important;
+        flex-shrink: 0 !important;
+        flex-basis: auto !important;
         width: 100% !important;
+        max-width: 100% !important;
         display: flex;
         justify-content: center;
+        align-items: center;
         margin: 0 auto;
         min-width: 0 !important;
+        overflow: visible;
       }
       
+      /* Let game.js resizeCanvas() set width/height via inline px — !important here
+         overrides inline styles and height:auto often collapses canvas to 0 in flex column. */
       canvas {
-        width: 100% !important;       /* Fits perfectly inside the container */
-        max-width: 100% !important;   /* Prevents it from growing too large */
-        height: auto !important;
+        max-width: 100% !important;
         display: block;
+        margin-left: auto;
+        margin-right: auto;
       }
 
       /* Top-right controls on mobile */
@@ -1018,9 +1068,62 @@
   <button id="portalButton" class="portal-button">
     Back to Main Portal
   </button>
-  <div id="rotateNotice">
-    🔄 Please rotate your device to landscape for the best experience!
+  <div id="rotateNotice" role="dialog" aria-modal="true" aria-live="polite" aria-label="Landscape recommended">
+    <span class="rotate-notice-icon" aria-hidden="true">🔄</span>
+    <div>Switch to landscape mode for the best gameplay experience.</div>
+    <div class="rotate-notice-sub">Rotate your device or tap to continue.</div>
+    <button type="button" class="rotate-notice-dismiss" id="rotateNoticeDismiss">Continue</button>
   </div>
+  <script>
+    (function () {
+      var notice = document.getElementById("rotateNotice");
+      if (!notice) return;
+      var dismissedInPortrait = false;
+
+      function isPortrait() {
+        if (window.matchMedia("(orientation: portrait)").matches) return true;
+        if (window.matchMedia("(orientation: landscape)").matches) return false;
+        return window.innerHeight > window.innerWidth;
+      }
+
+      function dismiss() {
+        if (!notice.classList.contains("is-visible")) return;
+        dismissedInPortrait = true;
+        notice.classList.remove("is-visible");
+      }
+
+      function syncRotateNotice() {
+        if (!isPortrait()) {
+          dismissedInPortrait = false;
+          notice.classList.remove("is-visible");
+          return;
+        }
+        if (dismissedInPortrait) {
+          notice.classList.remove("is-visible");
+          return;
+        }
+        notice.classList.add("is-visible");
+      }
+
+      notice.addEventListener("click", dismiss);
+      document.addEventListener("keydown", function (e) {
+        if (e.key === "Escape" && notice.classList.contains("is-visible")) dismiss();
+      });
+
+      var mq = window.matchMedia("(orientation: portrait)");
+      if (mq.addEventListener) mq.addEventListener("change", syncRotateNotice);
+      else if (mq.addListener) mq.addListener(syncRotateNotice);
+      window.addEventListener("resize", syncRotateNotice);
+      if (window.visualViewport) {
+        window.visualViewport.addEventListener("resize", syncRotateNotice);
+      }
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", syncRotateNotice);
+      } else {
+        syncRotateNotice();
+      }
+    })();
+  </script>
   <script>
     // Parse URL hash params
     function getHashParams() {
@@ -1331,7 +1434,6 @@
     </div>
     
     <footer>
-      <p style="margin:0 0 10px;"><a href="editor.html">Level editor</a> (build levels for levels.js)</p>
       Chess piece images by <a href="https://en.wikipedia.org/wiki/User:Cburnett">Cburnett</a>, 
       licensed under <a href="https://creativecommons.org/licenses/by-sa/3.0/">CC BY-SA 3.0</a>. 
       Source: <a href="https://commons.wikimedia.org/wiki/Category:SVG_chess_pieces">Wikimedia Commons</a>.

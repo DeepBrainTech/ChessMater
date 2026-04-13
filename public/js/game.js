@@ -564,9 +564,13 @@ function resizeCanvas() {
   const sidePanel = document.getElementById("gameSidePanel");
   const canvasContainer = canvas.parentElement;
 
+  const vv = window.visualViewport;
+  const viewW = vv ? vv.width : window.innerWidth;
+  const viewH = vv ? vv.height : window.innerHeight;
+
   const viewportPadding = 20;
-  let maxWidth = window.innerWidth - viewportPadding * 2;
-  let maxHeight = window.innerHeight - 90;
+  let maxWidth = viewW - viewportPadding * 2;
+  let maxHeight = viewH - 90;
 
   if (layoutRow && canvasContainer) {
     const layoutStyle = window.getComputedStyle(layoutRow);
@@ -575,7 +579,7 @@ function resizeCanvas() {
     const gap = Number.parseFloat(layoutStyle.columnGap || layoutStyle.gap || "0") || 0;
 
     // Height budget from layout row down to viewport bottom.
-    maxHeight = Math.max(220, window.innerHeight - rowRect.top - 24);
+    maxHeight = Math.max(220, viewH - rowRect.top - 24);
 
     if (isColumn) {
       maxWidth = Math.max(220, canvasContainer.clientWidth || maxWidth);
@@ -3185,7 +3189,10 @@ confettiStyle.textContent = `
 `;
 
 document.head.appendChild(confettiStyle);
-window.addEventListener('resize', resizeCanvas);
+window.addEventListener("resize", resizeCanvas);
+if (window.visualViewport) {
+  window.visualViewport.addEventListener("resize", resizeCanvas);
+}
 
 // Initialize the game
 initializeCanvas();
