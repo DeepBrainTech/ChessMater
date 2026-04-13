@@ -452,6 +452,10 @@
           <span class="puzzle-name-prefix">Puzzle </span>
           <input type="text" id="puzzleNumber" inputmode="numeric" autocomplete="off" placeholder="35" maxlength="8" aria-label="Puzzle number (digits only)">
         </div>
+        <div class="editor-block-tip-field" style="margin-top:12px; max-width:520px; margin-left:auto; margin-right:auto;">
+          <label for="editorBlockTip" style="display:block; font-weight:600; margin-bottom:6px;">Block tip (optional)</label>
+          <textarea id="editorBlockTip" rows="3" maxlength="2000" placeholder="Shown in Block Tip on the main game. Leave empty for &quot;No tip for this level.&quot;" style="width:100%; box-sizing:border-box; padding:8px; font-size:0.95rem; resize:vertical;"></textarea>
+        </div>
         <div style="margin-top:10px; display:flex; flex-wrap:wrap; gap:10px; justify-content:center;">
           <button type="button" id="copyLevelsJsBtn">Copy for levels.js (clipboard)</button>
           <button type="button" id="downloadBtn">Download JSON backup</button>
@@ -474,7 +478,7 @@
 
       <div class="hint-box">
         <strong>How to add a level to <code>public/js/levels.js</code></strong>: set the number so the level name is
-        <code>Puzzle N</code> (same style as existing levels), click <strong>Copy for levels.js</strong>,
+        <code>Puzzle N</code> (same style as existing levels), optionally fill <strong>Block tip</strong>, click <strong>Copy for levels.js</strong>,
         open <code>levels.js</code> in your editor, find <code>const LEVELS = [</code>, add a comma after the
         <strong>last</strong> object if needed, then paste your new entry. If it is the new last item, you may keep or
         remove the trailing comma to match the file style. Save and refresh the main game.

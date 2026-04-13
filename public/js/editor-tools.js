@@ -14,10 +14,15 @@
     });
   }
 
+  /** Last level name from Load / Import; used when puzzle # box is empty or non-Puzzle N. */
+  let editorFallbackLevelName = null;
+
   function getExportLevelName() {
     const raw = puzzleNumberInput && puzzleNumberInput.value ? puzzleNumberInput.value.trim() : "";
     const digits = raw.replace(/\D/g, "");
-    return digits ? `Puzzle ${digits}` : "chess_puzzle";
+    if (digits) return `Puzzle ${digits}`;
+    if (editorFallbackLevelName) return editorFallbackLevelName;
+    return "chess_puzzle";
   }
 
   const editorUndoStack = [];
@@ -100,6 +105,7 @@
   }
 
   function eraseBoard() {
+    editorFallbackLevelName = null;
     playTestBaseline = null;
     pushEditorUndoCheckpoint();
     board = Array.from({ length: ROWS }, () => Array(COLS).fill(CELL_TYPES.EMPTY));
@@ -112,6 +118,8 @@
     fogEnabled = false;
     const fogToggleBtn = document.getElementById("levelFogToggle");
     if (fogToggleBtn) fogToggleBtn.checked = false;
+    const blockTipEl = document.getElementById("editorBlockTip");
+    if (blockTipEl) blockTipEl.value = "";
     selectedPlayerIndex = -1;
     resetPhaseBlocks();
     showTransformerMenu = false;
@@ -134,7 +142,9 @@
       return null;
     }
     const puzzleName = getExportLevelName();
-    return {
+    const blockTipEl = document.getElementById("editorBlockTip");
+    const blockTip = blockTipEl ? blockTipEl.value.trim() : "";
+    const obj = {
       version: "1.3",
       name: puzzleName,
       rows: ROWS,
@@ -147,10 +157,53 @@
       fog: fogEnabled,
       createdAt: new Date().toISOString()
     };
+    if (blockTip) obj.blockTip = blockTip;
+    return obj;
+  }
+
+  /** Match levels.js style: only each board row is one line; other fields stay pretty-printed. */
+  function prettyExportKeyValue(k, v, comma) {
+    const json = JSON.stringify(v, null, 2);
+    const lines = json.split("\n");
+    const keyPrefix = `  ${JSON.stringify(k)}: `;
+    if (lines.length === 1) {
+      return keyPrefix + lines[0] + comma;
+    }
+    const first = keyPrefix + lines[0];
+    const middle = lines.slice(1, -1).map((ln) => `  ${ln}`);
+    const last = `  ${lines[lines.length - 1]}${comma}`;
+    return [first, ...middle, last].join("\n");
+  }
+
+  function stringifyPuzzleDataForExport(puzzleData) {
+    const keys = Object.keys(puzzleData);
+    const parts = ["{"];
+    for (let i = 0; i < keys.length; i++) {
+      const k = keys[i];
+      const v = puzzleData[k];
+      const comma = i < keys.length - 1 ? "," : "";
+      if (k === "board" && Array.isArray(v)) {
+        if (v.length === 0) {
+          parts.push(`  "board": []${comma}`);
+        } else {
+          const rows = v
+            .map((row, r) => {
+              const rowComma = r < v.length - 1 ? "," : "";
+              return `    [${row.join(", ")}]${rowComma}`;
+            })
+            .join("\n");
+          parts.push(`  "board": [\n${rows}\n  ]${comma}`);
+        }
+      } else {
+        parts.push(prettyExportKeyValue(k, v, comma));
+      }
+    }
+    parts.push("}");
+    return parts.join("\n");
   }
 
   function formatPuzzleEntryForLevelsJs(puzzleData) {
-    const json = JSON.stringify(puzzleData, null, 2);
+    const json = stringifyPuzzleDataForExport(puzzleData);
     return json.split("\n").map((line) => "    " + line).join("\n") + ",";
   }
 
@@ -198,7 +251,7 @@
     const puzzleData = buildPuzzleExportObject();
     if (!puzzleData) return;
 
-    const jsonString = JSON.stringify(puzzleData, null, 2);
+    const jsonString = stringifyPuzzleDataForExport(puzzleData);
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(jsonString);
     const downloadAnchorNode = document.createElement("a");
     downloadAnchorNode.setAttribute("href", dataStr);
@@ -219,10 +272,16 @@
   }
 
   function applyLoadedLevelToEditorForm(puzzleData) {
-    const name = puzzleData && puzzleData.name ? String(puzzleData.name) : "";
-    const m = /^Puzzle\s+(\d+)$/i.exec(name.trim());
+    const name = puzzleData && puzzleData.name ? String(puzzleData.name).trim() : "";
+    editorFallbackLevelName = name || null;
+    const m = /^Puzzle\s+(\d+)$/i.exec(name);
     if (m && puzzleNumberInput) {
       puzzleNumberInput.value = m[1];
+    }
+    const blockTipEl = document.getElementById("editorBlockTip");
+    if (blockTipEl) {
+      blockTipEl.value =
+        puzzleData && puzzleData.blockTip != null ? String(puzzleData.blockTip) : "";
     }
   }
 
@@ -454,10 +513,16 @@
 
       if (newMode === "play" && prevMode === "edit") {
         playTestBaseline = cloneEditorState();
+        const tipEl = document.getElementById("editorBlockTip");
+        playTestBaseline._editorBlockTip = tipEl ? tipEl.value : "";
       }
 
       if (newMode === "edit" && prevMode === "play" && playTestBaseline) {
         restoreEditorState(playTestBaseline);
+        const tipEl = document.getElementById("editorBlockTip");
+        if (tipEl && playTestBaseline._editorBlockTip !== undefined) {
+          tipEl.value = playTestBaseline._editorBlockTip;
+        }
         if (typeof window.cmResetEditorAfterPlaytest === "function") {
           window.cmResetEditorAfterPlaytest();
         }
