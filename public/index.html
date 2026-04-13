@@ -4,13 +4,19 @@
   <meta charset="UTF-8">
   <title>ChessMater</title>
   <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+    }
+
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d);
-      margin: 0;
+      box-sizing: border-box;
       padding: 20px;
       color: #333;
-      min-height: 100vh;
+      min-height: 100dvh;
+      overflow-x: hidden;
     }
     .container {
       max-width: 1300px;
@@ -19,6 +25,7 @@
       padding: 20px;
       border-radius: 10px;
       box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+      position: relative;
     }
     h1 {
       text-align: center;
@@ -118,6 +125,9 @@
       min-height: 24px;
       color: #2c3e50;
     }
+    #statusMessage {
+      display: none;
+    }
     .player-count {
       margin-top: 10px;
       text-align: center;
@@ -207,22 +217,29 @@
     
     /* Level selection styles */
     .level-selector {
-      margin-top: 20px;
-      padding: 15px;
-      background: #f8f9fa;
-      border-radius: 8px;
+      margin-top: 10px;
+      padding: 0;
+      background: transparent;
+      border-radius: 0;
       width: 100%;
-      max-width: 800px;
+      max-width: none;
+      box-sizing: border-box;
     }
     
     .level-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      grid-template-columns: 1fr;
       gap: 10px;
       margin-top: 10px;
+      max-height: 420px;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding-right: 4px;
     }
     
     .level-button {
+      width: 100%;
+      box-sizing: border-box;
       padding: 10px;
       background: #3498db;
       color: white;
@@ -236,6 +253,11 @@
     .level-button:hover {
       background: #2980b9;
       transform: translateY(-2px);
+    }
+    .level-button.current-level {
+      border: 2px solid #ff4d4f;
+      box-shadow: 0 0 0 2px rgba(255, 77, 79, 0.35), 0 0 14px rgba(255, 77, 79, 0.55), 0 8px 18px rgba(0,0,0,0.25);
+      transform: translateY(-1px);
     }
     
     .level-button.completed {
@@ -298,7 +320,7 @@
     }
     
     .consumer-mode #controls {
-      justify-content: center;
+      display: none;
     }
     
     .consumer-mode .level-selector {
@@ -321,6 +343,94 @@
       color: #fff;
     }
 
+    #mainContainer {
+      display: none;
+    }
+    body.in-game #mainContainer {
+      display: block;
+    }
+
+    /* Top controls inside ChessMater container */
+    #gameTopRightControls {
+      position: static;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 8px;
+      margin: -4px 0 14px;
+      z-index: 100;
+    }
+    #gameTopRightControls .controls-left,
+    #gameTopRightControls .controls-right {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .top-stats {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      color: #2c3e50;
+      font-size: 14px;
+      font-weight: 600;
+      margin-right: 6px;
+    }
+    .top-stats .player-count,
+    .top-stats .objective-count {
+      margin: 0;
+      text-align: left;
+      white-space: nowrap;
+    }
+    .top-stats .move-count,
+    .top-stats .fewest-other-moves {
+      margin: 0;
+      text-align: left;
+      white-space: nowrap;
+    }
+    #blockTipStats {
+      margin-top: 8px;
+      color: #2c3e50;
+      font-size: 14px;
+      font-weight: 600;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 4px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    #blockTipStats .player-count,
+    #blockTipStats .objective-count {
+      margin: 0;
+      text-align: left;
+      white-space: nowrap;
+      width: 100%;
+    }
+    #gameTopRightControls button {
+      display: none;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 12px;
+      color: #fff;
+      font-weight: bold;
+      font-size: 14px;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+    }
+    body.in-game #gameTopRightControls button {
+      display: inline-block;
+    }
+    #musicToggle {
+      background: #3498db;
+    }
+    #restartLevelBtn {
+      background: #e74c3c;
+    }
+    #antigravityToggle {
+      background-color: #e67e22;
+    }
+
     .start-screen h1 {
       font-size: 3rem;
       margin-bottom: 20px;
@@ -331,16 +441,19 @@
       padding: 12px 24px;
       font-size: 1.2rem;
       font-weight: bold;
-      background-color: #1da1f2;
+      background: linear-gradient(145deg, #2d9cdb, #4a69bd);
       color: white;
       border: none;
       border-radius: 8px;
       cursor: pointer;
       box-shadow: 2px 2px 10px rgba(0,0,0,0.3);
+      transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
     }
 
     #startButton:hover {
-      background-color: #0d8ddb;
+      filter: brightness(1.05);
+      transform: translateY(-1px);
+      box-shadow: 0 6px 14px rgba(0,0,0,0.28);
     }
 
     .start-screen-buttons {
@@ -354,16 +467,36 @@
       padding: 12px 24px;
       font-size: 1.2rem;
       font-weight: bold;
-      background-color: #9b59b6;
+      background: linear-gradient(145deg, #f39c12, #d35400);
       color: white;
       border: none;
       border-radius: 8px;
       cursor: pointer;
       box-shadow: 2px 2px 10px rgba(0,0,0,0.3);
+      transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
     }
 
     #leaderboardButton:hover {
-      background-color: #8e44ad;
+      filter: brightness(1.05);
+      transform: translateY(-1px);
+      box-shadow: 0 6px 14px rgba(0,0,0,0.28);
+    }
+    #instructionsButton {
+      padding: 12px 24px;
+      font-size: 1.1rem;
+      font-weight: bold;
+      background: linear-gradient(145deg, #e74c3c, #b71c1c);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      box-shadow: 2px 2px 10px rgba(0,0,0,0.3);
+      transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+    }
+    #instructionsButton:hover {
+      filter: brightness(1.05);
+      transform: translateY(-1px);
+      box-shadow: 0 6px 14px rgba(0,0,0,0.28);
     }
 
     #loginPrompt {
@@ -397,6 +530,197 @@
 
     .leaderboard-modal.active {
       display: flex;
+    }
+    .guide-content h2 {
+      margin: 16px 0 8px;
+      font-size: 1.15rem;
+    }
+    .guide-content p {
+      margin: 6px 0 0;
+      line-height: 1.55;
+      opacity: 0.96;
+    }
+    .guide-content ul {
+      margin: 8px 0 0 20px;
+      line-height: 1.55;
+    }
+    .level-complete-content {
+      max-width: 420px;
+      text-align: center;
+    }
+    .level-complete-actions {
+      margin-top: 16px;
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .level-complete-actions button {
+      border: none;
+      border-radius: 8px;
+      padding: 10px 18px;
+      color: #fff;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.25);
+    }
+    #levelCompleteRetryBtn {
+      background: linear-gradient(145deg, #16a085, #1abc9c);
+    }
+    #levelCompleteNextBtn {
+      background: linear-gradient(145deg, #2d9cdb, #4a69bd);
+    }
+
+    .undo-exchange-modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.55);
+      z-index: 10002;
+      justify-content: center;
+      align-items: center;
+      padding: 16px;
+      box-sizing: border-box;
+    }
+    .undo-exchange-modal.active {
+      display: flex;
+    }
+    .undo-exchange-panel {
+      background: linear-gradient(165deg, #1e2d45 0%, #141c2e 55%, #121a2c 100%);
+      color: #f4f6fb;
+      border-radius: 16px;
+      padding: 22px 24px 18px;
+      width: min(92vw, 400px);
+      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+    }
+    .undo-exchange-title {
+      margin: 0 0 14px;
+      font-size: 1.35rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+    .undo-exchange-cost-line {
+      margin: 0 0 16px;
+      font-size: 1rem;
+      opacity: 0.95;
+    }
+    .undo-exchange-cost-line strong {
+      font-weight: 700;
+      color: #fff;
+    }
+    .undo-exchange-balances {
+      margin: 0 0 8px;
+      font-size: 0.98rem;
+      line-height: 1.65;
+    }
+    .undo-exchange-balances p {
+      margin: 4px 0;
+    }
+    .undo-exchange-balances span {
+      font-weight: 600;
+      color: #fff;
+    }
+    .undo-exchange-message {
+      min-height: 1.2em;
+      font-size: 0.9rem;
+      margin: 10px 0 0;
+      opacity: 0.92;
+    }
+    .undo-exchange-message.error {
+      color: #ff8a8a;
+    }
+    .undo-exchange-message.success {
+      color: #6ee7b7;
+    }
+    .undo-exchange-message.hint {
+      color: #a8b9d4;
+    }
+    .undo-exchange-footer {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 12px;
+      margin-top: 22px;
+      flex-wrap: wrap;
+    }
+    .undo-exchange-footer button {
+      border: none;
+      border-radius: 12px;
+      padding: 11px 22px;
+      font-size: 0.98rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.12s ease, filter 0.12s ease;
+    }
+    .undo-exchange-footer button:hover:not(:disabled) {
+      filter: brightness(1.06);
+    }
+    .undo-exchange-footer button:active:not(:disabled) {
+      transform: scale(0.98);
+    }
+    .undo-exchange-btn-cancel {
+      background: #3d4d63;
+      color: #fff;
+    }
+    .undo-exchange-btn-confirm {
+      background: linear-gradient(180deg, #f39c3d 0%, #e67e22 100%);
+      color: #fff;
+      box-shadow: 0 4px 14px rgba(230, 126, 34, 0.45);
+    }
+    .undo-exchange-btn-confirm:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    .block-tip-modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.7);
+      z-index: 10001;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .block-tip-modal.active {
+      display: flex;
+    }
+
+    .block-tip-content {
+      background: #ffffff;
+      color: #2c3e50;
+      padding: 20px;
+      border-radius: 12px;
+      width: min(92vw, 480px);
+      max-height: 72vh;
+      overflow-y: auto;
+      box-shadow: 0 10px 35px rgba(0,0,0,0.35);
+    }
+
+    .block-tip-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .block-tip-header h3 {
+      margin: 0;
+      font-size: 1.25rem;
+    }
+
+    .close-block-tip {
+      border: none;
+      background: #e9ecef;
+      color: #2c3e50;
+      border-radius: 999px;
+      width: 34px;
+      height: 34px;
+      font-size: 20px;
+      line-height: 1;
+      cursor: pointer;
     }
 
     .leaderboard-content {
@@ -527,11 +851,34 @@
       font-size: 1.1rem;
     }
 
+    #gameLayoutRow {
+      display: flex;
+      gap: 12px;
+      width: 100%;
+      align-items: stretch;
+    }
+
+    #gameSidePanel {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      flex: 1 1 0;
+      width: auto;
+      min-width: 0;
+      background: transparent;
+      border-radius: 0;
+      padding: 0;
+      box-sizing: border-box;
+      overflow: hidden;
+    }
+
     .canvas-container {
       display: flex;
       justify-content: center;
       align-items: center;
-      width: 100%;
+      flex: 4 1 0;
+      width: auto;
+      min-width: 0;
       overflow: hidden; /* <--- Fix */
     }
 
@@ -555,21 +902,20 @@
       font-weight: bold;
       z-index: 10000;
     }
-    #blockDescriptionBox {
-      max-width: 220px;
-      width: 100%;
-      overflow-wrap: break-word;
-      flex-shrink: 0;
-    }
 
     /* --- MOBILE LAYOUT --- */
     @media screen and (max-width: 900px) {
       /* 1. Force Vertical Layout (Stack Canvas & Tip Box) */
-      .game-area > div[style*="display: flex"] {
+      #gameLayoutRow {
         flex-direction: column !important;
         align-items: center !important;
         gap: 10px !important;
         width: 100%;
+      }
+      #gameSidePanel {
+        width: 100% !important;
+        flex: none !important;
+        align-items: center;
       }
 
       /* 2. Center and resize the Canvas */
@@ -588,78 +934,30 @@
         display: block;
       }
 
-      /* 3. Fix "Block Tip" Visibility */
-      #blockDescriptionBox {
-        position: static !important; /* Don't float */
-        width: 90% !important;
-        margin: 10px auto !important;
-        background: rgba(255, 255, 255, 0.95) !important; /* Opaque white background */
-        color: #333 !important; /* Dark text */
-        padding: 15px !important;
-        border-radius: 8px !important;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.3) !important;
-        display: block !important;
+      /* Top-right controls on mobile */
+      #gameTopRightControls {
+        margin: 0 0 10px;
+        flex-wrap: wrap;
+      }
+      #gameTopRightControls .controls-left,
+      #gameTopRightControls .controls-right {
+        gap: 6px;
+      }
+      #gameTopRightControls button {
+        font-size: 12px;
+        padding: 6px 9px;
+      }
+      .top-stats {
+        width: 100%;
+        justify-content: center;
+        margin-right: 0;
+      }
+
+      .level-selector {
         max-width: 90vw !important;
       }
-      
-      /* Ensure header and text inside are readable */
-      #blockDescriptionBox h3, 
-      #blockDescriptionBox p {
-        color: #333 !important;
-        margin: 5px 0 !important;
-        text-shadow: none !important;
-      }
-
-      /* 4. Move Floating Buttons UP to avoid browser bar */
-      #restartLevelBtn, 
-      #musicToggle, 
-      button[onclick="toggleAntigravity()"] {
-        position: fixed !important;
-        bottom: 10px !important;
-        z-index: 10000 !important;
-        /* Make buttons smaller to fit side-by-side */
-        font-size: 0.8rem !important; 
-        padding: 8px 10px !important;
-        min-height: 40px !important; /* Override the big button size */
-        width: auto !important; /* Let them shrink to fit text */
-        box-shadow: 0 4px 10px rgba(0,0,0,0.4) !important;
-      }
-
-      /* 5. Separate the buttons horizontally so they don't overlap */
-      button[onclick="toggleAntigravity()"] {
-        left: 10px !important;
-        width: 30% !important; /* Assign explicit width shares */
-      }
-      
-      #musicToggle {
-        right: 10px !important;
-        left: auto !important;
-        width: 25% !important;
-      }
-      
-      #restartLevelBtn {
-        left: 50% !important;
-        transform: translateX(-50%) !important;
-        width: 30% !important;
-        right: auto !important;
-      }
-
-      /* 6. Add extra padding to bottom of page so buttons don't cover levels */
-      body {
-        padding-bottom: 120px !important;
-      }
-
-      body::after {
-        content: "";
-        position: fixed;
-        bottom: 0;
-        left: 0;
-        width: 100%;
-        height: 70px; /* Height of the button area */
-        background: rgba(26, 42, 108, 0.95); /* Dark Blue to match theme */
-        border-top: 1px solid rgba(255,255,255,0.2);
-        z-index: 9999; /* Just behind the buttons */
-        pointer-events: none; /* Let clicks pass through if needed */
+      .level-grid {
+        max-height: 300px !important;
       }
 
       /* Portal button mobile styles */
@@ -712,7 +1010,7 @@
         gap: 12px !important;
       }
 
-      #startButton, #leaderboardButton {
+      #startButton, #leaderboardButton, #instructionsButton {
         padding: 10px 20px !important;
         font-size: 1rem !important;
       }
@@ -749,6 +1047,12 @@
     const hashParams = getHashParams();
     const gameToken = hashParams.token || null;
     const locale = hashParams.locale || 'en';
+    const portalTokenParam = hashParams.portal_token || hashParams.portalToken || null;
+    const portalApiParam = hashParams.portal_api || hashParams.portalApi || null;
+    window.cmPortalToken = portalTokenParam || null;
+    window.cmPortalApiBase = portalApiParam
+      ? String(portalApiParam).replace(/\/+$/, '')
+      : '';
 
     // If new token in URL, clear old local data (QuantumGo-style)
     if (gameToken) {
@@ -880,6 +1184,7 @@
     <p id="loginPrompt" class="login-prompt" style="display: none;">Please log in to play. <a href="https://deepbraintechnology.com/" target="_blank">Go to main portal to log in</a></p>
     <div class="start-screen-buttons">
       <button id="startButton">Start Game</button>
+      <button id="instructionsButton">Beginner Guide</button>
       <button id="leaderboardButton">🏆 Leaderboard</button>
     </div>
   </div>
@@ -900,21 +1205,124 @@
       </div>
     </div>
   </div>
+
+  <div id="guideModal" class="leaderboard-modal">
+    <div class="leaderboard-content guide-content">
+      <div class="leaderboard-header">
+        <h2>Beginner Guide</h2>
+        <button class="close-leaderboard" id="closeGuideModal">&times;</button>
+      </div>
+
+      <h2>Goal</h2>
+      <p>Move at least one piece to the goal tile. If objectives exist, complete all objectives first.</p>
+
+      <h2>Basic Controls</h2>
+      <ul>
+        <li>Click one of your pieces to select it.</li>
+        <li>Click a valid destination tile to move.</li>
+        <li>Use Undo Move to revert the last move.</li>
+        <li>Use Restart Level to reset the current puzzle.</li>
+      </ul>
+
+      <h2>Piece Movement</h2>
+      <ul>
+        <li>Each piece follows chess movement rules (rook, bishop, queen, knight, king, pawn).</li>
+        <li>A move must be valid for the selected piece and respect level obstacles.</li>
+      </ul>
+
+      <h2>Special Blocks</h2>
+      <ul>
+        <li><strong>Solid Block</strong>: acts as a wall/platform.</li>
+        <li><strong>Phase Block</strong>: can be passed from below in specific situations.</li>
+        <li><strong>Transformer</strong>: lets you change the selected piece type.</li>
+        <li><strong>Objective</strong>: must be stepped on before finishing when present.</li>
+        <li><strong>Counter Goal</strong>: goal with a move countdown limit.</li>
+        <li><strong>Teleporters</strong>: same-color pair teleports pieces.</li>
+        <li><strong>Bomb</strong>: can destroy pieces and alter board state.</li>
+      </ul>
+
+      <h2>Win And Lose</h2>
+      <ul>
+        <li>Win: reach the goal after satisfying objective/counter requirements.</li>
+        <li>Lose condition can happen in bomb-heavy levels if all pieces are destroyed.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div id="levelCompleteModal" class="leaderboard-modal">
+    <div class="leaderboard-content level-complete-content">
+      <div class="leaderboard-header">
+        <h2>Level Complete</h2>
+        <button class="close-leaderboard" id="closeLevelCompleteModal">&times;</button>
+      </div>
+      <p id="levelCompleteText">Great job! What do you want to do next?</p>
+      <div class="level-complete-actions">
+        <button id="levelCompleteRetryBtn">Retry</button>
+        <button id="levelCompleteNextBtn">Next Level</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="blockTipModal" class="block-tip-modal">
+    <div class="block-tip-content">
+      <div class="block-tip-header">
+        <h3>Block Tip</h3>
+        <button class="close-block-tip" id="closeBlockTip" aria-label="Close block tip">&times;</button>
+      </div>
+      <p id="blockDescription">Welcome! Start the first level to learn about blocks.</p>
+    </div>
+  </div>
+
+  <div id="undoExchangeModal" class="undo-exchange-modal" aria-hidden="true">
+    <div class="undo-exchange-panel" role="dialog" aria-labelledby="undoExchangeTitle">
+      <h2 class="undo-exchange-title" id="undoExchangeTitle">Use Undo</h2>
+      <p class="undo-exchange-cost-line">Cost: <strong id="undoExchangeCostText">5 coins</strong></p>
+      <div class="undo-exchange-balances">
+        <p>Coins: <span id="undoExchangeCoins">—</span></p>
+        <p>Diamonds: <span id="undoExchangeDiamonds">—</span></p>
+        <p>Flowers: <span id="undoExchangeFlowers">—</span></p>
+      </div>
+      <p id="undoExchangeMessage" class="undo-exchange-message" role="status"></p>
+      <div class="undo-exchange-footer">
+        <button type="button" id="undoExchangeCloseBtn" class="undo-exchange-btn-cancel">Cancel</button>
+        <button type="button" id="undoExchangeRedeemBtn" class="undo-exchange-btn-confirm">Confirm</button>
+      </div>
+    </div>
+  </div>
   
   <div class="container consumer-mode" id="mainContainer">
     <h1>ChessMater</h1>
     <p id="mainContainerUserName" class="current-user-name"></p>
+    <div id="gameTopRightControls">
+      <div class="controls-left">
+        <div class="top-stats">
+          <div class="move-count" id="moveCount">Your move: 0</div>
+          <div class="fewest-other-moves" id="fewestOtherMoves">Fewest move by other user: --</div>
+        </div>
+        <button id="undoMoveBtn">Undo(0)</button>
+        <button id="restartLevelBtn">Restart Level</button>
+        <button id="antigravityToggle" onclick="toggleAntigravity()">Antigravity</button>
+      </div>
+      <div class="controls-right">
+        <button type="button" id="blockTipToggle">Block Tip</button>
+        <button id="musicToggle">Music</button>
+      </div>
+    </div>
     <div class="game-area">
-      <div style="display: flex; gap: 20px;">
+      <div id="gameLayoutRow">
         <div class="canvas-container">
           <canvas id="gameCanvas" width="1280" height="800"></canvas>
         </div>
       
-        <div style="display:flex;flex-direction:column;gap:4px;">
-          <button type="button" id="blockTipToggle" class="control-group" style="align-self:flex-start;">Block Tip</button>
-          <div id="blockDescriptionBox" class="hidden">
-          <h3>Block Tip</h3>
-          <p id="blockDescription">Welcome! Start the first level to learn about blocks.</p>
+        <div id="gameSidePanel">
+          <div id="blockTipStats">
+            <div class="player-count" id="playerCount">Players: 0</div>
+            <div class="objective-count" id="objectiveCount">Objectives: 0/0</div>
+          </div>
+          <div class="level-selector">
+            <div class="level-grid" id="levelGrid">
+              <!-- Levels will be populated by JavaScript -->
+            </div>
           </div>
         </div>
       </div>
@@ -971,10 +1379,6 @@
           </select>
         </div> -->
 
-        <div style="margin-top: 20px; text-align: center;">
-          <button id="nextLevelBtn" style="display: none;">Next Level ➡️</button>
-        </div>
-
         <div id="customSizeInputs" class="developer-only" style="display: none; margin-top: 10px;">
           <input type="number" id="customRows" placeholder="Rows" min="4" max="20" value="10">
           <span>x</span>
@@ -1001,15 +1405,6 @@
         <p>Warning: This will clear everything from the board!</p>
       </div>
       
-      <div class="level-selector">
-        <h3>Select a Level</h3>
-        <div class="level-grid" id="levelGrid">
-          <!-- Levels will be populated by JavaScript -->
-        </div>
-      </div>
-      
-      <div class="player-count" id="playerCount">Players: 0</div>
-      <div class="objective-count" id="objectiveCount">Objectives: 0/0</div>
       <div class="status" id="statusMessage"></div>
       
       <!-- <div class="instructions">
@@ -1036,35 +1431,54 @@
       const musicToggle = document.getElementById("musicToggle");
       const startButton = document.getElementById("startButton");
       let musicPlaying = false;
+      window.cmAudioMuted = false;
 
-      // 🎮 Start the music when the Start button is clicked
+      function applyGlobalMute(muted) {
+        window.cmAudioMuted = !!muted;
+
+        document.querySelectorAll("audio").forEach((audioEl) => {
+          audioEl.muted = window.cmAudioMuted;
+        });
+
+        if (bgMusic) {
+          if (window.cmAudioMuted) {
+            bgMusic.pause();
+          } else if (musicPlaying) {
+            bgMusic.play().catch(() => {});
+          }
+        }
+
+        if (musicToggle) {
+          musicToggle.textContent = window.cmAudioMuted ? "🔇 Muted" : "🔊 Music";
+        }
+      }
+
+      // Start the music when the Start button is clicked
       if (startButton) {
         startButton.addEventListener("click", () => {
           if (!musicPlaying) {
-            bgMusic.volume = 0.5; // Optional: softer background
-            bgMusic.play().catch(() => {});
+            bgMusic.volume = 0.5;
             musicPlaying = true;
-            musicToggle.textContent = "🔊 Music";
+            if (!window.cmAudioMuted) {
+              bgMusic.play().catch(() => {});
+            }
           }
         });
       }
 
-      // 🎚️ Toggle music on/off
-      musicToggle.addEventListener("click", () => {
-        if (bgMusic.paused) {
-          bgMusic.play();
-          musicToggle.textContent = "🔊 Music";
-          musicPlaying = true;
-        } else {
-          bgMusic.pause();
-          musicToggle.textContent = "🔇 Muted";
-          musicPlaying = false;
-        }
-      });
+      // Toggle global audio on/off
+      if (musicToggle) {
+        musicToggle.addEventListener("click", () => {
+          applyGlobalMute(!window.cmAudioMuted);
+        });
+      }
+
+      applyGlobalMute(false);
     });
 
     document.addEventListener("DOMContentLoaded", () => {
       const restartBtn = document.getElementById("restartLevelBtn");
+      const undoMoveBtn = document.getElementById("undoMoveBtn");
 
       if (restartBtn) {
         restartBtn.addEventListener("click", () => {
@@ -1075,6 +1489,15 @@
           }
         });
       }
+      if (undoMoveBtn) {
+        undoMoveBtn.addEventListener("click", () => {
+          if (typeof undoMove === "function") {
+            undoMove();
+          } else {
+            console.error("undoMove() not found");
+          }
+        });
+      }
 
       // Leaderboard functionality
       const leaderboardButton = document.getElementById("leaderboardButton");
@@ -1082,6 +1505,9 @@
       const closeLeaderboard = document.getElementById("closeLeaderboard");
       const leaderboardList = document.getElementById("leaderboardList");
       const leaderboardModeSelect = document.getElementById("leaderboardModeSelect");
+      const instructionsButton = document.getElementById("instructionsButton");
+      const guideModal = document.getElementById("guideModal");
+      const closeGuideModal = document.getElementById("closeGuideModal");
 
       function populateLeaderboardModes() {
         if (!leaderboardModeSelect) return;
@@ -1144,6 +1570,26 @@
         leaderboardModal.addEventListener("click", (e) => {
           if (e.target === leaderboardModal) {
             leaderboardModal.classList.remove("active");
+          }
+        });
+      }
+
+      if (instructionsButton && guideModal) {
+        instructionsButton.addEventListener("click", () => {
+          guideModal.classList.add("active");
+        });
+      }
+
+      if (closeGuideModal && guideModal) {
+        closeGuideModal.addEventListener("click", () => {
+          guideModal.classList.remove("active");
+        });
+      }
+
+      if (guideModal) {
+        guideModal.addEventListener("click", (e) => {
+          if (e.target === guideModal) {
+            guideModal.classList.remove("active");
           }
         });
       }
@@ -1299,6 +1745,12 @@
     window.mergeMaxUnlocked = mergeMaxUnlocked;
 
     async function fetchProgress() {
+      if (isLocalDev) {
+        const allLevels = (typeof LEVELS !== "undefined" && Array.isArray(LEVELS) && LEVELS.length > 0)
+          ? LEVELS.length
+          : 999;
+        return mergeMaxUnlocked(allLevels);
+      }
       try {
         // 等待 token 验证完成
         await (window.authReady || Promise.resolve());
@@ -1332,6 +1784,8 @@
       const levelGrid = document.getElementById("levelGrid");
       if (!levelGrid) return;
       levelGrid.innerHTML = "";
+      let currentLevelButton = null;
+      let maxUnlockedButton = null;
 
       // 使用传入的进度,或使用缓存的进度,或从服务器获取
       let maxUnlocked;
@@ -1343,6 +1797,11 @@
         maxUnlocked = await fetchProgress();
       }
 
+      if (isLocalDev) {
+        maxUnlocked = LEVELS.length;
+        mergeMaxUnlocked(maxUnlocked);
+      }
+
 
       LEVELS.forEach((level, index) => {
         const button = document.createElement("button");
@@ -1352,6 +1811,11 @@
 
         button.className = "level-button";
         button.textContent = level.name || `Level ${index + 1}`;
+        button.dataset.levelIndex = String(index + 1);
+
+        if (index + 1 === maxUnlocked) {
+          maxUnlockedButton = button;
+        }
 
         if (isLocked) {
             button.style.background = "#777";
@@ -1368,19 +1832,56 @@
             button.style.background = "linear-gradient(145deg, #4a90e2, #357abd)";
             button.addEventListener("click", () => {
                 currentLevelIndex = index;
-                // Hide start screen when loading a level
-                const startScreen = document.getElementById("startScreen");
-                if (startScreen) {
-                    startScreen.style.display = "none";
-                    updatePortalButton(); // Update button state
-                }
+                setGameState(true);
                 loadPuzzle(level);
             });
         }
 
+        if (index === currentLevelIndex) {
+          button.classList.add("current-level");
+          currentLevelButton = button;
+        }
+
         levelGrid.appendChild(button);
       });
+
+      const scrollTargetButton = currentLevelButton || maxUnlockedButton;
+      if (scrollTargetButton) {
+        requestAnimationFrame(() => {
+          scrollTargetButton.scrollIntoView({ block: "center", inline: "nearest" });
+        });
+      }
     }
+
+    function ensureCurrentLevelVisible() {
+      const levelGrid = document.getElementById("levelGrid");
+      if (!levelGrid) return;
+      const currentButton = levelGrid.querySelector(".level-button.current-level");
+      if (!currentButton) return;
+
+      const gridRect = levelGrid.getBoundingClientRect();
+      const btnRect = currentButton.getBoundingClientRect();
+      const fullyVisible = btnRect.top >= gridRect.top && btnRect.bottom <= gridRect.bottom;
+      if (!fullyVisible) {
+        currentButton.scrollIntoView({ block: "center", inline: "nearest", behavior: "smooth" });
+      }
+    }
+
+    function highlightCurrentLevelButton() {
+      const levelGrid = document.getElementById("levelGrid");
+      if (!levelGrid) return;
+      const buttons = levelGrid.querySelectorAll(".level-button");
+      buttons.forEach((btn, idx) => {
+        if (idx === currentLevelIndex) {
+          btn.classList.add("current-level");
+        } else {
+          btn.classList.remove("current-level");
+        }
+      });
+      requestAnimationFrame(ensureCurrentLevelVisible);
+    }
+    window.highlightCurrentLevelButton = highlightCurrentLevelButton;
+    window.ensureCurrentLevelVisible = ensureCurrentLevelVisible;
 
 
     
@@ -1401,6 +1902,17 @@
       const el = document.getElementById("loginPrompt");
       if (el) el.style.display = isLoggedIn() ? "none" : "block";
     }
+    function setGameState(inGame) {
+      const startScreen = document.getElementById("startScreen");
+      if (startScreen) {
+        startScreen.style.display = inGame ? "none" : "flex";
+      }
+      document.body.classList.toggle("in-game", !!inGame);
+      if (typeof window.updatePortalButton === "function") {
+        window.updatePortalButton();
+      }
+    }
+    window.setGameState = setGameState;
     window.updateLoginPromptVisibility = updateLoginPromptVisibility;
 
     document.addEventListener("DOMContentLoaded", async () => {
@@ -1430,13 +1942,9 @@
         // In game: show "Back to Home" and return to start screen
         portalButton.textContent = "Back to Home";
         portalButton.onclick = () => {
-          const startScreen = document.getElementById("startScreen");
-          if (startScreen) {
-            startScreen.style.display = "flex";
-            if (typeof loadLevels === "function") {
-              loadLevels(window.currentMaxUnlocked);
-            }
-            updatePortalButton(); // Update button state
+          setGameState(false);
+          if (typeof loadLevels === "function") {
+            loadLevels(window.currentMaxUnlocked);
           }
         };
       }
@@ -1444,6 +1952,7 @@
     window.updatePortalButton = updatePortalButton;
 
     // Initialize portal button state
+    setGameState(false);
     updatePortalButton();
 
     // Monitor start-screen visibility changes
@@ -1482,20 +1991,25 @@
     // Start Game Button Logic
     const startButton = document.getElementById("startButton");
     if (startButton) {
-        startButton.addEventListener("click", () => {
+        startButton.addEventListener("click", async () => {
         if (!isLoggedIn()) {
           alert("Please log in to continue playing");
           return;
         }
-        const startScreen = document.getElementById("startScreen");
-        if (startScreen) {
-            startScreen.style.display = "none";
-            updatePortalButton(); // Update button when game starts
+        const maxUnlocked = await fetchProgress();
+        if (typeof loadLevels === "function") {
+          await loadLevels(maxUnlocked);
         }
+        setGameState(true);
 
-        // Load Level 1 and force play mode
+        // Load max unlocked level and force play mode
         if (typeof LEVELS !== 'undefined' && LEVELS.length > 0) {
-            loadPuzzle(LEVELS[0]);
+            const startIndex = Math.min(
+              Math.max((window.currentMaxUnlocked || maxUnlocked || 1) - 1, 0),
+              LEVELS.length - 1
+            );
+            currentLevelIndex = startIndex;
+            loadPuzzle(LEVELS[startIndex]);
 
             // Just to be sure everything initializes:
             if (typeof enablePlayerControls === "function") {
@@ -1524,52 +2038,7 @@
   </audio>
 
 
-  <button id="restartLevelBtn" style="
-    position: fixed;
-    bottom: 20px;
-    right: 140px; /* ✅ increased to make space for the other button */
-    padding: 10px 16px;
-    border: none;
-    border-radius: 8px;
-    background: #e74c3c;
-    color: white;
-    font-weight: bold;
-    cursor: pointer;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-    z-index: 9999;
-  ">
-    🔁 Restart Level</button>
-
-  <button id="musicToggle" style="
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    padding: 10px 16px;
-    border: none;
-    border-radius: 8px;
-    background: #3498db;
-    color: white;
-    font-weight: bold;
-    cursor: pointer;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-    z-index: 9999;
-  ">🔊 Music</button>
-
-  <button onclick="toggleAntigravity()" style="
-    position: fixed;
-    bottom: 20px;
-    left: 20px;
-    z-index: 1000;
-    padding: 10px 15px;
-    font-weight: bold;
-    background-color: #e67e22;
-    color: white;
-    border: none;
-    border-radius: 8px;
-    box-shadow: 2px 2px 10px rgba(0,0,0,0.3);
-    cursor: pointer;
-  ">
-    ⬆️ Antigravity</button>
 
 </body>
 </html>
+

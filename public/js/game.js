@@ -13,6 +13,15 @@ const ctx = canvas.getContext("2d");
 const statusMessage = document.getElementById("statusMessage");
 const playerCount = document.getElementById("playerCount");
 const objectiveCount = document.getElementById("objectiveCount");
+const moveCountDisplay = document.getElementById("moveCount");
+const fewestOtherMovesDisplay = document.getElementById("fewestOtherMoves");
+const undoMoveButton = document.getElementById("undoMoveBtn");
+const levelCompleteModal = document.getElementById("levelCompleteModal");
+const levelCompleteText = document.getElementById("levelCompleteText");
+const closeLevelCompleteModalBtn = document.getElementById("closeLevelCompleteModal");
+const levelCompleteRetryBtn = document.getElementById("levelCompleteRetryBtn");
+const levelCompleteNextBtn = document.getElementById("levelCompleteNextBtn");
+const SHOW_IN_GAME_STATUS = false;
 // const gravityBtn = document.getElementById("gravityBtn");
 const downloadBtn = document.getElementById("downloadBtn");
 const eraseBoardBtn = document.getElementById("eraseBoardBtn");
@@ -110,6 +119,321 @@ let lastRiseTime = 0;
 const RISE_SPEED = 700; // pixels per second
 let currentLevelIndex = 0;
 let levelMoveCount = 0;
+let moveHistorySnapshots = [];
+let undoCredits = 0;
+
+function updateUndoButtonLabel() {
+  if (!undoMoveButton) return;
+  undoMoveButton.textContent = `Undo(${undoCredits})`;
+}
+
+function getApiBaseUrl() {
+  return window.API_BASE_URL || "https://chessmater-production.up.railway.app";
+}
+
+function buildAuthHeaders() {
+  const headers = { "Content-Type": "application/json" };
+  if (window.cmToken) {
+    headers.Authorization = `Bearer ${window.cmToken}`;
+  }
+  return headers;
+}
+
+async function syncUndoCreditsFromServer() {
+  try {
+    await (window.authReady || Promise.resolve());
+    const res = await fetch(`${getApiBaseUrl()}/undo-credits`, {
+      method: "GET",
+      credentials: "include",
+      headers: buildAuthHeaders()
+    });
+    if (!res.ok) return false;
+    const data = await res.json();
+    const credits = Number.parseInt(data?.undoCredits, 10);
+    undoCredits = Number.isFinite(credits) ? credits : 0;
+    updateUndoButtonLabel();
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+async function grantUndoCredit(amount = 1) {
+  const parsed = Number.parseInt(amount, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) return;
+
+  try {
+    await (window.authReady || Promise.resolve());
+    const res = await fetch(`${getApiBaseUrl()}/undo-credits/grant`, {
+      method: "POST",
+      credentials: "include",
+      headers: buildAuthHeaders(),
+      body: JSON.stringify({ amount: parsed })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const credits = Number.parseInt(data?.undoCredits, 10);
+      undoCredits = Number.isFinite(credits) ? credits : undoCredits + parsed;
+      updateUndoButtonLabel();
+      return;
+    }
+  } catch (_) {}
+
+  undoCredits += parsed;
+  updateUndoButtonLabel();
+}
+
+async function consumeUndoCredit(amount = 1) {
+  const parsed = Number.parseInt(amount, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) return false;
+
+  try {
+    await (window.authReady || Promise.resolve());
+    const res = await fetch(`${getApiBaseUrl()}/undo-credits/use`, {
+      method: "POST",
+      credentials: "include",
+      headers: buildAuthHeaders(),
+      body: JSON.stringify({ amount: parsed })
+    });
+    if (res.status === 400) {
+      return false;
+    }
+    if (res.ok) {
+      const data = await res.json();
+      const credits = Number.parseInt(data?.undoCredits, 10);
+      undoCredits = Number.isFinite(credits) ? credits : Math.max(undoCredits - parsed, 0);
+      updateUndoButtonLabel();
+      return true;
+    }
+  } catch (_) {}
+
+  if (undoCredits < parsed) return false;
+  undoCredits -= parsed;
+  updateUndoButtonLabel();
+  return true;
+}
+
+/** Main portal shop item (must match portal config). */
+const PORTAL_UNDO_ITEM_ID = "chess_mater_undo";
+const PORTAL_UNDO_GAME_MODE = "chessmater";
+const UNDO_SHOP_HINT_COINS = 5;
+
+function normalizePortalApiBase(base) {
+  if (!base || typeof base !== "string") return "";
+  return base.replace(/\/+$/, "");
+}
+
+function portalUndoShopAvailable() {
+  const token = window.cmPortalToken;
+  const base = normalizePortalApiBase(window.cmPortalApiBase || "");
+  return !!(token && base);
+}
+
+async function getPortalAssets() {
+  const token = window.cmPortalToken;
+  const base = normalizePortalApiBase(window.cmPortalApiBase || "");
+  if (!token || !base) return null;
+  try {
+    const res = await fetch(`${base}/api/user/assets`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "X-User-Timezone": Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"
+      }
+    });
+    const data = await res.json().catch(() => null);
+    const coins = data?.data?.coins;
+    const diamonds = data?.data?.diamonds;
+    const flowers = data?.data?.flowers;
+    if (typeof coins !== "number" || typeof diamonds !== "number" || typeof flowers !== "number") {
+      return null;
+    }
+    return {
+      coins: Math.max(0, Math.floor(coins)),
+      diamonds: Math.max(0, Math.floor(diamonds)),
+      flowers: Math.max(0, Math.floor(flowers))
+    };
+  } catch (_) {
+    return null;
+  }
+}
+
+async function postPortalRedeemUndo() {
+  const token = window.cmPortalToken;
+  const base = normalizePortalApiBase(window.cmPortalApiBase || "");
+  if (!token || !base) return { ok: false, message: "Portal session not available." };
+  const url = `${base}/api/user/shop/redeem?item_id=${encodeURIComponent(PORTAL_UNDO_ITEM_ID)}&game_mode=${encodeURIComponent(PORTAL_UNDO_GAME_MODE)}`;
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "X-User-Timezone": Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"
+      }
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+      const msg =
+        (data && (data.message || data.error || data.detail)) ||
+        `Redeem failed (${res.status}).`;
+      return { ok: false, message: String(msg) };
+    }
+    if (data && data.success === false) {
+      const msg = (data.message || data.error || "Redeem rejected.") + "";
+      return { ok: false, message: msg };
+    }
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, message: err && err.message ? err.message : "Network error during redeem." };
+  }
+}
+
+async function grantUndoCreditsFromServerOnly(amount = 1) {
+  const parsed = Number.parseInt(amount, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) return false;
+  try {
+    await (window.authReady || Promise.resolve());
+    const res = await fetch(`${getApiBaseUrl()}/undo-credits/grant`, {
+      method: "POST",
+      credentials: "include",
+      headers: buildAuthHeaders(),
+      body: JSON.stringify({ amount: parsed })
+    });
+    if (!res.ok) return false;
+    const data = await res.json();
+    const credits = Number.parseInt(data?.undoCredits, 10);
+    if (Number.isFinite(credits)) {
+      undoCredits = credits;
+    } else {
+      undoCredits += parsed;
+    }
+    updateUndoButtonLabel();
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+const undoExchangeModal = document.getElementById("undoExchangeModal");
+const undoExchangeCoinsEl = document.getElementById("undoExchangeCoins");
+const undoExchangeDiamondsEl = document.getElementById("undoExchangeDiamonds");
+const undoExchangeFlowersEl = document.getElementById("undoExchangeFlowers");
+const undoExchangeMessageEl = document.getElementById("undoExchangeMessage");
+const undoExchangeRedeemBtn = document.getElementById("undoExchangeRedeemBtn");
+const undoExchangeCloseBtn = document.getElementById("undoExchangeCloseBtn");
+const undoExchangeCostTextEl = document.getElementById("undoExchangeCostText");
+
+function setUndoExchangeBalanceCells(coinsText, diamondsText, flowersText) {
+  if (undoExchangeCoinsEl) undoExchangeCoinsEl.textContent = coinsText;
+  if (undoExchangeDiamondsEl) undoExchangeDiamondsEl.textContent = diamondsText;
+  if (undoExchangeFlowersEl) undoExchangeFlowersEl.textContent = flowersText;
+}
+
+function setUndoExchangeMessage(text, kind) {
+  if (!undoExchangeMessageEl) return;
+  undoExchangeMessageEl.textContent = text || "";
+  undoExchangeMessageEl.classList.remove("error", "success", "hint");
+  if (kind === "error") undoExchangeMessageEl.classList.add("error");
+  if (kind === "success") undoExchangeMessageEl.classList.add("success");
+  if (kind === "hint") undoExchangeMessageEl.classList.add("hint");
+}
+
+function setUndoExchangeBusy(busy) {
+  if (!undoExchangeRedeemBtn) return;
+  undoExchangeRedeemBtn.disabled = !!busy || !portalUndoShopAvailable();
+}
+
+function closeUndoExchangeModal() {
+  if (!undoExchangeModal) return;
+  undoExchangeModal.classList.remove("active");
+  undoExchangeModal.setAttribute("aria-hidden", "true");
+}
+
+async function refreshUndoExchangeAssetsDisplay() {
+  if (!portalUndoShopAvailable()) {
+    setUndoExchangeBalanceCells("—", "—", "—");
+    setUndoExchangeMessage("Open from the main portal to load your coins, diamonds, and flowers.", "hint");
+    return;
+  }
+  setUndoExchangeMessage("");
+  setUndoExchangeBalanceCells("…", "…", "…");
+  const assets = await getPortalAssets();
+  if (!assets) {
+    setUndoExchangeBalanceCells("—", "—", "—");
+    setUndoExchangeMessage("Could not load assets. Check portal session.", "error");
+    return;
+  }
+  setUndoExchangeBalanceCells(String(assets.coins), String(assets.diamonds), String(assets.flowers));
+}
+
+async function openUndoExchangeModal() {
+  if (!undoExchangeModal) return;
+  if (undoExchangeCostTextEl) {
+    undoExchangeCostTextEl.textContent = `${UNDO_SHOP_HINT_COINS} coins`;
+  }
+  setUndoExchangeMessage("");
+  undoExchangeModal.classList.add("active");
+  undoExchangeModal.setAttribute("aria-hidden", "false");
+  setUndoExchangeBusy(false);
+  await refreshUndoExchangeAssetsDisplay();
+}
+
+async function handleUndoExchangeRedeem() {
+  if (!portalUndoShopAvailable()) return;
+  setUndoExchangeMessage("");
+  setUndoExchangeBusy(true);
+  const redeem = await postPortalRedeemUndo();
+  if (!redeem.ok) {
+    setUndoExchangeMessage(redeem.message || "Redeem failed.", "error");
+    setUndoExchangeBusy(false);
+    await refreshUndoExchangeAssetsDisplay();
+    return;
+  }
+  const granted = await grantUndoCreditsFromServerOnly(1);
+  if (!granted) {
+    setUndoExchangeMessage(
+      "Portal redeem may have succeeded, but adding undo credits failed. Please refresh or contact support if coins were deducted.",
+      "error"
+    );
+    setUndoExchangeBusy(false);
+    await syncUndoCreditsFromServer();
+    await refreshUndoExchangeAssetsDisplay();
+    return;
+  }
+  await refreshUndoExchangeAssetsDisplay();
+  await syncUndoCreditsFromServer();
+  setUndoExchangeBusy(false);
+  closeUndoExchangeModal();
+}
+
+function setupUndoExchangeModal() {
+  if (undoExchangeCloseBtn) {
+    undoExchangeCloseBtn.addEventListener("click", closeUndoExchangeModal);
+  }
+  if (undoExchangeModal) {
+    undoExchangeModal.addEventListener("click", (e) => {
+      if (e.target === undoExchangeModal) closeUndoExchangeModal();
+    });
+  }
+  if (undoExchangeRedeemBtn) {
+    undoExchangeRedeemBtn.addEventListener("click", () => {
+      handleUndoExchangeRedeem();
+    });
+  }
+}
+
+setupUndoExchangeModal();
+window.openUndoExchangeModal = openUndoExchangeModal;
+
+function isAudioMuted() {
+  return !!window.cmAudioMuted;
+}
+
+function playSound(audioEl, volume) {
+  if (!audioEl || isAudioMuted()) return;
+  audioEl.currentTime = 0;
+  if (typeof volume === "number") audioEl.volume = volume;
+  audioEl.play().catch(() => {});
+}
 
 
 // Transformer block variables
@@ -190,19 +514,6 @@ if (modeSelect) {
 })};
 
 
-const nextLevelBtn = document.getElementById("nextLevelBtn");
-if (nextLevelBtn) {
-  nextLevelBtn.addEventListener("click", () => {
-    if (currentLevelIndex < LEVELS.length - 1) {
-      currentLevelIndex++;
-      loadPuzzle(LEVELS[currentLevelIndex]);
-      nextLevelBtn.style.display = "none";
-      updateStatus(`Starting Level ${currentLevelIndex + 1}`);
-    } else {
-      updateStatus("You have beaten all levels! 🎉");
-    }
-  });
-}
 
 // gravityBtn.addEventListener("click", () => {
 //   applyGravity();
@@ -224,11 +535,59 @@ if (eraseBoardBtn) {
 
 document.addEventListener('DOMContentLoaded', () => {
   try {
+    const legacyNextBtn = document.getElementById('nextLevelBtn');
+    if (legacyNextBtn) {
+      const legacyContainer = legacyNextBtn.parentElement;
+      legacyNextBtn.remove();
+      if (legacyContainer && legacyContainer.children.length === 0) {
+        legacyContainer.remove();
+      }
+    }
+
     const tipToggle = document.getElementById('blockTipToggle');
-    const tipBox = document.getElementById('blockDescriptionBox');
-    if (tipBox && tipToggle && typeof tipToggle.addEventListener === 'function') {
+    const tipModal = document.getElementById('blockTipModal');
+    const closeBlockTip = document.getElementById('closeBlockTip');
+    if (tipModal && tipToggle && typeof tipToggle.addEventListener === 'function') {
       tipToggle.addEventListener('click', () => {
-        if (tipBox) tipBox.classList.toggle('hidden');
+        tipModal.classList.add('active');
+      });
+    }
+    if (tipModal && closeBlockTip) {
+      closeBlockTip.addEventListener('click', () => {
+        tipModal.classList.remove('active');
+      });
+      tipModal.addEventListener('click', (e) => {
+        if (e.target === tipModal) {
+          tipModal.classList.remove('active');
+        }
+      });
+    }
+
+    if (levelCompleteRetryBtn) {
+      levelCompleteRetryBtn.addEventListener('click', () => {
+        if (levelCompleteModal) levelCompleteModal.classList.remove('active');
+        restartLevel();
+      });
+    }
+
+    if (levelCompleteNextBtn) {
+      levelCompleteNextBtn.addEventListener('click', () => {
+        if (currentLevelIndex < LEVELS.length - 1) {
+          currentLevelIndex++;
+          if (levelCompleteModal) levelCompleteModal.classList.remove('active');
+          loadPuzzle(LEVELS[currentLevelIndex]);
+        }
+      });
+    }
+
+    if (closeLevelCompleteModalBtn && levelCompleteModal) {
+      closeLevelCompleteModalBtn.addEventListener('click', () => {
+        levelCompleteModal.classList.remove('active');
+      });
+      levelCompleteModal.addEventListener('click', (e) => {
+        if (e.target === levelCompleteModal) {
+          levelCompleteModal.classList.remove('active');
+        }
       });
     }
   } catch (e) {}
@@ -283,10 +642,31 @@ function resizeCanvas() {
   canvas.width = COLS * TILE_SIZE;
   canvas.height = ROWS * TILE_SIZE;
 
-  // Get available screen space
-  // We subtract a little (e.g., 100px) to leave room for the UI buttons
-  const maxWidth = window.innerWidth;
-  const maxHeight = window.innerHeight - 80; 
+  const layoutRow = document.getElementById("gameLayoutRow");
+  const sidePanel = document.getElementById("gameSidePanel");
+  const canvasContainer = canvas.parentElement;
+
+  const viewportPadding = 20;
+  let maxWidth = window.innerWidth - viewportPadding * 2;
+  let maxHeight = window.innerHeight - 90;
+
+  if (layoutRow && canvasContainer) {
+    const layoutStyle = window.getComputedStyle(layoutRow);
+    const isColumn = (layoutStyle.flexDirection || "").startsWith("column");
+    const rowRect = layoutRow.getBoundingClientRect();
+    const gap = Number.parseFloat(layoutStyle.columnGap || layoutStyle.gap || "0") || 0;
+
+    // Height budget from layout row down to viewport bottom.
+    maxHeight = Math.max(220, window.innerHeight - rowRect.top - 24);
+
+    if (isColumn) {
+      maxWidth = Math.max(220, canvasContainer.clientWidth || maxWidth);
+    } else {
+      const rowWidth = layoutRow.clientWidth || maxWidth;
+      const sideWidth = sidePanel ? sidePanel.getBoundingClientRect().width : 0;
+      maxWidth = Math.max(220, rowWidth - sideWidth - gap);
+    }
+  }
 
   // Calculate the best scale to fit BOTH width and height
   const scaleX = maxWidth / canvas.width;
@@ -299,16 +679,60 @@ function resizeCanvas() {
 }
 
 function updateStatus(message) {
+  if (!SHOW_IN_GAME_STATUS) return;
+  if (!statusMessage) return;
   statusMessage.textContent = message;
   setTimeout(() => {
     if (statusMessage.textContent === message) {
-      statusMessage.textContent = '';
+      statusMessage.textContent = "";
     }
   }, 3000);
 }
 
 function updatePlayerCount() {
   playerCount.textContent = `Players: ${players.length}`;
+}
+
+function updateMoveCountDisplay() {
+  if (!moveCountDisplay) return;
+  moveCountDisplay.textContent = `Your move: ${levelMoveCount}`;
+}
+
+async function fetchFewestOtherMovesForCurrentLevel() {
+  if (!fewestOtherMovesDisplay) return;
+
+  const levelNumber = currentLevelIndex + 1;
+  if (!Number.isFinite(levelNumber) || levelNumber <= 0) {
+    fewestOtherMovesDisplay.textContent = "Fewest move by other user: --";
+    return;
+  }
+
+  const apiBaseUrl = window.API_BASE_URL || "https://chessmater-production.up.railway.app";
+  const headers = {};
+  if (window.cmToken) {
+    headers.Authorization = `Bearer ${window.cmToken}`;
+  }
+
+  try {
+    const res = await fetch(`${apiBaseUrl}/stats/fewest-other-moves?level=${encodeURIComponent(levelNumber)}`, {
+      method: "GET",
+      credentials: "include",
+      headers
+    });
+
+    if (!res.ok) {
+      fewestOtherMovesDisplay.textContent = "Fewest move by other user: --";
+      return;
+    }
+
+    const data = await res.json();
+    const bestMoves = Number.parseInt(data?.best_moves, 10);
+    fewestOtherMovesDisplay.textContent = Number.isFinite(bestMoves)
+      ? `Fewest move by other user: ${bestMoves}`
+      : "Fewest move by other user: --";
+  } catch (_) {
+    fewestOtherMovesDisplay.textContent = "Fewest move by other user: --";
+  }
 }
 
 // Update objective counter display
@@ -436,6 +860,10 @@ function saveLevelToFolder() {
 // --- Load puzzle from JSON file ---
 function loadPuzzle(puzzleData) {
   currentPuzzleData = JSON.parse(JSON.stringify(puzzleData)); // Deep copy
+  moveHistorySnapshots = [];
+  if (levelCompleteModal) {
+    levelCompleteModal.classList.remove("active");
+  }
   try {
     // Use saved dimensions or default to current
     const loadedRows = puzzleData.rows || ROWS;
@@ -557,28 +985,36 @@ function loadPuzzle(puzzleData) {
     mode = "play";
     gameWon = false;
     levelMoveCount = 0;
+    updateMoveCountDisplay();
     visitedSquares.forEach(row => row.fill(false)); // Reset fog on load
     if (typeof enablePlayerControls === "function") {
         enablePlayerControls();
     }
     // --- Show block tip only for first 7 levels ---
-    const descBox = document.getElementById("blockDescriptionBox");
     const descText = document.getElementById("blockDescription");
 
     // Determine which level was loaded
     currentLevelIndex = LEVELS.findIndex(lvl => lvl.name === puzzleData.name);
-    if (descBox && descText) {
+    if (typeof window.highlightCurrentLevelButton === "function") {
+      window.highlightCurrentLevelButton();
+    }
+    if (descText) {
     if (currentLevelIndex >= 0 && currentLevelIndex < 7) {
-      descBox.style.display = "block";
       descText.textContent = LEVEL_BLOCK_DESCRIPTIONS[currentLevelIndex];
     } else if (currentLevelIndex === 30) {
-      descBox.style.display = "block";
       descText.textContent = "Level 31: ⚔️ Welcome to Fog of War! In this level, the board is shrouded in mystery — you can only see tiles your pieces can reach. Plan your moves carefully and explore the unknown. What lies beyond could be danger... or your path to victory. 🎯 Tip: Use long-range pieces like the Queen or Bishop to reveal more of the board quickly.";
     } else {
-      descBox.style.display = "none";
+      descText.textContent = "No tip for this level.";
     }
   }
 
+    if (window.authReady && typeof window.authReady.finally === "function") {
+      window.authReady.finally(() => {
+        fetchFewestOtherMovesForCurrentLevel();
+      });
+    } else {
+      fetchFewestOtherMovesForCurrentLevel();
+    }
     drawBoard();
   } catch (error) {
     updateStatus("Error loading puzzle: " + error.message);
@@ -844,13 +1280,18 @@ function updateFallingPieces() {
   }
 }
 
-function showNextLevelButton() {
-  const nextBtn = document.getElementById("nextLevelBtn");
-  if (currentLevelIndex < LEVELS.length - 1) {
-    nextBtn.style.display = "inline-block";
-  } else {
-    nextBtn.style.display = "none";
+function showLevelCompleteModal() {
+  if (!levelCompleteModal) return;
+  const hasNext = currentLevelIndex < LEVELS.length - 1;
+  if (levelCompleteText) {
+    levelCompleteText.textContent = hasNext
+      ? "Great job! What do you want to do next?"
+      : "Great job! You finished the final level. You can retry this level.";
   }
+  if (levelCompleteNextBtn) {
+    levelCompleteNextBtn.style.display = hasNext ? "inline-block" : "none";
+  }
+  levelCompleteModal.classList.add("active");
 }
 
 
@@ -1020,9 +1461,10 @@ async function checkWinCondition() {
     for (const player of players) {
       if (player.row === goal.row && player.col === goal.col) {
         gameWon = true;
+        await grantUndoCredit(1);
         updateStatus("Puzzle solved! All objectives completed and goal reached!");
         triggerConfetti();
-        showNextLevelButton();
+        showLevelCompleteModal();
         syncProgressAfterWin();
         break;
       }
@@ -1143,7 +1585,10 @@ function movePlayer(playerIndex, newRow, newCol) {
     return;
   }
 
+  saveUndoSnapshot();
+
   levelMoveCount += 1;
+  updateMoveCountDisplay();
 
   // ✅ NEW: Check if moving into a bomb BEFORE moving
   const isBombBlock = board[newRow][newCol] === CELL_TYPES.BOMB;
@@ -1232,9 +1677,83 @@ function movePlayer(playerIndex, newRow, newCol) {
 
   const moveSound = document.getElementById("moveSound");
   if (moveSound) {
-    moveSound.currentTime = 0; // reset to start for rapid reuse
-    moveSound.play().catch(() => {});
+    playSound(moveSound);
   }
+}
+
+function cloneGameData(data) {
+  return data == null ? data : JSON.parse(JSON.stringify(data));
+}
+
+function saveUndoSnapshot() {
+  moveHistorySnapshots.push({
+    ROWS,
+    COLS,
+    board: cloneGameData(board),
+    players: cloneGameData(players),
+    goal: cloneGameData(goal),
+    objectives: cloneGameData(objectives),
+    objectivesCompleted,
+    totalObjectives,
+    phaseBlockStates: cloneGameData(phaseBlockStates),
+    bombs: cloneGameData(bombs),
+    teleportBlocks: cloneGameData(teleportBlocks),
+    playerTeleportCooldowns: Array.from(playerTeleportCooldowns.entries()),
+    gameWon,
+    selectedPlayerIndex,
+    levelMoveCount
+  });
+}
+
+async function undoMove() {
+  if (undoCredits <= 0) {
+    openUndoExchangeModal();
+    return;
+  }
+
+  if (moveHistorySnapshots.length === 0) {
+    return;
+  }
+
+  const consumed = await consumeUndoCredit(1);
+  if (!consumed) {
+    openUndoExchangeModal();
+    return;
+  }
+
+  const snapshot = moveHistorySnapshots.pop();
+
+  ROWS = snapshot.ROWS;
+  COLS = snapshot.COLS;
+  resizeCanvas();
+
+  board = cloneGameData(snapshot.board);
+  players = cloneGameData(snapshot.players);
+  goal = cloneGameData(snapshot.goal);
+  objectives = cloneGameData(snapshot.objectives);
+  objectivesCompleted = snapshot.objectivesCompleted;
+  totalObjectives = snapshot.totalObjectives;
+  phaseBlockStates = cloneGameData(snapshot.phaseBlockStates);
+  bombs = cloneGameData(snapshot.bombs);
+  teleportBlocks = cloneGameData(snapshot.teleportBlocks);
+  playerTeleportCooldowns = new Map(snapshot.playerTeleportCooldowns || []);
+  gameWon = snapshot.gameWon;
+  selectedPlayerIndex = -1;
+  levelMoveCount = snapshot.levelMoveCount;
+
+  // Clear transient animation/effect state before redraw
+  fallingPieces = [];
+  risingPieces = [];
+  pendingMoveCounter = false;
+  explodingPlayers = [];
+  showTransformerMenu = false;
+  transformerPosition = null;
+  transformerPlayerIndex = -1;
+
+  updatePlayerCount();
+  updateObjectiveCount();
+  updateMoveCountDisplay();
+  drawBoard();
 }
 
 function handleTeleport(player) {
@@ -2130,9 +2649,7 @@ function drawBoard() {
 function triggerConfetti() {
   //const Winsound = new Audio("assets/audio/woo-hoo-82843.mp3");
   const Winsound = new Audio("assets/audio/completion.mp3");
-  Winsound.currentTime = 0;
-  Winsound.volume = 0.7;
-  Winsound.play().catch(() => {});
+  playSound(Winsound, 0.7);
   const confettiCount = 150; // More confetti!
   const confettiColors = [
     '#ff6b6b', '#4ecdc4', '#f9ca24', '#6c5ce7', '#00b894', 
@@ -2347,8 +2864,7 @@ function moveBombs() {
       // 💥 Play explosion sound
       const explosionSound = document.getElementById("explosionSound");
       if (explosionSound) {
-          explosionSound.currentTime = 0; // Reset to start
-          explosionSound.play().catch(() => {});
+          playSound(explosionSound);
       }
 
       // Save explosion animation details
@@ -2393,8 +2909,7 @@ function updateBombs() {
       // 💥 Play explosion sound
       const explosionSound = document.getElementById("explosionSound");
       if (explosionSound) {
-        explosionSound.currentTime = 0; // Reset to start
-        explosionSound.play().catch(() => {});
+        playSound(explosionSound);
       }
       
       // Create explosion animation
@@ -2475,8 +2990,7 @@ function handleBombCollision(player, playerIndex, bombRow, bombCol) {
   // 💥 Play explosion sound
   const explosionSound = document.getElementById("explosionSound");
   if (explosionSound) {
-    explosionSound.currentTime = 0; // Reset to start
-    explosionSound.play().catch(() => {});
+    playSound(explosionSound);
   }
 
   // Create explosion animation at the bomb's position
@@ -2573,8 +3087,10 @@ function handleMove(e) {
   if (gameWon && mode === "play") return;
   
   let rect = canvas.getBoundingClientRect();
-  let x = e.clientX - rect.left;
-  let y = e.clientY - rect.top;
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  let x = (e.clientX - rect.left) * scaleX;
+  let y = (e.clientY - rect.top) * scaleY;
   let col = Math.floor(x / TILE_SIZE);
   let row = Math.floor(y / TILE_SIZE);
 
@@ -2879,21 +3395,10 @@ canvas.addEventListener("touchstart", (e) => {
   e.preventDefault();
 
   const touch = e.touches[0];
-  const rect = canvas.getBoundingClientRect();
-
-  // Adjust for scaling
-  const scaleX = canvas.width / rect.width;
-  const scaleY = canvas.height / rect.height;
-
-  const x = (touch.clientX - rect.left) * scaleX;
-  const y = (touch.clientY - rect.top) * scaleY;
-
-  const simulatedEvent = {
-    clientX: x + rect.left,
-    clientY: y + rect.top
-  };
-
-  handleMove(simulatedEvent);
+  handleMove({
+    clientX: touch.clientX,
+    clientY: touch.clientY
+  });
 }, { passive: false });
 
 // --- Add keyboard controls for deselection ---
@@ -2970,15 +3475,6 @@ confettiStyle.textContent = `
   }
 `;
 
-document.addEventListener('DOMContentLoaded', () => {
-  const blockBox = document.getElementById('blockDescriptionBox');
-  
-  if (blockBox) {
-    blockBox.addEventListener('click', () => {
-      blockBox.classList.toggle('expanded');
-    });
-  }
-});
 document.head.appendChild(confettiStyle);
 window.addEventListener('resize', resizeCanvas);
 
@@ -2986,7 +3482,16 @@ window.addEventListener('resize', resizeCanvas);
 initializeCanvas();
 resizeCanvas();
 updateStatus("Welcome to Multi-Player Chess Puzzle with Gravity! Start by placing your player pieces.");
+updateUndoButtonLabel();
+if (window.authReady && typeof window.authReady.finally === "function") {
+  window.authReady.finally(() => {
+    syncUndoCreditsFromServer();
+  });
+} else {
+  syncUndoCreditsFromServer();
+}
 updatePlayerCount();
 updateObjectiveCount();
 setupFileUpload(); // Set up file upload functionality
 gameLoop();
+

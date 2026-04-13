@@ -397,7 +397,8 @@ const initTablesSql = `
   );
   CREATE TABLE IF NOT EXISTS user_progress (
     user_id TEXT PRIMARY KEY,
-    max_unlocked INT
+    max_unlocked INT,
+    undo_credits INT NOT NULL DEFAULT 0
   );
   CREATE TABLE IF NOT EXISTS levels (
     id SERIAL PRIMARY KEY,
@@ -418,6 +419,7 @@ const initTablesSql = `
 async function ensureTables() {
   try {
     await pool.query(initTablesSql);
+    await pool.query('ALTER TABLE user_progress ADD COLUMN IF NOT EXISTS undo_credits INT NOT NULL DEFAULT 0');
     console.log('✅ DB tables ensured (users, user_progress, levels)');
   } catch (err) {
     console.error('❌ Failed to create tables:', err.message);
@@ -427,6 +429,7 @@ async function ensureTables() {
 app.get('/init', async (req, res) => {
   try {
     await pool.query(initTablesSql);
+    await pool.query('ALTER TABLE user_progress ADD COLUMN IF NOT EXISTS undo_credits INT NOT NULL DEFAULT 0');
     res.send('✅ Tables created');
   } catch (err) {
     console.error('Init failed:', err);
@@ -498,6 +501,80 @@ app.post('/progress', authenticate, async (req, res) => {
   }
 });
 
+app.get('/undo-credits', authenticate, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT undo_credits FROM user_progress WHERE user_id = $1',
+      [req.user.user_id]
+    );
+    const undoCredits = Number.parseInt(result.rows[0]?.undo_credits, 10);
+    res.json({ undoCredits: Number.isFinite(undoCredits) ? undoCredits : 0 });
+  } catch (err) {
+    console.error('Error fetching undo credits:', err);
+    res.status(500).json({ error: 'Failed to fetch undo credits' });
+  }
+});
+
+app.post('/undo-credits/grant', authenticate, async (req, res) => {
+  const parsedAmount = Number.parseInt(req.body?.amount, 10);
+  const amount = Number.isFinite(parsedAmount) && parsedAmount > 0 ? parsedAmount : 1;
+
+  try {
+    const result = await pool.query(
+      `
+      INSERT INTO user_progress (user_id, max_unlocked, undo_credits)
+      VALUES ($1, 1, $2)
+      ON CONFLICT (user_id)
+      DO UPDATE SET undo_credits = user_progress.undo_credits + EXCLUDED.undo_credits
+      RETURNING undo_credits
+      `,
+      [req.user.user_id, amount]
+    );
+
+    const undoCredits = Number.parseInt(result.rows[0]?.undo_credits, 10);
+    res.json({ success: true, undoCredits: Number.isFinite(undoCredits) ? undoCredits : 0 });
+  } catch (err) {
+    console.error('Error granting undo credits:', err);
+    res.status(500).json({ error: 'Failed to grant undo credits' });
+  }
+});
+
+app.post('/undo-credits/use', authenticate, async (req, res) => {
+  const parsedAmount = Number.parseInt(req.body?.amount, 10);
+  const amount = Number.isFinite(parsedAmount) && parsedAmount > 0 ? parsedAmount : 1;
+
+  try {
+    await pool.query(
+      `
+      INSERT INTO user_progress (user_id, max_unlocked, undo_credits)
+      VALUES ($1, 1, 0)
+      ON CONFLICT (user_id) DO NOTHING
+      `,
+      [req.user.user_id]
+    );
+
+    const result = await pool.query(
+      `
+      UPDATE user_progress
+      SET undo_credits = undo_credits - $2
+      WHERE user_id = $1 AND undo_credits >= $2
+      RETURNING undo_credits
+      `,
+      [req.user.user_id, amount]
+    );
+
+    if (!result.rows.length) {
+      return res.status(400).json({ error: 'Not enough undo credits' });
+    }
+
+    const undoCredits = Number.parseInt(result.rows[0]?.undo_credits, 10);
+    res.json({ success: true, undoCredits: Number.isFinite(undoCredits) ? undoCredits : 0 });
+  } catch (err) {
+    console.error('Error consuming undo credits:', err);
+    res.status(500).json({ error: 'Failed to consume undo credits' });
+  }
+});
+
 app.post('/saveLevel', authenticate, async (req, res) => {
   const { levelName, levelData } = req.body;
   console.log('POST /saveLevel for user:', req.user.user_id);
@@ -528,6 +605,38 @@ app.get('/loadLevels', authenticate, async (req, res) => {
   } catch (err) {
     console.error('Error loading levels:', err);
     res.status(500).json({ error: 'Failed to load levels' });
+  }
+});
+
+app.get('/stats/fewest-other-moves', authenticate, async (req, res) => {
+  try {
+    const parsedLevel = Number.parseInt(req.query.level, 10);
+    if (!Number.isFinite(parsedLevel) || parsedLevel <= 0) {
+      return res.status(400).json({ error: 'Invalid level parameter' });
+    }
+
+    const currentUserId = String(req.user.user_id);
+    const result = await pool.query(
+      `SELECT user_id, best_moves
+       FROM user_level_stats
+       WHERE level_index = $1 AND user_id <> $2
+       ORDER BY best_moves ASC, user_id ASC
+       LIMIT 1`,
+      [parsedLevel, currentUserId]
+    );
+
+    if (!result.rows.length) {
+      return res.json({ level: parsedLevel, best_moves: null, user_id: null });
+    }
+
+    res.json({
+      level: parsedLevel,
+      best_moves: result.rows[0].best_moves,
+      user_id: result.rows[0].user_id
+    });
+  } catch (err) {
+    console.error('Error fetching fewest moves by other user:', err);
+    res.status(500).json({ error: 'Failed to fetch fewest moves by other user' });
   }
 });
 
@@ -575,3 +684,6 @@ const PORT = process.env.PORT || 3000;
     console.log(`Server running on port ${PORT}`);
   });
 })();
+
+
+
