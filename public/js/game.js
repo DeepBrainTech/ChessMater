@@ -8,6 +8,9 @@
  * - Source: https://commons.wikimedia.org/wiki/Category:SVG_chess_pieces
  */
 
+const CM_EDITOR_PAGE =
+  typeof window !== "undefined" && window.CM_EDITOR_PAGE === true;
+
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 const statusMessage = document.getElementById("statusMessage");
@@ -23,17 +26,11 @@ const levelCompleteRetryBtn = document.getElementById("levelCompleteRetryBtn");
 const levelCompleteNextBtn = document.getElementById("levelCompleteNextBtn");
 const SHOW_IN_GAME_STATUS = false;
 // const gravityBtn = document.getElementById("gravityBtn");
-const downloadBtn = document.getElementById("downloadBtn");
-const eraseBoardBtn = document.getElementById("eraseBoardBtn");
-const puzzleNameInput = document.getElementById("puzzleName");
-const saveNotice = document.getElementById("saveNotice");
 
 //default board dimensions
 const TILE_SIZE = 60;
 let ROWS = 10;
 let COLS = 16;
-const DEFAULT_ROWS = 10;
-const DEFAULT_COLS = 16;
 let fallingPieces = [];
 let fogEnabled = false;
 let pendingMoveCounter = false;
@@ -106,8 +103,8 @@ let totalObjectives = 0;
 let phaseBlockStates = {}; // Track which phase blocks have been activated
 let bombs = []; // {row, col, direction}
 let explodingPlayers = []; // { x, y, rotation, velocityY, img }
-let mode = "edit";     // edit or play
-let editMode = "player_rook"; // tool in edit mode
+let mode = CM_EDITOR_PAGE ? "edit" : "play";
+let editMode = "player_rook"; // tool in edit mode (editor page only)
 let gravityEnabled = true;
 let gameWon = false;
 let selectedPlayerIndex = -1; // Track which player is selected
@@ -441,33 +438,6 @@ let showTransformerMenu = false;
 let transformerPosition = null;
 let transformerPlayerIndex = -1;
 
-const boardSizeBtn = document.getElementById("boardSize");
-if (boardSizeBtn) {
-  boardSizeBtn.addEventListener("change", (e) => {
-  const size = e.target.value;
-  
-  if (size === "custom") {
-    document.getElementById("customSizeInputs").style.display = "block";
-  } else {
-    document.getElementById("customSizeInputs").style.display = "none";
-    
-    switch(size) {
-      case "8x8":
-        resizeBoard(8, 8);
-        break;
-      case "12x20":
-        resizeBoard(12, 20);
-        break;
-      case "6x10":
-        resizeBoard(6, 10);
-        break;
-      default: // 10x16
-        resizeBoard(10, 16);
-        break;
-    }
-  }
-})};
-
 const fogToggle = document.getElementById("levelFogToggle");
 if (fogToggle) {
   fogToggle.addEventListener("change", (e) => {
@@ -477,61 +447,9 @@ if (fogToggle) {
   });
 }
 
-const applyBtn = document.getElementById("applyCustomSize");
-if (applyBtn) {
-   applyBtn.addEventListener("click", () => {
-  const customRows = parseInt(document.getElementById("customRows").value) || DEFAULT_ROWS;
-  const customCols = parseInt(document.getElementById("customCols").value) || DEFAULT_COLS;
-  
-  // Validate dimensions
-  const validRows = Math.min(Math.max(customRows, 4), 20);
-  const validCols = Math.min(Math.max(customCols, 4), 30);
-  
-  resizeBoard(validRows, validCols);
-})};
-
-const modeSelect = document.getElementById("modeSelect");
-if (modeSelect) {
-   modeSelect.addEventListener("change", (e) => {
-  mode = e.target.value;
-  selectedPlayerIndex = -1; // Deselect when switching modes
-  updateStatus(`Mode: ${mode === 'edit' ? 'Edit Mode' : 'Play Mode'}`);
-  
-  // Reset phase block states when switching to edit mode
-  if (mode === "edit") {
-    resetPhaseBlocks();
-  }
-  
-  // Close transformer menu when switching modes
-  showTransformerMenu = false;
-  transformerPosition = null;
-  transformerPlayerIndex = -1;
-  
-  // Apply gravity automatically when switching to play mode
-  if (mode === "play" && gravityEnabled && !gameWon) {
-    applyGravity();
-  }
-})};
-
-
-
 // gravityBtn.addEventListener("click", () => {
 //   applyGravity();
 // });
-
-if (downloadBtn) {
-  downloadBtn.addEventListener("click", () => {
-    saveLevelToFolder();
-  });
-}
-
-if (eraseBoardBtn) {
-  eraseBoardBtn.addEventListener("click", () => {
-    if (confirm("Are you sure you want to erase the entire board? This cannot be undone.")) {
-      eraseBoard();
-    }
-  });
-}
 
 document.addEventListener('DOMContentLoaded', () => {
   try {
@@ -679,6 +597,14 @@ function resizeCanvas() {
 }
 
 function updateStatus(message) {
+  const editorBanner = document.getElementById("editorStatusBanner");
+  if (editorBanner) {
+    editorBanner.textContent = message;
+    clearTimeout(updateStatus._editorT);
+    updateStatus._editorT = setTimeout(() => {
+      if (editorBanner.textContent === message) editorBanner.textContent = "";
+    }, 5000);
+  }
   if (!SHOW_IN_GAME_STATUS) return;
   if (!statusMessage) return;
   statusMessage.textContent = message;
@@ -690,6 +616,7 @@ function updateStatus(message) {
 }
 
 function updatePlayerCount() {
+  if (!playerCount) return;
   playerCount.textContent = `Players: ${players.length}`;
 }
 
@@ -737,6 +664,7 @@ async function fetchFewestOtherMovesForCurrentLevel() {
 
 // Update objective counter display
 function updateObjectiveCount() {
+  if (!objectiveCount) return;
   const completed = objectives.filter(obj => obj.completed).length;
   objectiveCount.textContent = `Objectives: ${completed}/${totalObjectives}`;
 }
@@ -781,80 +709,6 @@ function resetPhaseBlocks() {
       }
     }
   }
-}
-
-// --- Erase the entire board ---
-function eraseBoard() {
-  board = Array.from({ length: ROWS }, () => Array(COLS).fill(CELL_TYPES.EMPTY));
-  players = [];
-  goal = null;
-  objectives = [];
-  objectivesCompleted = 0;
-  totalObjectives = 0;
-  gameWon = false;
-  fogEnabled = false;
-  const fogToggleBtn = document.getElementById("levelFogToggle");
-  if (fogToggleBtn) fogToggleBtn.checked = false;
-  selectedPlayerIndex = -1;
-  resetPhaseBlocks();
-  showTransformerMenu = false;
-  transformerPosition = null;
-  transformerPlayerIndex = -1;
-  visitedSquares.forEach(row => row.fill(false));
-  updatePlayerCount();
-  updateObjectiveCount();
-  updateStatus(`Board cleared! Size: ${ROWS}x${COLS}`);
-}
-
-// --- Save level to levels folder ---
-// --- Save level to levels folder ---
-function saveLevelToFolder() {
-  if (players.length === 0) {
-    updateStatus("Please add at least one player before saving");
-    return;
-  }
-  
-  if (!goal) {
-    updateStatus("Please add a goal before saving");
-    return;
-  }
-  
-  const puzzleName = puzzleNameInput.value || "chess_puzzle";
-  
-  // Create puzzle data object - FIXED: Include all goal properties
-  const puzzleData = {
-    version: "1.3",
-    name: puzzleName,
-    rows: ROWS,
-    cols: COLS,
-    board: board,
-    players: players,
-    goal: goal, // This should include type and counter if it's a counter goal
-    objectives: objectives,
-    bombs: bombs, // ✅ Add bombs to saved data
-    fog: fogEnabled,
-    createdAt: new Date().toISOString()
-  };
-  
-  // Convert to JSON string
-  const jsonString = JSON.stringify(puzzleData, null, 2);
-  
-  // Create download link with levels/ path
-  const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(jsonString);
-  const downloadAnchorNode = document.createElement('a');
-  downloadAnchorNode.setAttribute("href", dataStr);
-  downloadAnchorNode.setAttribute("download", `${puzzleName.replace(/\s+/g, '_')}.json`);
-  document.body.appendChild(downloadAnchorNode);
-  downloadAnchorNode.click();
-  downloadAnchorNode.remove();
-  
-  // Show save notice
-  saveNotice.style.display = 'block';
-  setTimeout(() => {
-    saveNotice.style.display = 'none';
-  }, 3000);
-  
-  updateStatus(`Puzzle "${puzzleName}" saved to levels folder!`);
 }
 
 // --- Load puzzle from JSON file ---
@@ -1019,40 +873,6 @@ function loadPuzzle(puzzleData) {
   } catch (error) {
     updateStatus("Error loading puzzle: " + error.message);
   }
-}
-
-// --- Handle file upload for loading puzzles ---
-function setupFileUpload() {
-  const fileInput = document.createElement('input');
-  fileInput.type = 'file';
-  fileInput.accept = '.json';
-  fileInput.style.display = 'none';
-  document.body.appendChild(fileInput);
-  
-  fileInput.addEventListener('change', (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
-    
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const puzzleData = JSON.parse(e.target.result);
-        loadPuzzle(puzzleData);
-      } catch (error) {
-        updateStatus("Error parsing puzzle file: " + error.message);
-      }
-    };
-    reader.readAsText(file);
-  });
-  
-  // Add load button to UI
-  const loadButton = document.createElement('button');
-  loadButton.textContent = 'Load Puzzle from Levels';
-  loadButton.addEventListener('click', () => {
-    fileInput.click();
-  });
-  
-  document.querySelector('.download-section').appendChild(loadButton);
 }
 
 function decrementCounterAfterMove() {
@@ -2094,7 +1914,7 @@ function drawPieceSelectionMenu() {
 function getVisibleSquares() {
   const visible = Array.from({ length: ROWS }, () => Array(COLS).fill(false));
 
-  if (!fogEnabled || mode === "edit") {
+  if (!fogEnabled || (CM_EDITOR_PAGE && mode === "edit")) {
     for (let r = 0; r < ROWS; r++)
       for (let c = 0; c < COLS; c++)
         visible[r][c] = true;
@@ -3096,129 +2916,16 @@ function handleMove(e) {
 
   if (row < 0 || row >= ROWS || col < 0 || col >= COLS) return;
 
-  if (mode === "edit") {
-    if (editMode === "block") {
-      board[row][col] = CELL_TYPES.SOLID_BLOCK;
-      updateStatus(`Solid block placed at (${row}, ${col})`);
-    } else if (editMode === "phase_block") {
-      board[row][col] = CELL_TYPES.PHASE_BLOCK;
-      updateStatus(`Phase-through block placed at (${row}, ${col})`);
-    } else if (editMode === "transformer") {
-      board[row][col] = CELL_TYPES.TRANSFORMER;
-      updateStatus(`Transformer block placed at (${row}, ${col})`);
-    } else if (editMode === "teleport") {
-      board[row][col] = CELL_TYPES.TELEPORT;
-      // Add to teleportBlocks array if not already there
-      if (!teleportBlocks.some(tp => tp.row === row && tp.col === col)) {
-        teleportBlocks.push({ row, col });
-      }
-      updateStatus(`Teleport block placed at (${row}, ${col})`);
-    } else if (editMode === "objective") {
-      // Check if there's already an objective here
-      const existingObjective = objectives.find(obj => obj.row === row && obj.col === col);
-      if (!existingObjective) {
-        board[row][col] = CELL_TYPES.OBJECTIVE;
-        objectives.push({ row, col, completed: false });
-        totalObjectives = objectives.length;
-        updateObjectiveCount();
-        updateStatus(`Objective placed at (${row}, ${col}). Total: ${totalObjectives}`);
-      } else {
-        updateStatus("Objective already exists at this position");
-      }
-    } else if (editMode === "erase") {
-      board[row][col] = CELL_TYPES.EMPTY;
-
-      // Remove from teleportBlocks if it was a teleport block
-      const teleportIndex = teleportBlocks.findIndex(tp => tp.row === row && tp.col === col);
-      if (teleportIndex !== -1) {
-        teleportBlocks.splice(teleportIndex, 1);
-      }
-      
-      // Remove player if one was at this position
-      const playerIndex = getPlayerAt(row, col);
-      if (playerIndex !== -1) {
-        players.splice(playerIndex, 1);
-        updatePlayerCount();
-      }
-      
-      // Remove goal if it was at this position
-      if (goal && goal.row === row && goal.col === col) {
-        goal = null;
-      }
-      
-      // Remove objective if one was at this position
-      const objectiveIndex = objectives.findIndex(obj => obj.row === row && obj.col === col);
-      if (objectiveIndex !== -1) {
-        objectives.splice(objectiveIndex, 1);
-        totalObjectives = objectives.length;
-        objectivesCompleted = objectives.filter(obj => obj.completed).length;
-        updateObjectiveCount();
-      }
-      
-      updateStatus(`Cell cleared at (${row}, ${col})`);
-    } else if (editMode.startsWith("player_")) {
-      // Extract piece type from edit mode
-      const piece = editMode.split("_")[1];
-      
-      // Allow placing multiple players on the same cell (stacking)
-      board[row][col] = CELL_TYPES.PLAYER;
-      players.push({ row, col, pieceType: piece });
-      updatePlayerCount();
-      updateStatus(`${piece.charAt(0).toUpperCase() + piece.slice(1)} placed at (${row}, ${col}). Total: ${players.length}`);
-      
-      // Apply gravity after placing
-      if (gravityEnabled) {
-        applyGravity();
-      }
-    } else if (editMode.startsWith("teleport_")) {
-      const color = editMode.split("_")[1]; // "purple", "green", etc.
-      const teleportType = {
-        purple: CELL_TYPES.TELEPORT_PURPLE,
-        green: CELL_TYPES.TELEPORT_GREEN,
-        blue: CELL_TYPES.TELEPORT_BLUE,
-        orange: CELL_TYPES.TELEPORT_ORANGE
-      }[color];
-      
-      if (teleportType) {
-        board[row][col] = teleportType;
-        // Add to teleportBlocks array if not already there
-        if (!teleportBlocks.some(tp => tp.row === row && tp.col === col)) {
-          teleportBlocks.push({ row, col, type: teleportType });
-        }
-        updateStatus(`${color.charAt(0).toUpperCase() + color.slice(1)} teleporter placed at (${row}, ${col})`);
-      }
-    } else if (editMode === "goal") {
-      if (goal) board[goal.row][goal.col] = CELL_TYPES.EMPTY;
-      board[row][col] = CELL_TYPES.GOAL;
-      goal = { row, col };
-      updateStatus(`Goal placed at (${row}, ${col})`);
-      
-      // Apply gravity after placing
-      if (gravityEnabled) {
-        applyGravity();
-      }
-    } else if (editMode === "counter_goal") {
-      if (goal) board[goal.row][goal.col] = CELL_TYPES.EMPTY;
-
-      const moves = parseInt(document.getElementById("counterGoalMoves").value) || 5;
-
-      board[row][col] = CELL_TYPES.COUNTER_GOAL;
-      goal = { row, col, type: "counter", counter: moves };
-
-      updateStatus(`Counter Goal placed at (${row}, ${col}) with ${goal.counter} moves`);
-    } else if (editMode === "bomb") {
-      // Only place bomb on empty cells
-      if (board[row][col] === CELL_TYPES.EMPTY) {
-        board[row][col] = CELL_TYPES.BOMB;
-        bombs.push({ row, col, direction: 1 }); // Default moving right
-        updateStatus(`Bomb placed at (${row}, ${col})`);
-      } else {
-        updateStatus("Cannot place bomb on occupied cell");
-      }
+  if (CM_EDITOR_PAGE && mode === "edit") {
+    if (typeof window.cmEditorOnEditCell === "function") {
+      window.cmEditorOnEditCell(row, col);
     }
-  } else if (mode === "play") {
+    return;
+  }
+
+  if (mode === "play") {
     if (players.length === 0) {
-      updateStatus("Place at least one player piece first in Edit Mode");
+      updateStatus("No pieces on this level. Choose another level.");
       return;
     }
     
@@ -3481,7 +3188,11 @@ window.addEventListener('resize', resizeCanvas);
 // Initialize the game
 initializeCanvas();
 resizeCanvas();
-updateStatus("Welcome to Multi-Player Chess Puzzle with Gravity! Start by placing your player pieces.");
+updateStatus(
+  CM_EDITOR_PAGE
+    ? "Level editor: place pieces and goal, then copy or download."
+    : "Welcome! Choose a level from the list to play."
+);
 updateUndoButtonLabel();
 if (window.authReady && typeof window.authReady.finally === "function") {
   window.authReady.finally(() => {
@@ -3492,6 +3203,6 @@ if (window.authReady && typeof window.authReady.finally === "function") {
 }
 updatePlayerCount();
 updateObjectiveCount();
-setupFileUpload(); // Set up file upload functionality
+
 gameLoop();
 

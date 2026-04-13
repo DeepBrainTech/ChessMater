@@ -136,14 +136,6 @@
       margin-top: 20px;
       text-align: center;
     }
-    #puzzleName {
-      padding: 8px 15px;
-      border: 2px solid #3498db;
-      border-radius: 5px;
-      font-size: 16px;
-      margin-right: 10px;
-      width: 200px;
-    }
     .save-notice {
       margin-top: 10px;
       padding: 10px;
@@ -1176,8 +1168,6 @@
     }
     document.addEventListener("DOMContentLoaded", updateCurrentUserName);
   </script>
-  <button class="mode-toggle" id="modeToggle">Switch to Consumer Mode</button>
-
   <div id="startScreen" class="start-screen">
     <h1>ChessMater</h1>
     <p id="startScreenUserName" class="current-user-name"></p>
@@ -1327,84 +1317,6 @@
         </div>
       </div>
       
-      <div id="controls">
-        <div class="control-group developer-only">
-          <label>Mode:</label>
-          <select id="modeSelect">
-            <option value="edit">Edit Mode</option>
-            <option value="play">Play Mode</option>
-          </select>
-        </div>
-        
-        <div class="control-group developer-only">
-          <label>Edit Tool:</label>
-          <select id="editMode">
-            <option value="player_rook">Rook</option>
-            <option value="player_bishop">Bishop</option>
-            <option value="player_queen">Queen</option>
-            <option value="player_knight">Knight</option>
-            <option value="player_king">King</option>
-            <option value="player_pawn">Pawn</option>
-            <option value="goal">Goal</option>
-            <option value="counter_goal">Counter Goal</option>
-            <option value="block">Solid Block</option>
-            <option value="phase_block">Phase Block</option>
-            <option value="transformer">Transformer Block</option>
-            <option value="objective">Objective Block</option>
-            <option value="teleport_purple">Purple Teleporter</option>
-            <option value="teleport_green">Green Teleporter</option>
-            <option value="teleport_blue">Blue Teleporter</option>
-            <option value="teleport_orange">Orange Teleporter</option>
-            <option value="bomb">Bomb Block</option>
-            <option value="erase">Erase</option>
-          </select>
-        </div>
-
-        <div class="control-group developer-only">
-          <label>Board Size:</label>
-          <select id="boardSize">
-            <option value="10x16">10x16 (Default)</option>
-            <option value="8x8">8x8 (Chess Board)</option>
-            <option value="12x20">12x20 (Large)</option>
-            <option value="6x10">6x10 (Small)</option>
-            <option value="custom">Custom...</option>
-          </select>
-        </div>
-
-        <!-- <div class="control-group">
-          <label>Visibility:</label>
-          <select id="visibilityMode">
-            <option value="classic">Classic</option>
-            <option value="fog">Fog of War</option>
-          </select>
-        </div> -->
-
-        <div id="customSizeInputs" class="developer-only" style="display: none; margin-top: 10px;">
-          <input type="number" id="customRows" placeholder="Rows" min="4" max="20" value="10">
-          <span>x</span>
-          <input type="number" id="customCols" placeholder="Columns" min="4" max="30" value="16">
-          <button id="applyCustomSize">Apply</button>
-        </div>
-        
-        <div class="control-group developer-only" id="counterGoalSettings" style="display:none;">
-          <label>Counter Goal Moves:</label>
-          <input type="number" id="counterGoalMoves" value="5" min="1" max="99">
-        </div>
-      </div>
-      
-      <div class="download-section developer-only">
-        <input type="text" id="puzzleName" placeholder="Puzzle Name">
-        <button id="downloadBtn">Save Puzzle to Levels Folder</button>
-        <div class="save-notice" id="saveNotice">
-          Puzzle saved to levels folder! The file will be downloaded automatically.
-        </div>
-      </div>
-      
-      <div class="danger-zone developer-only">
-        <button id="eraseBoardBtn">Erase Entire Board</button>
-        <p>Warning: This will clear everything from the board!</p>
-      </div>
-      
       <div class="status" id="statusMessage"></div>
       
       <!-- <div class="instructions">
@@ -1419,6 +1331,7 @@
     </div>
     
     <footer>
+      <p style="margin:0 0 10px;"><a href="editor.html">Level editor</a> (build levels for levels.js)</p>
       Chess piece images by <a href="https://en.wikipedia.org/wiki/User:Cburnett">Cburnett</a>, 
       licensed under <a href="https://creativecommons.org/licenses/by-sa/3.0/">CC BY-SA 3.0</a>. 
       Source: <a href="https://commons.wikimedia.org/wiki/Category:SVG_chess_pieces">Wikimedia Commons</a>.
@@ -1684,54 +1597,6 @@
       }
     });
 
-    // Mode management
-    let isDeveloperMode = true;
-    
-    // Predefined levels (in a real app, these would be loaded from files)
-    const predefinedLevels = [
-      { name: "Level 1", file: "levels/level1.json" },
-      { name: "Level 2", file: "levels/level2.json" },
-      { name: "Level 3", file: "levels/level3.json" }
-      // { name: "Level 4", file: "levels/level4.json" },
-      // { name: "Level 5", file: "levels/level5.json" },
-      // { name: "Level 6", file: "levels/level6.json" },
-      // { name: "Level 7", file: "levels/level7.json" },
-      // { name: "Level 8", file: "levels/level8.json" },
-      // { name: "Level 9", file: "levels/level9.json" },
-      // { name: "Level 10", file: "levels/level10.json" }
-    ];
-    
-    // Toggle between developer and consumer mode (guard for missing element)
-    const modeToggleEl = document.getElementById('modeToggle');
-    if (modeToggleEl) {
-      modeToggleEl.addEventListener('click', function() {
-        isDeveloperMode = !isDeveloperMode;
-        const container = document.getElementById('mainContainer');
-        const toggleButton = document.getElementById('modeToggle');
-        if (!container || !toggleButton) return;
-        if (isDeveloperMode) {
-          container.classList.remove('consumer-mode');
-          container.classList.add('developer-mode');
-          toggleButton.textContent = 'Switch to Consumer Mode';
-          const modeSelect = document.getElementById('modeSelect');
-          if (modeSelect) modeSelect.value = 'edit';
-          mode = 'edit';
-          updateStatus('Developer Mode: Full editing capabilities enabled');
-        } else {
-          container.classList.remove('developer-mode');
-          container.classList.add('consumer-mode');
-          toggleButton.textContent = 'Switch to Developer Mode';
-          const modeSelect = document.getElementById('modeSelect');
-          if (modeSelect) modeSelect.value = 'play';
-          mode = 'play';
-          updateStatus('Consumer Mode: Level selection enabled');
-
-          // 🟢 Load levels from levels.js when entering consumer mode
-          loadLevels();
-        }
-      });
-    }
-
     // 全局变量：缓存当前会话的最大解锁关卡（只在首页加载时获取一次）
     window.currentMaxUnlocked = 1;
 
@@ -1980,13 +1845,6 @@
 
     // Load level buttons
     loadLevels();
-
-    // Set to Play Mode
-    const modeSelect = document.getElementById("modeSelect");
-    if (modeSelect) {
-        modeSelect.value = "play";
-        modeSelect.dispatchEvent(new Event("change"));
-    }
 
     // Start Game Button Logic
     const startButton = document.getElementById("startButton");
