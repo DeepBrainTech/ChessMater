@@ -555,6 +555,104 @@
       color: rgba(255, 255, 255, 0.95);
       font-weight: 600;
     }
+    .level-complete-achievement {
+      margin: 10px 0 0;
+      min-height: 1.2em;
+      font-size: 0.92rem;
+      font-weight: 700;
+      color: #ffe58a;
+      text-align: center;
+    }
+    .level-complete-replay {
+      margin-top: 12px;
+      padding: 10px;
+      border-radius: 10px;
+      background: rgba(0, 0, 0, 0.18);
+      text-align: left;
+      position: relative;
+    }
+    .level-complete-replay.locked .level-complete-replay-lock {
+      display: flex;
+    }
+    .level-complete-replay-canvas-wrap {
+      position: relative;
+      width: 100%;
+      max-width: 320px;
+      margin: 0 auto;
+    }
+    .level-complete-replay-lock {
+      position: absolute;
+      inset: 0;
+      background: rgba(255, 255, 255, 0.38);
+      backdrop-filter: blur(1.5px);
+      border-radius: 8px;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 10px;
+      z-index: 2;
+      cursor: pointer;
+      color: #2c3e50;
+      font-weight: 700;
+      text-align: center;
+      padding: 12px;
+      box-sizing: border-box;
+    }
+    .level-complete-replay-lock-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 999px;
+      background: #fff;
+      border: 2px solid #d9d9d9;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+    }
+    .level-complete-replay-lock-text {
+      font-size: 0.94rem;
+      line-height: 1.35;
+    }
+    .level-complete-replay-title {
+      margin: 0 0 8px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: rgba(255, 255, 255, 0.96);
+    }
+    .level-complete-replay-subtitle {
+      margin: 0 0 8px;
+      font-size: 0.84rem;
+      color: rgba(255, 255, 255, 0.88);
+      text-align: center;
+    }
+    .level-complete-replay canvas {
+      width: 100%;
+      max-width: 320px;
+      height: auto;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      background: rgba(9, 13, 21, 0.7);
+      display: block;
+      margin: 0 auto;
+    }
+    .level-complete-replay-hint,
+    .level-complete-replay-step,
+    .level-complete-replay-event {
+      margin: 8px 0 0;
+      font-size: 0.84rem;
+      color: rgba(255, 255, 255, 0.88);
+      text-align: center;
+    }
+    .level-complete-replay-step {
+      font-weight: 700;
+      color: rgba(255, 255, 255, 0.96);
+    }
+    .level-complete-replay-event {
+      color: #ffe58a;
+      font-weight: 700;
+      min-height: 1.2em;
+    }
     .level-complete-actions button {
       border: none;
       border-radius: 8px;
@@ -1361,6 +1459,21 @@
         <div id="levelCompleteMoveCount">Your move: 0</div>
         <div id="levelCompleteFewestOtherMoves">Fewest move by other user: --</div>
       </div>
+      <p id="levelCompleteAchievement" class="level-complete-achievement"></p>
+      <div class="level-complete-replay" id="levelCompleteReplayPanel">
+        <p class="level-complete-replay-title" id="levelCompleteReplayTitle">Fewest move by other user walkthrough</p>
+        <p class="level-complete-replay-subtitle" id="levelCompleteReplaySubtitle"></p>
+        <div class="level-complete-replay-canvas-wrap">
+          <canvas id="levelCompleteReplayCanvas" width="320" height="220" aria-label="Replay mini board"></canvas>
+          <div class="level-complete-replay-lock" id="levelCompleteReplayLock">
+            <div class="level-complete-replay-lock-icon">🔒</div>
+            <div class="level-complete-replay-lock-text">Unlock replay for this level<br/>Cost: 2 diamonds</div>
+          </div>
+        </div>
+        <p class="level-complete-replay-hint" id="levelCompleteReplayHint">Use Arrow Keys: ←/→ step, ↑ first, ↓ last</p>
+        <p class="level-complete-replay-step" id="levelCompleteReplayStep">Step: --/--</p>
+        <p class="level-complete-replay-event" id="levelCompleteReplayEvent"></p>
+      </div>
       <div class="level-complete-actions">
         <button id="levelCompleteRetryBtn">Retry</button>
         <button id="levelCompleteNextBtn">Next Level</button>
@@ -1394,6 +1507,40 @@
       </div>
     </div>
   </div>
+
+  <div id="antigravityExchangeModal" class="undo-exchange-modal" aria-hidden="true">
+    <div class="undo-exchange-panel" role="dialog" aria-labelledby="antigravityExchangeTitle">
+      <h2 class="undo-exchange-title" id="antigravityExchangeTitle">Use Antigravity</h2>
+      <p class="undo-exchange-cost-line">Cost: <strong id="antigravityExchangeCostText">5 coins</strong></p>
+      <div class="undo-exchange-balances">
+        <p>Coins: <span id="antigravityExchangeCoins">—</span></p>
+        <p>Diamonds: <span id="antigravityExchangeDiamonds">—</span></p>
+        <p>Flowers: <span id="antigravityExchangeFlowers">—</span></p>
+      </div>
+      <p id="antigravityExchangeMessage" class="undo-exchange-message" role="status"></p>
+      <div class="undo-exchange-footer">
+        <button type="button" id="antigravityExchangeCloseBtn" class="undo-exchange-btn-cancel">Cancel</button>
+        <button type="button" id="antigravityExchangeRedeemBtn" class="undo-exchange-btn-confirm">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="replayExchangeModal" class="undo-exchange-modal" aria-hidden="true">
+    <div class="undo-exchange-panel" role="dialog" aria-labelledby="replayExchangeTitle">
+      <h2 class="undo-exchange-title" id="replayExchangeTitle">Unlock Replay</h2>
+      <p class="undo-exchange-cost-line">Cost: <strong id="replayExchangeCostText">2 diamonds</strong></p>
+      <div class="undo-exchange-balances">
+        <p>Coins: <span id="replayExchangeCoins">—</span></p>
+        <p>Diamonds: <span id="replayExchangeDiamonds">—</span></p>
+        <p>Flowers: <span id="replayExchangeFlowers">—</span></p>
+      </div>
+      <p id="replayExchangeMessage" class="undo-exchange-message" role="status"></p>
+      <div class="undo-exchange-footer">
+        <button type="button" id="replayExchangeCloseBtn" class="undo-exchange-btn-cancel">Cancel</button>
+        <button type="button" id="replayExchangeRedeemBtn" class="undo-exchange-btn-confirm">Confirm</button>
+      </div>
+    </div>
+  </div>
   
   <div class="container consumer-mode" id="mainContainer">
     <h1>ChessMater</h1>
@@ -1406,7 +1553,7 @@
         </div>
         <button id="undoMoveBtn">Undo(0)</button>
         <button id="restartLevelBtn">Restart Level</button>
-        <button id="antigravityToggle" onclick="toggleAntigravity()">Antigravity</button>
+        <button id="antigravityToggle" onclick="toggleAntigravity()">Antigravity(0)</button>
       </div>
       <div class="controls-right">
         <button type="button" id="blockTipToggle">Block Tip</button>

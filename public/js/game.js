@@ -19,10 +19,20 @@ const objectiveCount = document.getElementById("objectiveCount");
 const moveCountDisplay = document.getElementById("moveCount");
 const fewestOtherMovesDisplay = document.getElementById("fewestOtherMoves");
 const undoMoveButton = document.getElementById("undoMoveBtn");
+const antigravityToggleButton = document.getElementById("antigravityToggle");
 const levelCompleteModal = document.getElementById("levelCompleteModal");
 const levelCompleteText = document.getElementById("levelCompleteText");
 const levelCompleteMoveCountDisplay = document.getElementById("levelCompleteMoveCount");
 const levelCompleteFewestOtherMovesDisplay = document.getElementById("levelCompleteFewestOtherMoves");
+const levelCompleteAchievement = document.getElementById("levelCompleteAchievement");
+const levelCompleteReplayPanel = document.getElementById("levelCompleteReplayPanel");
+const levelCompleteReplayLock = document.getElementById("levelCompleteReplayLock");
+const levelCompleteReplayTitle = document.getElementById("levelCompleteReplayTitle");
+const levelCompleteReplayCanvas = document.getElementById("levelCompleteReplayCanvas");
+const levelCompleteReplaySubtitle = document.getElementById("levelCompleteReplaySubtitle");
+const levelCompleteReplayHint = document.getElementById("levelCompleteReplayHint");
+const levelCompleteReplayStep = document.getElementById("levelCompleteReplayStep");
+const levelCompleteReplayEvent = document.getElementById("levelCompleteReplayEvent");
 const closeLevelCompleteModalBtn = document.getElementById("closeLevelCompleteModal");
 const levelCompleteRetryBtn = document.getElementById("levelCompleteRetryBtn");
 const levelCompleteNextBtn = document.getElementById("levelCompleteNextBtn");
@@ -119,12 +129,31 @@ const RISE_SPEED = 700; // pixels per second
 let currentLevelIndex = 0;
 let levelMoveCount = 0;
 let fewestOtherMovesForLevel = null;
+let fewestOtherMovesUserName = "";
+let fewestOtherMovesReplayPath = null;
+let fewestOtherMovesReplayStepNumbers = [];
+let currentLevelMoveTrace = [];
+let pendingMoveTraceEntry = null;
+let levelCompleteReplayIndex = 0;
 let moveHistorySnapshots = [];
 let undoCredits = 0;
+let antigravityCredits = 0;
+let replayUnlockedForLevel = false;
+let antigravityUnlockedThisRun = false;
 
 function updateUndoButtonLabel() {
   if (!undoMoveButton) return;
   undoMoveButton.textContent = `Undo(${undoCredits})`;
+}
+
+function updateAntigravityButtonLabel() {
+  if (!antigravityToggleButton) return;
+  const state = antigravityEnabled ? "ON" : "OFF";
+  if (antigravityUnlockedThisRun) {
+    antigravityToggleButton.textContent = `Antigravity ${state}`;
+  } else {
+    antigravityToggleButton.textContent = `Antigravity(${antigravityCredits})`;
+  }
 }
 
 function getApiBaseUrl() {
@@ -152,6 +181,25 @@ async function syncUndoCreditsFromServer() {
     const credits = Number.parseInt(data?.undoCredits, 10);
     undoCredits = Number.isFinite(credits) ? credits : 0;
     updateUndoButtonLabel();
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+async function syncAntigravityCreditsFromServer() {
+  try {
+    await (window.authReady || Promise.resolve());
+    const res = await fetch(`${getApiBaseUrl()}/antigravity-credits`, {
+      method: "GET",
+      credentials: "include",
+      headers: buildAuthHeaders()
+    });
+    if (!res.ok) return false;
+    const data = await res.json();
+    const credits = Number.parseInt(data?.antigravityCredits, 10);
+    antigravityCredits = Number.isFinite(credits) ? credits : 0;
+    updateAntigravityButtonLabel();
     return true;
   } catch (_) {
     return false;
@@ -213,10 +261,63 @@ async function consumeUndoCredit(amount = 1) {
   return true;
 }
 
+async function grantAntigravityCreditsFromServerOnly(amount = 1) {
+  const parsed = Number.parseInt(amount, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) return false;
+  try {
+    await (window.authReady || Promise.resolve());
+    const res = await fetch(`${getApiBaseUrl()}/antigravity-credits/grant`, {
+      method: "POST",
+      credentials: "include",
+      headers: buildAuthHeaders(),
+      body: JSON.stringify({ amount: parsed })
+    });
+    if (!res.ok) return false;
+    const data = await res.json();
+    const credits = Number.parseInt(data?.antigravityCredits, 10);
+    antigravityCredits = Number.isFinite(credits) ? credits : antigravityCredits + parsed;
+    updateAntigravityButtonLabel();
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+async function consumeAntigravityCredit(amount = 1) {
+  const parsed = Number.parseInt(amount, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) return false;
+  try {
+    await (window.authReady || Promise.resolve());
+    const res = await fetch(`${getApiBaseUrl()}/antigravity-credits/use`, {
+      method: "POST",
+      credentials: "include",
+      headers: buildAuthHeaders(),
+      body: JSON.stringify({ amount: parsed })
+    });
+    if (res.status === 400) return false;
+    if (res.ok) {
+      const data = await res.json();
+      const credits = Number.parseInt(data?.antigravityCredits, 10);
+      antigravityCredits = Number.isFinite(credits) ? credits : Math.max(antigravityCredits - parsed, 0);
+      updateAntigravityButtonLabel();
+      return true;
+    }
+  } catch (_) {}
+
+  if (antigravityCredits < parsed) return false;
+  antigravityCredits -= parsed;
+  updateAntigravityButtonLabel();
+  return true;
+}
+
 /** Main portal shop item (must match portal config). */
 const PORTAL_UNDO_ITEM_ID = "chess_mater_undo";
+const PORTAL_ANTIGRAVITY_ITEM_ID = "chess_mater_antigravity";
+const PORTAL_REPLAY_ITEM_ID = "chess_mater_reply";
 const PORTAL_UNDO_GAME_MODE = "chessmater";
 const UNDO_SHOP_HINT_COINS = 5;
+const ANTIGRAVITY_SHOP_HINT_COINS = 5;
+const REPLAY_SHOP_HINT_DIAMONDS = 2;
 
 function normalizePortalApiBase(base) {
   if (!base || typeof base !== "string") return "";
@@ -258,10 +359,14 @@ async function getPortalAssets() {
 }
 
 async function postPortalRedeemUndo() {
+  return postPortalRedeemItem(PORTAL_UNDO_ITEM_ID);
+}
+
+async function postPortalRedeemItem(itemId) {
   const token = window.cmPortalToken;
   const base = normalizePortalApiBase(window.cmPortalApiBase || "");
   if (!token || !base) return { ok: false, message: "Portal session not available." };
-  const url = `${base}/api/user/shop/redeem?item_id=${encodeURIComponent(PORTAL_UNDO_ITEM_ID)}&game_mode=${encodeURIComponent(PORTAL_UNDO_GAME_MODE)}`;
+  const url = `${base}/api/user/shop/redeem?item_id=${encodeURIComponent(itemId)}&game_mode=${encodeURIComponent(PORTAL_UNDO_GAME_MODE)}`;
   try {
     const res = await fetch(url, {
       method: "POST",
@@ -321,6 +426,22 @@ const undoExchangeMessageEl = document.getElementById("undoExchangeMessage");
 const undoExchangeRedeemBtn = document.getElementById("undoExchangeRedeemBtn");
 const undoExchangeCloseBtn = document.getElementById("undoExchangeCloseBtn");
 const undoExchangeCostTextEl = document.getElementById("undoExchangeCostText");
+const antigravityExchangeModal = document.getElementById("antigravityExchangeModal");
+const antigravityExchangeCoinsEl = document.getElementById("antigravityExchangeCoins");
+const antigravityExchangeDiamondsEl = document.getElementById("antigravityExchangeDiamonds");
+const antigravityExchangeFlowersEl = document.getElementById("antigravityExchangeFlowers");
+const antigravityExchangeMessageEl = document.getElementById("antigravityExchangeMessage");
+const antigravityExchangeRedeemBtn = document.getElementById("antigravityExchangeRedeemBtn");
+const antigravityExchangeCloseBtn = document.getElementById("antigravityExchangeCloseBtn");
+const antigravityExchangeCostTextEl = document.getElementById("antigravityExchangeCostText");
+const replayExchangeModal = document.getElementById("replayExchangeModal");
+const replayExchangeCoinsEl = document.getElementById("replayExchangeCoins");
+const replayExchangeDiamondsEl = document.getElementById("replayExchangeDiamonds");
+const replayExchangeFlowersEl = document.getElementById("replayExchangeFlowers");
+const replayExchangeMessageEl = document.getElementById("replayExchangeMessage");
+const replayExchangeRedeemBtn = document.getElementById("replayExchangeRedeemBtn");
+const replayExchangeCloseBtn = document.getElementById("replayExchangeCloseBtn");
+const replayExchangeCostTextEl = document.getElementById("replayExchangeCostText");
 
 function setUndoExchangeBalanceCells(coinsText, diamondsText, flowersText) {
   if (undoExchangeCoinsEl) undoExchangeCoinsEl.textContent = coinsText;
@@ -423,6 +544,226 @@ function setupUndoExchangeModal() {
 
 setupUndoExchangeModal();
 window.openUndoExchangeModal = openUndoExchangeModal;
+
+function setGenericExchangeBalanceCells(coinsEl, diamondsEl, flowersEl, coinsText, diamondsText, flowersText) {
+  if (coinsEl) coinsEl.textContent = coinsText;
+  if (diamondsEl) diamondsEl.textContent = diamondsText;
+  if (flowersEl) flowersEl.textContent = flowersText;
+}
+
+function setGenericExchangeMessage(messageEl, text, kind) {
+  if (!messageEl) return;
+  messageEl.textContent = text || "";
+  messageEl.classList.remove("error", "success", "hint");
+  if (kind === "error") messageEl.classList.add("error");
+  if (kind === "success") messageEl.classList.add("success");
+  if (kind === "hint") messageEl.classList.add("hint");
+}
+
+async function fetchReplayUnlockStatusForLevel(levelNumber) {
+  const lvl = Number.parseInt(levelNumber, 10);
+  if (!Number.isFinite(lvl) || lvl <= 0) return false;
+  try {
+    await (window.authReady || Promise.resolve());
+    const res = await fetch(`${getApiBaseUrl()}/replay-unlocks/status?level=${encodeURIComponent(lvl)}`, {
+      method: "GET",
+      credentials: "include",
+      headers: buildAuthHeaders()
+    });
+    if (!res.ok) return false;
+    const data = await res.json();
+    return !!data?.unlocked;
+  } catch (_) {
+    return false;
+  }
+}
+
+async function activateReplayUnlockForLevel(levelNumber) {
+  const lvl = Number.parseInt(levelNumber, 10);
+  if (!Number.isFinite(lvl) || lvl <= 0) return false;
+  try {
+    await (window.authReady || Promise.resolve());
+    const res = await fetch(`${getApiBaseUrl()}/replay-unlocks/activate`, {
+      method: "POST",
+      credentials: "include",
+      headers: buildAuthHeaders(),
+      body: JSON.stringify({ level: lvl })
+    });
+    return res.ok;
+  } catch (_) {
+    return false;
+  }
+}
+
+function closeAntigravityExchangeModal() {
+  if (!antigravityExchangeModal) return;
+  antigravityExchangeModal.classList.remove("active");
+  antigravityExchangeModal.setAttribute("aria-hidden", "true");
+}
+
+async function refreshAntigravityExchangeAssetsDisplay() {
+  if (!portalUndoShopAvailable()) {
+    setGenericExchangeBalanceCells(antigravityExchangeCoinsEl, antigravityExchangeDiamondsEl, antigravityExchangeFlowersEl, "—", "—", "—");
+    setGenericExchangeMessage(antigravityExchangeMessageEl, "Open from the main portal to load your coins, diamonds, and flowers.", "hint");
+    return;
+  }
+  setGenericExchangeMessage(antigravityExchangeMessageEl, "");
+  setGenericExchangeBalanceCells(antigravityExchangeCoinsEl, antigravityExchangeDiamondsEl, antigravityExchangeFlowersEl, "…", "…", "…");
+  const assets = await getPortalAssets();
+  if (!assets) {
+    setGenericExchangeBalanceCells(antigravityExchangeCoinsEl, antigravityExchangeDiamondsEl, antigravityExchangeFlowersEl, "—", "—", "—");
+    setGenericExchangeMessage(antigravityExchangeMessageEl, "Could not load assets. Check portal session.", "error");
+    return;
+  }
+  setGenericExchangeBalanceCells(antigravityExchangeCoinsEl, antigravityExchangeDiamondsEl, antigravityExchangeFlowersEl, String(assets.coins), String(assets.diamonds), String(assets.flowers));
+}
+
+function setAntigravityExchangeBusy(busy) {
+  if (!antigravityExchangeRedeemBtn) return;
+  antigravityExchangeRedeemBtn.disabled = !!busy || !portalUndoShopAvailable();
+}
+
+async function openAntigravityExchangeModal() {
+  if (!antigravityExchangeModal) return;
+  if (antigravityExchangeCostTextEl) {
+    antigravityExchangeCostTextEl.textContent = `${ANTIGRAVITY_SHOP_HINT_COINS} coins`;
+  }
+  setGenericExchangeMessage(antigravityExchangeMessageEl, "");
+  antigravityExchangeModal.classList.add("active");
+  antigravityExchangeModal.setAttribute("aria-hidden", "false");
+  setAntigravityExchangeBusy(false);
+  await refreshAntigravityExchangeAssetsDisplay();
+}
+
+async function handleAntigravityExchangeRedeem() {
+  if (!portalUndoShopAvailable()) return;
+  setGenericExchangeMessage(antigravityExchangeMessageEl, "");
+  setAntigravityExchangeBusy(true);
+  const redeem = await postPortalRedeemItem(PORTAL_ANTIGRAVITY_ITEM_ID);
+  if (!redeem.ok) {
+    setGenericExchangeMessage(antigravityExchangeMessageEl, redeem.message || "Redeem failed.", "error");
+    setAntigravityExchangeBusy(false);
+    await refreshAntigravityExchangeAssetsDisplay();
+    return;
+  }
+  const granted = await grantAntigravityCreditsFromServerOnly(1);
+  if (!granted) {
+    setGenericExchangeMessage(antigravityExchangeMessageEl, "Portal redeem may have succeeded, but adding antigravity credits failed. Please refresh.", "error");
+    setAntigravityExchangeBusy(false);
+    await syncAntigravityCreditsFromServer();
+    await refreshAntigravityExchangeAssetsDisplay();
+    return;
+  }
+  await refreshAntigravityExchangeAssetsDisplay();
+  await syncAntigravityCreditsFromServer();
+  setAntigravityExchangeBusy(false);
+  closeAntigravityExchangeModal();
+}
+
+function setupAntigravityExchangeModal() {
+  if (antigravityExchangeCloseBtn) antigravityExchangeCloseBtn.addEventListener("click", closeAntigravityExchangeModal);
+  if (antigravityExchangeModal) {
+    antigravityExchangeModal.addEventListener("click", (e) => {
+      if (e.target === antigravityExchangeModal) closeAntigravityExchangeModal();
+    });
+  }
+  if (antigravityExchangeRedeemBtn) {
+    antigravityExchangeRedeemBtn.addEventListener("click", () => {
+      handleAntigravityExchangeRedeem();
+    });
+  }
+}
+
+function closeReplayExchangeModal() {
+  if (!replayExchangeModal) return;
+  replayExchangeModal.classList.remove("active");
+  replayExchangeModal.setAttribute("aria-hidden", "true");
+}
+
+async function refreshReplayExchangeAssetsDisplay() {
+  if (!portalUndoShopAvailable()) {
+    setGenericExchangeBalanceCells(replayExchangeCoinsEl, replayExchangeDiamondsEl, replayExchangeFlowersEl, "—", "—", "—");
+    setGenericExchangeMessage(replayExchangeMessageEl, "Open from the main portal to load your coins, diamonds, and flowers.", "hint");
+    return;
+  }
+  setGenericExchangeMessage(replayExchangeMessageEl, "");
+  setGenericExchangeBalanceCells(replayExchangeCoinsEl, replayExchangeDiamondsEl, replayExchangeFlowersEl, "…", "…", "…");
+  const assets = await getPortalAssets();
+  if (!assets) {
+    setGenericExchangeBalanceCells(replayExchangeCoinsEl, replayExchangeDiamondsEl, replayExchangeFlowersEl, "—", "—", "—");
+    setGenericExchangeMessage(replayExchangeMessageEl, "Could not load assets. Check portal session.", "error");
+    return;
+  }
+  setGenericExchangeBalanceCells(replayExchangeCoinsEl, replayExchangeDiamondsEl, replayExchangeFlowersEl, String(assets.coins), String(assets.diamonds), String(assets.flowers));
+}
+
+function setReplayExchangeBusy(busy) {
+  if (!replayExchangeRedeemBtn) return;
+  replayExchangeRedeemBtn.disabled = !!busy || !portalUndoShopAvailable();
+}
+
+async function openReplayExchangeModal() {
+  if (!replayExchangeModal) return;
+  if (replayExchangeCostTextEl) replayExchangeCostTextEl.textContent = `${REPLAY_SHOP_HINT_DIAMONDS} diamonds`;
+  setGenericExchangeMessage(replayExchangeMessageEl, "");
+  replayExchangeModal.classList.add("active");
+  replayExchangeModal.setAttribute("aria-hidden", "false");
+  setReplayExchangeBusy(false);
+  await refreshReplayExchangeAssetsDisplay();
+}
+
+async function handleReplayExchangeRedeem() {
+  if (!portalUndoShopAvailable()) return;
+  const levelNumber = currentLevelIndex + 1;
+  if (!Number.isFinite(levelNumber) || levelNumber <= 0) return;
+  setGenericExchangeMessage(replayExchangeMessageEl, "");
+  setReplayExchangeBusy(true);
+  const redeem = await postPortalRedeemItem(PORTAL_REPLAY_ITEM_ID);
+  if (!redeem.ok) {
+    setGenericExchangeMessage(replayExchangeMessageEl, redeem.message || "Redeem failed.", "error");
+    setReplayExchangeBusy(false);
+    await refreshReplayExchangeAssetsDisplay();
+    return;
+  }
+  const activated = await activateReplayUnlockForLevel(levelNumber);
+  if (!activated) {
+    setGenericExchangeMessage(replayExchangeMessageEl, "Redeem succeeded, but replay unlock sync failed. Please refresh.", "error");
+    setReplayExchangeBusy(false);
+    await refreshReplayExchangeAssetsDisplay();
+    return;
+  }
+
+  replayUnlockedForLevel = true;
+  await fetchFewestOtherMovesForCurrentLevel();
+  updateLevelCompleteReplayDisplay();
+  await refreshReplayExchangeAssetsDisplay();
+  setReplayExchangeBusy(false);
+  closeReplayExchangeModal();
+}
+
+function setupReplayExchangeModal() {
+  if (replayExchangeCloseBtn) replayExchangeCloseBtn.addEventListener("click", closeReplayExchangeModal);
+  if (replayExchangeModal) {
+    replayExchangeModal.addEventListener("click", (e) => {
+      if (e.target === replayExchangeModal) closeReplayExchangeModal();
+    });
+  }
+  if (replayExchangeRedeemBtn) {
+    replayExchangeRedeemBtn.addEventListener("click", () => {
+      handleReplayExchangeRedeem();
+    });
+  }
+  if (levelCompleteReplayLock) {
+    levelCompleteReplayLock.addEventListener("click", () => {
+      openReplayExchangeModal();
+    });
+  }
+}
+
+setupAntigravityExchangeModal();
+setupReplayExchangeModal();
+window.openAntigravityExchangeModal = openAntigravityExchangeModal;
+window.openReplayExchangeModal = openReplayExchangeModal;
 
 function isAudioMuted() {
   return !!window.cmAudioMuted;
@@ -643,22 +984,449 @@ function updateLevelCompleteStatsDisplay() {
       ? `Fewest move by other user: ${fewestOtherMovesForLevel}`
       : "Fewest move by other user: --";
   }
+  updateLevelCompleteAchievementDisplay();
 }
 
-function updateFewestOtherMovesDisplay(bestMoves) {
+function updateLevelCompleteAchievementDisplay() {
+  if (!levelCompleteAchievement) return;
+  if (!Number.isFinite(levelMoveCount) || levelMoveCount < 0) {
+    levelCompleteAchievement.textContent = "";
+    return;
+  }
+
+  if (!Number.isFinite(fewestOtherMovesForLevel)) {
+    levelCompleteAchievement.textContent = "New record! No other player's best route exists yet.";
+    return;
+  }
+
+  if (levelMoveCount < fewestOtherMovesForLevel) {
+    const diff = fewestOtherMovesForLevel - levelMoveCount;
+    levelCompleteAchievement.textContent = `New record! You beat the best other route by ${diff} move${diff === 1 ? "" : "s"}.`;
+    return;
+  }
+
+  if (levelMoveCount === fewestOtherMovesForLevel) {
+    levelCompleteAchievement.textContent = "Great run! You tied the best other route.";
+    return;
+  }
+
+  levelCompleteAchievement.textContent = "";
+}
+
+function buildCurrentReplaySnapshot(moveMeta = null) {
+  return {
+    rows: ROWS,
+    cols: COLS,
+    board: cloneGameData(board),
+    players: cloneGameData(players),
+    goal: cloneGameData(goal),
+    objectives: cloneGameData(objectives),
+    move: moveMeta ? cloneGameData(moveMeta) : null
+  };
+}
+
+function resetCurrentLevelMoveTrace() {
+  pendingMoveTraceEntry = null;
+  currentLevelMoveTrace = [buildCurrentReplaySnapshot(null)];
+}
+
+function queueMoveTraceCapture(moveMeta) {
+  pendingMoveTraceEntry = moveMeta || {};
+}
+
+function markPendingMoveTraceAntigravity(flag = true) {
+  if (!pendingMoveTraceEntry) return;
+  pendingMoveTraceEntry.antigravityApplied = !!flag;
+}
+
+function queueSystemTraceCapture(meta) {
+  if (pendingMoveTraceEntry) return;
+  pendingMoveTraceEntry = meta || {};
+}
+
+function tryCapturePendingMoveTrace(force) {
+  if (!pendingMoveTraceEntry) return;
+  const settled = force || (
+    fallingPieces.length === 0 &&
+    risingPieces.length === 0 &&
+    !pendingMoveCounter
+  );
+  if (!settled) return;
+
+  const snapshot = buildCurrentReplaySnapshot(pendingMoveTraceEntry);
+  currentLevelMoveTrace.push(snapshot);
+  if (currentLevelMoveTrace.length > 500) {
+    currentLevelMoveTrace.splice(1, currentLevelMoveTrace.length - 500);
+  }
+  pendingMoveTraceEntry = null;
+}
+
+function sanitizeReplayPath(rawPath) {
+  if (!Array.isArray(rawPath) || rawPath.length === 0) return null;
+  const cleaned = rawPath.filter(step =>
+    step &&
+    Number.isFinite(Number(step.rows)) &&
+    Number.isFinite(Number(step.cols)) &&
+    Array.isArray(step.board) &&
+    Array.isArray(step.players)
+  );
+  return cleaned.length ? cleaned : null;
+}
+
+function hasReplayPlayerMove(step) {
+  const moveMeta = step && step.move ? step.move : null;
+  return !!(
+    moveMeta &&
+    moveMeta.from &&
+    Number.isFinite(Number(moveMeta.from.row)) &&
+    Number.isFinite(Number(moveMeta.from.col)) &&
+    moveMeta.to &&
+    Number.isFinite(Number(moveMeta.to.row)) &&
+    Number.isFinite(Number(moveMeta.to.col))
+  );
+}
+
+function buildReplayStepNumbers(path) {
+  if (!Array.isArray(path) || !path.length) return [];
+
+  const numbers = Array(path.length).fill(0);
+  const moveOrdinals = Array(path.length).fill(0);
+  let moveCounter = 0;
+
+  for (let i = 0; i < path.length; i++) {
+    if (hasReplayPlayerMove(path[i])) {
+      moveCounter += 1;
+      moveOrdinals[i] = moveCounter;
+    }
+  }
+
+  for (let i = 0; i < path.length; i++) {
+    if (i === 0) {
+      numbers[i] = 0;
+      continue;
+    }
+
+    if (moveOrdinals[i] > 0) {
+      numbers[i] = moveOrdinals[i];
+      continue;
+    }
+
+    // System-only frames share the next move number (if any), so users see
+    // "antigravity result -> move" under one logical step.
+    let nextMoveOrdinal = 0;
+    for (let j = i + 1; j < path.length; j++) {
+      if (moveOrdinals[j] > 0) {
+        nextMoveOrdinal = moveOrdinals[j];
+        break;
+      }
+    }
+    numbers[i] = nextMoveOrdinal > 0 ? nextMoveOrdinal : moveCounter;
+  }
+
+  return numbers;
+}
+
+function drawReplayCellDecoration(replayCtx, cellType, x, y, tile) {
+  const inset = Math.max(1, Math.floor(tile * 0.08));
+  const innerSize = Math.max(1, tile - inset * 2);
+  const centerX = x + tile / 2;
+  const centerY = y + tile / 2;
+
+  if (cellType === CELL_TYPES.SOLID_BLOCK) {
+    replayCtx.fillStyle = "rgba(46, 204, 113, 0.7)";
+    replayCtx.fillRect(x + inset, y + inset, innerSize, innerSize);
+    return;
+  }
+
+  if (cellType === CELL_TYPES.PHASE_BLOCK) {
+    replayCtx.fillStyle = "rgba(52, 152, 219, 0.3)";
+    replayCtx.fillRect(x + inset, y + inset, innerSize, innerSize);
+    replayCtx.fillStyle = "rgba(25, 118, 210, 0.6)";
+    const arrow = Math.max(2, Math.floor(tile * 0.16));
+    const bottom = y + tile - inset - 1;
+    replayCtx.beginPath();
+    replayCtx.moveTo(centerX, bottom);
+    replayCtx.lineTo(centerX - arrow, bottom - arrow);
+    replayCtx.lineTo(centerX + arrow, bottom - arrow);
+    replayCtx.closePath();
+    replayCtx.fill();
+    return;
+  }
+
+  if (cellType === CELL_TYPES.PHASE_BLOCK_ACTIVE) {
+    replayCtx.fillStyle = "rgba(41, 128, 185, 0.8)";
+    replayCtx.fillRect(x + inset, y + inset, innerSize, innerSize);
+    return;
+  }
+
+  if (cellType === CELL_TYPES.TRANSFORMER) {
+    replayCtx.fillStyle = "rgba(155, 89, 182, 0.7)";
+    replayCtx.fillRect(x + inset, y + inset, innerSize, innerSize);
+    replayCtx.fillStyle = "#ffffff";
+    replayCtx.textAlign = "center";
+    replayCtx.textBaseline = "middle";
+    replayCtx.font = `bold ${Math.max(8, Math.floor(tile * 0.5))}px Arial`;
+    replayCtx.fillText("?", centerX, centerY + 0.5);
+    return;
+  }
+
+  if (cellType === CELL_TYPES.OBJECTIVE || cellType === CELL_TYPES.OBJECTIVE_COMPLETED) {
+    replayCtx.fillStyle = cellType === CELL_TYPES.OBJECTIVE
+      ? "rgba(243, 156, 18, 0.7)"
+      : "rgba(46, 204, 113, 0.7)";
+    replayCtx.beginPath();
+    replayCtx.moveTo(centerX, y + inset);
+    replayCtx.lineTo(x + tile - inset, centerY);
+    replayCtx.lineTo(centerX, y + tile - inset);
+    replayCtx.lineTo(x + inset, centerY);
+    replayCtx.closePath();
+    replayCtx.fill();
+    if (cellType === CELL_TYPES.OBJECTIVE_COMPLETED) {
+      replayCtx.strokeStyle = "#ffffff";
+      replayCtx.lineWidth = Math.max(1, tile * 0.06);
+      replayCtx.beginPath();
+      replayCtx.moveTo(x + tile * 0.28, centerY);
+      replayCtx.lineTo(x + tile * 0.44, y + tile * 0.7);
+      replayCtx.lineTo(x + tile * 0.74, y + tile * 0.3);
+      replayCtx.stroke();
+    }
+    return;
+  }
+
+  if ([
+    CELL_TYPES.TELEPORT_PURPLE,
+    CELL_TYPES.TELEPORT_GREEN,
+    CELL_TYPES.TELEPORT_BLUE,
+    CELL_TYPES.TELEPORT_ORANGE
+  ].includes(cellType)) {
+    const color = TELEPORT_COLORS[cellType];
+    if (color) {
+      replayCtx.fillStyle = color.fill;
+      replayCtx.beginPath();
+      replayCtx.arc(centerX, centerY, tile / 3, 0, Math.PI * 2);
+      replayCtx.fill();
+      replayCtx.strokeStyle = color.stroke;
+      replayCtx.lineWidth = Math.max(1, tile * 0.07);
+      replayCtx.stroke();
+    }
+    return;
+  }
+
+  if (cellType === CELL_TYPES.BOMB) {
+    const img = pieceImages.bomb;
+    if (img && img.complete) {
+      const pad = Math.max(1, Math.floor(tile * 0.13));
+      replayCtx.drawImage(img, x + pad, y + pad, tile - pad * 2, tile - pad * 2);
+    } else {
+      replayCtx.fillStyle = "#111111";
+      replayCtx.beginPath();
+      replayCtx.arc(centerX, centerY, tile * 0.28, 0, Math.PI * 2);
+      replayCtx.fill();
+    }
+    return;
+  }
+
+  if (cellType === CELL_TYPES.GOAL || cellType === CELL_TYPES.COUNTER_GOAL) {
+    const img = pieceImages.target;
+    if (img && img.complete) {
+      const pad = Math.max(1, Math.floor(tile * 0.13));
+      replayCtx.drawImage(img, x + pad, y + pad, tile - pad * 2, tile - pad * 2);
+    } else {
+      replayCtx.fillStyle = "#c62828";
+      replayCtx.beginPath();
+      replayCtx.arc(centerX, centerY, tile * 0.28, 0, Math.PI * 2);
+      replayCtx.fill();
+    }
+  }
+}
+
+function drawReplayPlayerPiece(replayCtx, pieceType, row, col, ox, oy, tile) {
+  const x = ox + col * tile;
+  const y = oy + row * tile;
+  const pad = Math.max(1, Math.floor(tile * 0.13));
+  const img = pieceImages[pieceType];
+  if (img && img.complete) {
+    replayCtx.drawImage(img, x + pad, y + pad, tile - pad * 2, tile - pad * 2);
+    return;
+  }
+  replayCtx.fillStyle = "#ffffff";
+  replayCtx.beginPath();
+  replayCtx.arc(x + tile / 2, y + tile / 2, Math.max(2, tile * 0.32), 0, Math.PI * 2);
+  replayCtx.fill();
+  replayCtx.fillStyle = "#2c3e50";
+  replayCtx.textAlign = "center";
+  replayCtx.textBaseline = "middle";
+  replayCtx.font = `600 ${Math.max(7, Math.floor(tile * 0.35))}px Segoe UI`;
+  replayCtx.fillText(String(pieceType || "P").charAt(0).toUpperCase(), x + tile / 2, y + tile / 2 + 0.5);
+}
+
+function drawLevelCompleteReplaySnapshot(index) {
+  if (!levelCompleteReplayCanvas || !fewestOtherMovesReplayPath || !fewestOtherMovesReplayPath.length) return;
+  const replayCtx = levelCompleteReplayCanvas.getContext("2d");
+  if (!replayCtx) return;
+
+  const safeIndex = Math.max(0, Math.min(index, fewestOtherMovesReplayPath.length - 1));
+  levelCompleteReplayIndex = safeIndex;
+  const snapshot = fewestOtherMovesReplayPath[safeIndex];
+  const rows = Number(snapshot.rows) || 1;
+  const cols = Number(snapshot.cols) || 1;
+  const boardData = Array.isArray(snapshot.board) ? snapshot.board : [];
+  const playersData = Array.isArray(snapshot.players) ? snapshot.players : [];
+
+  const cw = levelCompleteReplayCanvas.width;
+  const ch = levelCompleteReplayCanvas.height;
+  replayCtx.clearRect(0, 0, cw, ch);
+  replayCtx.fillStyle = "#0d1118";
+  replayCtx.fillRect(0, 0, cw, ch);
+
+  const pad = 8;
+  const tile = Math.max(4, Math.floor(Math.min((cw - pad * 2) / cols, (ch - pad * 2) / rows)));
+  const boardW = tile * cols;
+  const boardH = tile * rows;
+  const ox = Math.floor((cw - boardW) / 2);
+  const oy = Math.floor((ch - boardH) / 2);
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const cellType = Number(boardData?.[r]?.[c]);
+      const x = ox + c * tile;
+      const y = oy + r * tile;
+      replayCtx.fillStyle = (r + c) % 2 === 0 ? "#b6cce0ff" : "#ffffffff";
+      replayCtx.fillRect(x, y, tile, tile);
+      replayCtx.strokeStyle = "rgba(0,0,0,0.12)";
+      replayCtx.strokeRect(x + 0.5, y + 0.5, tile, tile);
+      drawReplayCellDecoration(replayCtx, cellType, x, y, tile);
+    }
+  }
+
+  for (const p of playersData) {
+    if (!p || !Number.isFinite(p.row) || !Number.isFinite(p.col)) continue;
+    drawReplayPlayerPiece(replayCtx, p.pieceType, p.row, p.col, ox, oy, tile);
+  }
+
+  if (levelCompleteReplayStep) {
+    const logicalStep = fewestOtherMovesReplayStepNumbers[safeIndex] || 0;
+    const totalLogicalSteps = Number.isFinite(fewestOtherMovesForLevel)
+      ? fewestOtherMovesForLevel
+      : (fewestOtherMovesReplayStepNumbers.length ? Math.max(...fewestOtherMovesReplayStepNumbers) : 0);
+    levelCompleteReplayStep.textContent = `Step: ${logicalStep}/${totalLogicalSteps}`;
+  }
+  if (levelCompleteReplayEvent) {
+    const moveMeta = snapshot && snapshot.move ? snapshot.move : null;
+    if (moveMeta && moveMeta.antigravityApplied) {
+      levelCompleteReplayEvent.textContent = "Antigravity used on this step.";
+    } else {
+      levelCompleteReplayEvent.textContent = "";
+    }
+  }
+}
+
+function updateLevelCompleteReplayDisplay() {
+  if (!levelCompleteReplayPanel) return;
+  levelCompleteReplayPanel.style.display = "block";
+  const hasReplay = !!(fewestOtherMovesReplayPath && fewestOtherMovesReplayPath.length >= 2);
+  const hasName = !!(fewestOtherMovesUserName && String(fewestOtherMovesUserName).trim());
+  const showLocked = Number.isFinite(fewestOtherMovesForLevel) && !replayUnlockedForLevel;
+
+  if (levelCompleteReplayPanel) {
+    levelCompleteReplayPanel.classList.toggle("locked", !!showLocked);
+  }
+
+  if (!Number.isFinite(fewestOtherMovesForLevel)) {
+    if (levelCompleteReplayTitle) {
+      levelCompleteReplayTitle.textContent = "Best Route by --";
+    }
+    if (levelCompleteReplaySubtitle) {
+      levelCompleteReplaySubtitle.textContent = "No other player's best route yet. You set the current record.";
+    }
+    if (levelCompleteReplayCanvas) levelCompleteReplayCanvas.style.display = "none";
+    if (levelCompleteReplayHint) levelCompleteReplayHint.style.display = "none";
+    if (levelCompleteReplayStep) levelCompleteReplayStep.style.display = "none";
+    if (levelCompleteReplayEvent) {
+      levelCompleteReplayEvent.style.display = "none";
+      levelCompleteReplayEvent.textContent = "";
+    }
+    if (levelCompleteReplayLock) levelCompleteReplayLock.style.display = "none";
+    if (levelCompleteReplayPanel) levelCompleteReplayPanel.classList.remove("locked");
+    return;
+  }
+
+  if (showLocked) {
+    if (levelCompleteReplayTitle) {
+      const shownName = hasName ? String(fewestOtherMovesUserName).trim() : "Unknown";
+      levelCompleteReplayTitle.textContent = `Best Route by ${shownName}`;
+    }
+    if (levelCompleteReplaySubtitle) {
+      levelCompleteReplaySubtitle.textContent = `Fewest moves: ${fewestOtherMovesForLevel}`;
+    }
+    if (levelCompleteReplayCanvas) levelCompleteReplayCanvas.style.display = "block";
+    if (levelCompleteReplayHint) levelCompleteReplayHint.style.display = "block";
+    if (levelCompleteReplayStep) levelCompleteReplayStep.style.display = "block";
+    if (levelCompleteReplayEvent) levelCompleteReplayEvent.style.display = "block";
+    if (levelCompleteReplayLock) levelCompleteReplayLock.style.display = "flex";
+    if (hasReplay) {
+      drawLevelCompleteReplaySnapshot(levelCompleteReplayIndex);
+    }
+    return;
+  }
+
+  if (!hasReplay) {
+    if (levelCompleteReplayTitle) {
+      const shownName = hasName ? String(fewestOtherMovesUserName).trim() : "Unknown";
+      levelCompleteReplayTitle.textContent = `Best Route by ${shownName}`;
+    }
+    if (levelCompleteReplaySubtitle) {
+      levelCompleteReplaySubtitle.textContent = `Fewest moves: ${fewestOtherMovesForLevel}`;
+    }
+    if (levelCompleteReplayCanvas) levelCompleteReplayCanvas.style.display = "none";
+    if (levelCompleteReplayHint) levelCompleteReplayHint.style.display = "none";
+    if (levelCompleteReplayStep) levelCompleteReplayStep.style.display = "none";
+    if (levelCompleteReplayEvent) {
+      levelCompleteReplayEvent.style.display = "none";
+      levelCompleteReplayEvent.textContent = "";
+    }
+    if (levelCompleteReplayLock) levelCompleteReplayLock.style.display = "none";
+    return;
+  }
+
+  if (levelCompleteReplayLock) levelCompleteReplayLock.style.display = "none";
+
+  if (levelCompleteReplayTitle) {
+    const shownName = hasName ? String(fewestOtherMovesUserName).trim() : "Unknown";
+    levelCompleteReplayTitle.textContent = `Best Route by ${shownName}`;
+  }
+  if (levelCompleteReplaySubtitle) {
+    levelCompleteReplaySubtitle.textContent = `Fewest moves: ${fewestOtherMovesForLevel}`;
+  }
+  if (levelCompleteReplayCanvas) levelCompleteReplayCanvas.style.display = "block";
+  if (levelCompleteReplayHint) levelCompleteReplayHint.style.display = "block";
+  if (levelCompleteReplayStep) levelCompleteReplayStep.style.display = "block";
+  if (levelCompleteReplayEvent) levelCompleteReplayEvent.style.display = "block";
+  drawLevelCompleteReplaySnapshot(levelCompleteReplayIndex);
+}
+
+function updateFewestOtherMovesDisplay(bestMoves, replayPath, userName, replayUnlocked) {
   fewestOtherMovesForLevel = Number.isFinite(bestMoves) ? bestMoves : null;
+  fewestOtherMovesUserName = typeof userName === "string" ? userName.trim() : "";
+  replayUnlockedForLevel = !!replayUnlocked;
+  fewestOtherMovesReplayPath = sanitizeReplayPath(replayPath);
+  fewestOtherMovesReplayStepNumbers = buildReplayStepNumbers(fewestOtherMovesReplayPath || []);
+  if (fewestOtherMovesReplayPath) {
+    levelCompleteReplayIndex = 0;
+  }
   if (fewestOtherMovesDisplay) {
     fewestOtherMovesDisplay.textContent = Number.isFinite(fewestOtherMovesForLevel)
       ? `Fewest move by other user: ${fewestOtherMovesForLevel}`
       : "Fewest move by other user: --";
   }
   updateLevelCompleteStatsDisplay();
+  updateLevelCompleteReplayDisplay();
 }
 
 async function fetchFewestOtherMovesForCurrentLevel() {
   const levelNumber = currentLevelIndex + 1;
   if (!Number.isFinite(levelNumber) || levelNumber <= 0) {
-    updateFewestOtherMovesDisplay(null);
+    updateFewestOtherMovesDisplay(null, null, "", false);
     return;
   }
 
@@ -676,15 +1444,18 @@ async function fetchFewestOtherMovesForCurrentLevel() {
     });
 
     if (!res.ok) {
-      updateFewestOtherMovesDisplay(null);
+      updateFewestOtherMovesDisplay(null, null, "", false);
       return;
     }
 
     const data = await res.json();
     const bestMoves = Number.parseInt(data?.best_moves, 10);
-    updateFewestOtherMovesDisplay(bestMoves);
+    const bestName = typeof data?.username === "string" && data.username.trim()
+      ? data.username
+      : "";
+    updateFewestOtherMovesDisplay(bestMoves, data?.best_path, bestName, !!data?.replay_unlocked);
   } catch (_) {
-    updateFewestOtherMovesDisplay(null);
+    updateFewestOtherMovesDisplay(null, null, "", false);
   }
 }
 
@@ -854,9 +1625,13 @@ function loadPuzzle(puzzleData) {
     // ✅ Reset state so pieces can move again
     mode = "play";
     gameWon = false;
+    antigravityEnabled = false;
+    antigravityUnlockedThisRun = false;
     levelMoveCount = 0;
     updateMoveCountDisplay();
-    updateFewestOtherMovesDisplay(null);
+    updateAntigravityButtonLabel();
+    updateFewestOtherMovesDisplay(null, null, "", false);
+    resetCurrentLevelMoveTrace();
     visitedSquares.forEach(row => row.fill(false)); // Reset fog on load
     if (typeof enablePlayerControls === "function") {
         enablePlayerControls();
@@ -1113,7 +1888,9 @@ function updateFallingPieces() {
 function showLevelCompleteModal() {
   if (!levelCompleteModal) return;
   const hasNext = currentLevelIndex < LEVELS.length - 1;
+  levelCompleteReplayIndex = 0;
   updateLevelCompleteStatsDisplay();
+  updateLevelCompleteReplayDisplay();
   if (levelCompleteText) {
     levelCompleteText.textContent = hasNext
       ? "Great job!"
@@ -1123,6 +1900,7 @@ function showLevelCompleteModal() {
     levelCompleteNextBtn.style.display = hasNext ? "inline-block" : "none";
   }
   levelCompleteModal.classList.add("active");
+  void fetchFewestOtherMovesForCurrentLevel();
 }
 
 
@@ -1229,6 +2007,8 @@ if (CM_EDITOR_PAGE) {
   window.cmResetEditorAfterPlaytest = function () {
     levelMoveCount = 0;
     moveHistorySnapshots = [];
+    currentLevelMoveTrace = [];
+    pendingMoveTraceEntry = null;
     pendingMoveCounter = false;
     shakeAmount = 0;
     shakeX = 0;
@@ -1236,14 +2016,18 @@ if (CM_EDITOR_PAGE) {
     playerTeleportCooldowns.clear();
     risingPieces = [];
     isCheckingWinCondition = false;
+    antigravityEnabled = false;
+    antigravityUnlockedThisRun = false;
     if (levelCompleteModal) levelCompleteModal.classList.remove("active");
     gameWon = false;
     updateMoveCountDisplay();
+    updateAntigravityButtonLabel();
     updateUndoButtonLabel();
   };
 }
 
 function syncProgressAfterWin() {
+  tryCapturePendingMoveTrace(true);
   let actualLevelIndex = currentLevelIndex;
   if (actualLevelIndex < 0 && typeof LEVELS !== "undefined" && currentPuzzleData && currentPuzzleData.name) {
     actualLevelIndex = LEVELS.findIndex(lvl => lvl.name === currentPuzzleData.name);
@@ -1270,7 +2054,8 @@ function syncProgressAfterWin() {
   const progressData = {
     maxUnlocked: mergedUnlocked,
     level: solvedLevel,
-    moves: levelMoveCount
+    moves: levelMoveCount,
+    moveTrace: currentLevelMoveTrace
   };
   const jsonBody = JSON.stringify(progressData);
 
@@ -1287,7 +2072,25 @@ function syncProgressAfterWin() {
     credentials: 'include',
     headers,
     body: jsonBody
-  }).then(() => {}).catch(() => {});
+  })
+    .then(async (res) => {
+      if (!res.ok) return null;
+      return res.json().catch(() => null);
+    })
+    .then((data) => {
+      if (!data) return;
+      const credits = Number.parseInt(data?.undoCredits, 10);
+      if (Number.isFinite(credits)) {
+        undoCredits = credits;
+        updateUndoButtonLabel();
+      }
+      const antiCredits = Number.parseInt(data?.antigravityCredits, 10);
+      if (Number.isFinite(antiCredits)) {
+        antigravityCredits = antiCredits;
+        updateAntigravityButtonLabel();
+      }
+    })
+    .catch(() => {});
 }
 
 function checkWinCondition() {
@@ -1314,8 +2117,6 @@ function checkWinCondition() {
         triggerConfetti();
         showLevelCompleteModal();
         syncProgressAfterWin();
-        // Do not await: network grant would delay the modal by ~1–2s
-        void grantUndoCredit(1);
         break;
       }
     }
@@ -1425,6 +2226,9 @@ function movePlayer(playerIndex, newRow, newCol) {
   if (gameWon) return;
   
   const player = players[playerIndex];
+  const fromRow = player.row;
+  const fromCol = player.col;
+  const pieceType = player.pieceType;
   if (!isValidMove(playerIndex, newRow, newCol)) {
     // Check if the move was invalid because goal is locked
     if (board[newRow][newCol] === CELL_TYPES.GOAL && !areAllObjectivesCompleted()) {
@@ -1436,6 +2240,11 @@ function movePlayer(playerIndex, newRow, newCol) {
   }
 
   saveUndoSnapshot();
+  queueMoveTraceCapture({
+    from: { row: fromRow, col: fromCol },
+    to: { row: newRow, col: newCol },
+    pieceType
+  });
 
   levelMoveCount += 1;
   updateMoveCountDisplay();
@@ -1512,8 +2321,12 @@ function movePlayer(playerIndex, newRow, newCol) {
     const before = risingPieces.length;
     applyAntigravity();                          // may enqueue rises
     const after = risingPieces.length;
+    const usedAntigravity = after > before;
+    if (usedAntigravity) {
+      markPendingMoveTraceAntigravity(true);
+    }
 
-    if (after > before) {
+    if (usedAntigravity) {
       // Something (maybe this piece) will rise → wait to decrement until rises finish
       pendingMoveCounter = true;
     } else {
@@ -1590,6 +2403,10 @@ async function undoMove() {
   gameWon = snapshot.gameWon;
   selectedPlayerIndex = -1;
   levelMoveCount = snapshot.levelMoveCount;
+  pendingMoveTraceEntry = null;
+  if (currentLevelMoveTrace.length > 1) {
+    currentLevelMoveTrace.pop();
+  }
 
   // Clear transient animation/effect state before redraw
   fallingPieces = [];
@@ -3098,18 +3915,36 @@ function updateRisingPieces(timestamp) {
   }
 }
 
-function toggleAntigravity() {
+async function toggleAntigravity() {
+  if (gameWon) return;
+
+  if (!antigravityUnlockedThisRun) {
+    if (antigravityCredits <= 0) {
+      openAntigravityExchangeModal();
+      return;
+    }
+    const consumed = await consumeAntigravityCredit(1);
+    if (!consumed) {
+      openAntigravityExchangeModal();
+      return;
+    }
+    antigravityUnlockedThisRun = true;
+  }
+
   antigravityEnabled = !antigravityEnabled;
-  
+  updateAntigravityButtonLabel();
+
   if (antigravityEnabled) {
     updateStatus("🔼 Antigravity enabled - pieces rise upward!");
-    
-    // Clear any existing falling pieces first
     fallingPieces = [];
-    
-    // Small delay to ensure gravity is fully off
     setTimeout(() => {
-      applyAntigravity();
+      const didRise = applyAntigravity();
+      if (didRise) {
+        queueSystemTraceCapture({
+          systemEvent: "toggle_antigravity",
+          antigravityApplied: true
+        });
+      }
     }, 100);
   } else {
     updateStatus("🔽 Gravity enabled - pieces fall downward!");
@@ -3138,8 +3973,38 @@ canvas.addEventListener("touchstart", (e) => {
   });
 }, { passive: false });
 
-// --- Add keyboard controls for deselection ---
+// --- Keyboard controls ---
 document.addEventListener("keydown", (e) => {
+  if (
+    levelCompleteModal &&
+    levelCompleteModal.classList.contains("active") &&
+    replayUnlockedForLevel &&
+    fewestOtherMovesReplayPath &&
+    fewestOtherMovesReplayPath.length
+  ) {
+    const maxIndex = fewestOtherMovesReplayPath.length - 1;
+    if (e.key === "ArrowLeft") {
+      e.preventDefault();
+      drawLevelCompleteReplaySnapshot(levelCompleteReplayIndex - 1);
+      return;
+    }
+    if (e.key === "ArrowRight") {
+      e.preventDefault();
+      drawLevelCompleteReplaySnapshot(levelCompleteReplayIndex + 1);
+      return;
+    }
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      drawLevelCompleteReplaySnapshot(0);
+      return;
+    }
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      drawLevelCompleteReplaySnapshot(maxIndex);
+      return;
+    }
+  }
+
   if (mode === "play" && e.key === "Escape") {
     selectedPlayerIndex = -1;
     updateStatus("Selection cleared");
@@ -3168,6 +4033,7 @@ function gameLoop() {
   ctx.clearRect(-shakeX, -shakeY, canvas.width, canvas.height);
   updateFallingPieces();
   updateExplodingPlayers(); // 💣 Animate dead players
+  tryCapturePendingMoveTrace(false);
 
   frameCount++;
   if (frameCount % 50 === 0) {
@@ -3227,12 +4093,15 @@ updateStatus(
     : "Welcome! Choose a level from the list to play."
 );
 updateUndoButtonLabel();
+updateAntigravityButtonLabel();
 if (window.authReady && typeof window.authReady.finally === "function") {
   window.authReady.finally(() => {
     syncUndoCreditsFromServer();
+    syncAntigravityCreditsFromServer();
   });
 } else {
   syncUndoCreditsFromServer();
+  syncAntigravityCreditsFromServer();
 }
 updatePlayerCount();
 updateObjectiveCount();

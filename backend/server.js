@@ -309,19 +309,35 @@ app.post('/api/auth/verify', async (req, res) => {
       });
     }
 
-    // Find or create user
+    // Find or create user (portal_user_id is the stable identity)
     let user;
     try {
-      console.log(`🔍 Looking for user: username=${username}`);
+      console.log(`🔍 Looking for user by portal_user_id=${portalUserId}`);
       const userResult = await pool.query(
-        'SELECT * FROM users WHERE username = $1',
-        [username]
+        'SELECT * FROM users WHERE portal_user_id = $1 ORDER BY id ASC LIMIT 1',
+        [portalUserId.toString()]
       );
 
       if (userResult.rows.length > 0) {
-        // User exists
+        // User exists: keep username in sync with portal token
         user = userResult.rows[0];
-        console.log(`✅ User exists: username=${username}, id=${user.id}`);
+        if (user.username !== username) {
+          const conflictCheck = await pool.query(
+            'SELECT id FROM users WHERE username = $1 LIMIT 1',
+            [username]
+          );
+          if (!conflictCheck.rows.length || Number(conflictCheck.rows[0].id) === Number(user.id)) {
+            const updated = await pool.query(
+              'UPDATE users SET username = $1 WHERE id = $2 RETURNING *',
+              [username, user.id]
+            );
+            user = updated.rows[0] || user;
+            console.log(`🔄 Username synced for portal_user_id=${portalUserId}: ${username}`);
+          } else {
+            console.warn(`⚠️ Username "${username}" already used by another row; keep existing username="${user.username}" for portal_user_id=${portalUserId}`);
+          }
+        }
+        console.log(`✅ User exists: username=${user.username}, id=${user.id}, portal_user_id=${user.portal_user_id}`);
       } else {
         // Create user (portal_user_id used in temp password)
         const tempPassword = `portal_sso_${portalUserId}`;
@@ -398,7 +414,8 @@ const initTablesSql = `
   CREATE TABLE IF NOT EXISTS user_progress (
     user_id TEXT PRIMARY KEY,
     max_unlocked INT,
-    undo_credits INT NOT NULL DEFAULT 0
+    undo_credits INT NOT NULL DEFAULT 0,
+    antigravity_credits INT NOT NULL DEFAULT 2
   );
   CREATE TABLE IF NOT EXISTS levels (
     id SERIAL PRIMARY KEY,
@@ -411,7 +428,20 @@ const initTablesSql = `
     user_id TEXT NOT NULL,
     level_index INT NOT NULL,
     best_moves INT NOT NULL,
+    best_path JSONB,
     updated_at TIMESTAMP DEFAULT NOW(),
+    PRIMARY KEY (user_id, level_index)
+  );
+  CREATE TABLE IF NOT EXISTS user_level_undo_rewards (
+    user_id TEXT NOT NULL,
+    level_index INT NOT NULL,
+    rewarded_at TIMESTAMP DEFAULT NOW(),
+    PRIMARY KEY (user_id, level_index)
+  );
+  CREATE TABLE IF NOT EXISTS user_level_replay_unlocks (
+    user_id TEXT NOT NULL,
+    level_index INT NOT NULL,
+    unlocked_at TIMESTAMP DEFAULT NOW(),
     PRIMARY KEY (user_id, level_index)
   );
 `;
@@ -420,6 +450,8 @@ async function ensureTables() {
   try {
     await pool.query(initTablesSql);
     await pool.query('ALTER TABLE user_progress ADD COLUMN IF NOT EXISTS undo_credits INT NOT NULL DEFAULT 0');
+    await pool.query('ALTER TABLE user_progress ADD COLUMN IF NOT EXISTS antigravity_credits INT NOT NULL DEFAULT 2');
+    await pool.query('ALTER TABLE user_level_stats ADD COLUMN IF NOT EXISTS best_path JSONB');
     console.log('✅ DB tables ensured (users, user_progress, levels)');
   } catch (err) {
     console.error('❌ Failed to create tables:', err.message);
@@ -430,6 +462,8 @@ app.get('/init', async (req, res) => {
   try {
     await pool.query(initTablesSql);
     await pool.query('ALTER TABLE user_progress ADD COLUMN IF NOT EXISTS undo_credits INT NOT NULL DEFAULT 0');
+    await pool.query('ALTER TABLE user_progress ADD COLUMN IF NOT EXISTS antigravity_credits INT NOT NULL DEFAULT 2');
+    await pool.query('ALTER TABLE user_level_stats ADD COLUMN IF NOT EXISTS best_path JSONB');
     res.send('✅ Tables created');
   } catch (err) {
     console.error('Init failed:', err);
@@ -441,12 +475,18 @@ app.get('/progress', authenticate, async (req, res) => {
   console.log('GET /progress for user:', req.user.user_id);
   try {
     const result = await pool.query(
-      'SELECT max_unlocked FROM user_progress WHERE user_id = $1',
+      'SELECT max_unlocked, undo_credits, antigravity_credits FROM user_progress WHERE user_id = $1',
       [req.user.user_id]
     );
     const maxUnlocked = result.rows[0]?.max_unlocked || 1;
+    const undoCredits = Number.parseInt(result.rows[0]?.undo_credits, 10);
+    const antigravityCredits = Number.parseInt(result.rows[0]?.antigravity_credits, 10);
     console.log('Returning maxUnlocked:', maxUnlocked);
-    res.json({ maxUnlocked });
+    res.json({
+      maxUnlocked,
+      undoCredits: Number.isFinite(undoCredits) ? undoCredits : 0,
+      antigravityCredits: Number.isFinite(antigravityCredits) ? antigravityCredits : 2
+    });
   } catch (err) {
     console.error('Error fetching progress:', err);
     res.status(500).json({ error: 'Failed to fetch progress' });
@@ -460,10 +500,14 @@ app.post('/progress', authenticate, async (req, res) => {
   const parsedMoves = Number.parseInt(req.body?.moves, 10);
   const level = Number.isFinite(parsedLevel) ? parsedLevel : null;
   const moves = Number.isFinite(parsedMoves) ? parsedMoves : null;
+  const rawMoveTrace = Array.isArray(req.body?.moveTrace) ? req.body.moveTrace : null;
+  const moveTrace = rawMoveTrace ? rawMoveTrace.slice(0, 500) : null;
 
-  console.log('POST /progress - user:', req.user.user_id, 'maxUnlocked:', maxUnlocked, 'level:', level, 'moves:', moves);
+  console.log('POST /progress - user:', req.user.user_id, 'maxUnlocked:', maxUnlocked, 'level:', level, 'moves:', moves, 'moveTraceLength:', moveTrace ? moveTrace.length : 0);
 
   try {
+    await pool.query('BEGIN');
+
     await pool.query(
       `
       INSERT INTO user_progress (user_id, max_unlocked)
@@ -475,27 +519,70 @@ app.post('/progress', authenticate, async (req, res) => {
     );
 
     // 只要有关卡编号和moves数据(即使是0),都记录到stats表
+    let undoAwarded = false;
     if (level && level > 0 && moves !== null && moves !== undefined && moves >= 0) {
       console.log('Saving level stats for level:', level, 'with moves:', moves);
       await pool.query(
         `
-        INSERT INTO user_level_stats (user_id, level_index, best_moves, updated_at)
-        VALUES ($1, $2, $3, NOW())
+        INSERT INTO user_level_stats (user_id, level_index, best_moves, best_path, updated_at)
+        VALUES ($1, $2, $3, $4::jsonb, NOW())
         ON CONFLICT (user_id, level_index)
         DO UPDATE SET
           best_moves = LEAST(user_level_stats.best_moves, EXCLUDED.best_moves),
+          best_path = CASE
+            WHEN EXCLUDED.best_moves < user_level_stats.best_moves THEN EXCLUDED.best_path
+            WHEN EXCLUDED.best_moves = user_level_stats.best_moves AND user_level_stats.best_path IS NULL THEN EXCLUDED.best_path
+            ELSE user_level_stats.best_path
+          END,
           updated_at = NOW()
         `,
-        [req.user.user_id, level, moves]
+        [req.user.user_id, level, moves, moveTrace ? JSON.stringify(moveTrace) : null]
       );
+
+      // Grant level-clear undo reward only once per user per level.
+      const rewardInsert = await pool.query(
+        `
+        INSERT INTO user_level_undo_rewards (user_id, level_index, rewarded_at)
+        VALUES ($1, $2, NOW())
+        ON CONFLICT (user_id, level_index) DO NOTHING
+        RETURNING user_id
+        `,
+        [req.user.user_id, level]
+      );
+
+      if (rewardInsert.rows.length > 0) {
+        undoAwarded = true;
+        await pool.query(
+          `
+          UPDATE user_progress
+          SET undo_credits = undo_credits + 1
+          WHERE user_id = $1
+          `,
+          [req.user.user_id]
+        );
+      }
       console.log('Level stats saved successfully');
     } else {
       console.log('Level stats not saved - insufficient data:', { level, moves });
     }
 
+    const creditsResult = await pool.query(
+      'SELECT undo_credits, antigravity_credits FROM user_progress WHERE user_id = $1',
+      [req.user.user_id]
+    );
+    const undoCredits = Number.parseInt(creditsResult.rows[0]?.undo_credits, 10);
+    const antigravityCredits = Number.parseInt(creditsResult.rows[0]?.antigravity_credits, 10);
+
+    await pool.query('COMMIT');
     console.log('Progress saved successfully');
-    res.json({ success: true });
+    res.json({
+      success: true,
+      undoAwarded,
+      undoCredits: Number.isFinite(undoCredits) ? undoCredits : 0,
+      antigravityCredits: Number.isFinite(antigravityCredits) ? antigravityCredits : 2
+    });
   } catch (err) {
+    try { await pool.query('ROLLBACK'); } catch (_) {}
     console.error('Error saving progress:', err);
     res.status(500).json({ error: 'Failed to save progress' });
   }
@@ -575,6 +662,118 @@ app.post('/undo-credits/use', authenticate, async (req, res) => {
   }
 });
 
+app.get('/antigravity-credits', authenticate, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT antigravity_credits FROM user_progress WHERE user_id = $1',
+      [req.user.user_id]
+    );
+    const credits = Number.parseInt(result.rows[0]?.antigravity_credits, 10);
+    res.json({ antigravityCredits: Number.isFinite(credits) ? credits : 2 });
+  } catch (err) {
+    console.error('Error fetching antigravity credits:', err);
+    res.status(500).json({ error: 'Failed to fetch antigravity credits' });
+  }
+});
+
+app.post('/antigravity-credits/grant', authenticate, async (req, res) => {
+  const parsedAmount = Number.parseInt(req.body?.amount, 10);
+  const amount = Number.isFinite(parsedAmount) && parsedAmount > 0 ? parsedAmount : 1;
+
+  try {
+    const result = await pool.query(
+      `
+      INSERT INTO user_progress (user_id, max_unlocked, antigravity_credits)
+      VALUES ($1, 1, $2)
+      ON CONFLICT (user_id)
+      DO UPDATE SET antigravity_credits = user_progress.antigravity_credits + EXCLUDED.antigravity_credits
+      RETURNING antigravity_credits
+      `,
+      [req.user.user_id, amount]
+    );
+
+    const credits = Number.parseInt(result.rows[0]?.antigravity_credits, 10);
+    res.json({ success: true, antigravityCredits: Number.isFinite(credits) ? credits : 0 });
+  } catch (err) {
+    console.error('Error granting antigravity credits:', err);
+    res.status(500).json({ error: 'Failed to grant antigravity credits' });
+  }
+});
+
+app.post('/antigravity-credits/use', authenticate, async (req, res) => {
+  const parsedAmount = Number.parseInt(req.body?.amount, 10);
+  const amount = Number.isFinite(parsedAmount) && parsedAmount > 0 ? parsedAmount : 1;
+
+  try {
+    await pool.query(
+      `
+      INSERT INTO user_progress (user_id, max_unlocked, antigravity_credits)
+      VALUES ($1, 1, 2)
+      ON CONFLICT (user_id) DO NOTHING
+      `,
+      [req.user.user_id]
+    );
+
+    const result = await pool.query(
+      `
+      UPDATE user_progress
+      SET antigravity_credits = antigravity_credits - $2
+      WHERE user_id = $1 AND antigravity_credits >= $2
+      RETURNING antigravity_credits
+      `,
+      [req.user.user_id, amount]
+    );
+
+    if (!result.rows.length) {
+      return res.status(400).json({ error: 'Not enough antigravity credits' });
+    }
+
+    const credits = Number.parseInt(result.rows[0]?.antigravity_credits, 10);
+    res.json({ success: true, antigravityCredits: Number.isFinite(credits) ? credits : 0 });
+  } catch (err) {
+    console.error('Error consuming antigravity credits:', err);
+    res.status(500).json({ error: 'Failed to consume antigravity credits' });
+  }
+});
+
+app.get('/replay-unlocks/status', authenticate, async (req, res) => {
+  try {
+    const parsedLevel = Number.parseInt(req.query.level, 10);
+    if (!Number.isFinite(parsedLevel) || parsedLevel <= 0) {
+      return res.status(400).json({ error: 'Invalid level parameter' });
+    }
+    const result = await pool.query(
+      `SELECT 1 FROM user_level_replay_unlocks WHERE user_id = $1 AND level_index = $2 LIMIT 1`,
+      [String(req.user.user_id), parsedLevel]
+    );
+    res.json({ level: parsedLevel, unlocked: result.rows.length > 0 });
+  } catch (err) {
+    console.error('Error fetching replay unlock status:', err);
+    res.status(500).json({ error: 'Failed to fetch replay unlock status' });
+  }
+});
+
+app.post('/replay-unlocks/activate', authenticate, async (req, res) => {
+  try {
+    const parsedLevel = Number.parseInt(req.body?.level, 10);
+    if (!Number.isFinite(parsedLevel) || parsedLevel <= 0) {
+      return res.status(400).json({ error: 'Invalid level parameter' });
+    }
+    await pool.query(
+      `
+      INSERT INTO user_level_replay_unlocks (user_id, level_index, unlocked_at)
+      VALUES ($1, $2, NOW())
+      ON CONFLICT (user_id, level_index) DO NOTHING
+      `,
+      [String(req.user.user_id), parsedLevel]
+    );
+    res.json({ success: true, level: parsedLevel, unlocked: true });
+  } catch (err) {
+    console.error('Error activating replay unlock:', err);
+    res.status(500).json({ error: 'Failed to activate replay unlock' });
+  }
+});
+
 app.post('/saveLevel', authenticate, async (req, res) => {
   const { levelName, levelData } = req.body;
   console.log('POST /saveLevel for user:', req.user.user_id);
@@ -616,23 +815,46 @@ app.get('/stats/fewest-other-moves', authenticate, async (req, res) => {
     }
 
     const currentUserId = String(req.user.user_id);
+    const unlockResult = await pool.query(
+      `SELECT 1 FROM user_level_replay_unlocks WHERE user_id = $1 AND level_index = $2 LIMIT 1`,
+      [currentUserId, parsedLevel]
+    );
+    const replayUnlocked = unlockResult.rows.length > 0;
+
     const result = await pool.query(
-      `SELECT user_id, best_moves
-       FROM user_level_stats
-       WHERE level_index = $1 AND user_id <> $2
-       ORDER BY best_moves ASC, user_id ASC
+      `SELECT uls.user_id, uls.best_moves, uls.best_path, u.username
+       FROM user_level_stats uls
+       LEFT JOIN LATERAL (
+         SELECT username
+         FROM users
+         WHERE portal_user_id = uls.user_id
+         ORDER BY id DESC
+         LIMIT 1
+       ) u ON TRUE
+       WHERE uls.level_index = $1 AND uls.user_id <> $2
+       ORDER BY uls.best_moves ASC, uls.user_id ASC
        LIMIT 1`,
       [parsedLevel, currentUserId]
     );
 
     if (!result.rows.length) {
-      return res.json({ level: parsedLevel, best_moves: null, user_id: null });
+      return res.json({
+        level: parsedLevel,
+        best_moves: null,
+        user_id: null,
+        username: null,
+        best_path: null,
+        replay_unlocked: replayUnlocked
+      });
     }
 
     res.json({
       level: parsedLevel,
       best_moves: result.rows[0].best_moves,
-      user_id: result.rows[0].user_id
+      user_id: result.rows[0].user_id,
+      username: result.rows[0].username || null,
+      best_path: result.rows[0].best_path || null,
+      replay_unlocked: replayUnlocked
     });
   } catch (err) {
     console.error('Error fetching fewest moves by other user:', err);
@@ -653,7 +875,13 @@ app.get('/leaderboard', authenticate, async (req, res) => {
       result = await pool.query(
         `SELECT uls.user_id, uls.level_index, uls.best_moves, u.username
          FROM user_level_stats uls
-         LEFT JOIN users u ON u.portal_user_id = uls.user_id
+         LEFT JOIN LATERAL (
+           SELECT username
+           FROM users
+           WHERE portal_user_id = uls.user_id
+           ORDER BY id DESC
+           LIMIT 1
+         ) u ON TRUE
          WHERE uls.level_index = $1
          ORDER BY uls.best_moves ASC, uls.user_id ASC
          LIMIT 100`,
@@ -663,7 +891,13 @@ app.get('/leaderboard', authenticate, async (req, res) => {
       result = await pool.query(
         `SELECT up.user_id, up.max_unlocked, u.username
          FROM user_progress up
-         LEFT JOIN users u ON u.portal_user_id = up.user_id
+         LEFT JOIN LATERAL (
+           SELECT username
+           FROM users
+           WHERE portal_user_id = up.user_id
+           ORDER BY id DESC
+           LIMIT 1
+         ) u ON TRUE
          ORDER BY up.max_unlocked DESC, up.user_id ASC
          LIMIT 100`
       );
