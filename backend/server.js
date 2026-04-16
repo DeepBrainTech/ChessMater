@@ -831,10 +831,10 @@ app.get('/stats/fewest-other-moves', authenticate, async (req, res) => {
          ORDER BY id DESC
          LIMIT 1
        ) u ON TRUE
-       WHERE uls.level_index = $1 AND uls.user_id <> $2
+       WHERE uls.level_index = $1
        ORDER BY uls.best_moves ASC, uls.user_id ASC
        LIMIT 1`,
-      [parsedLevel, currentUserId]
+      [parsedLevel]
     );
 
     if (!result.rows.length) {
