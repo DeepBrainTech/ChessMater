@@ -21,6 +21,8 @@ const fewestOtherMovesDisplay = document.getElementById("fewestOtherMoves");
 const undoMoveButton = document.getElementById("undoMoveBtn");
 const levelCompleteModal = document.getElementById("levelCompleteModal");
 const levelCompleteText = document.getElementById("levelCompleteText");
+const levelCompleteMoveCountDisplay = document.getElementById("levelCompleteMoveCount");
+const levelCompleteFewestOtherMovesDisplay = document.getElementById("levelCompleteFewestOtherMoves");
 const closeLevelCompleteModalBtn = document.getElementById("closeLevelCompleteModal");
 const levelCompleteRetryBtn = document.getElementById("levelCompleteRetryBtn");
 const levelCompleteNextBtn = document.getElementById("levelCompleteNextBtn");
@@ -116,6 +118,7 @@ let lastRiseTime = 0;
 const RISE_SPEED = 700; // pixels per second
 let currentLevelIndex = 0;
 let levelMoveCount = 0;
+let fewestOtherMovesForLevel = null;
 let moveHistorySnapshots = [];
 let undoCredits = 0;
 
@@ -625,16 +628,37 @@ function updatePlayerCount() {
 }
 
 function updateMoveCountDisplay() {
-  if (!moveCountDisplay) return;
-  moveCountDisplay.textContent = `Your move: ${levelMoveCount}`;
+  if (moveCountDisplay) {
+    moveCountDisplay.textContent = `Your move: ${levelMoveCount}`;
+  }
+  updateLevelCompleteStatsDisplay();
+}
+
+function updateLevelCompleteStatsDisplay() {
+  if (levelCompleteMoveCountDisplay) {
+    levelCompleteMoveCountDisplay.textContent = `Your move: ${levelMoveCount}`;
+  }
+  if (levelCompleteFewestOtherMovesDisplay) {
+    levelCompleteFewestOtherMovesDisplay.textContent = Number.isFinite(fewestOtherMovesForLevel)
+      ? `Fewest move by other user: ${fewestOtherMovesForLevel}`
+      : "Fewest move by other user: --";
+  }
+}
+
+function updateFewestOtherMovesDisplay(bestMoves) {
+  fewestOtherMovesForLevel = Number.isFinite(bestMoves) ? bestMoves : null;
+  if (fewestOtherMovesDisplay) {
+    fewestOtherMovesDisplay.textContent = Number.isFinite(fewestOtherMovesForLevel)
+      ? `Fewest move by other user: ${fewestOtherMovesForLevel}`
+      : "Fewest move by other user: --";
+  }
+  updateLevelCompleteStatsDisplay();
 }
 
 async function fetchFewestOtherMovesForCurrentLevel() {
-  if (!fewestOtherMovesDisplay) return;
-
   const levelNumber = currentLevelIndex + 1;
   if (!Number.isFinite(levelNumber) || levelNumber <= 0) {
-    fewestOtherMovesDisplay.textContent = "Fewest move by other user: --";
+    updateFewestOtherMovesDisplay(null);
     return;
   }
 
@@ -652,17 +676,15 @@ async function fetchFewestOtherMovesForCurrentLevel() {
     });
 
     if (!res.ok) {
-      fewestOtherMovesDisplay.textContent = "Fewest move by other user: --";
+      updateFewestOtherMovesDisplay(null);
       return;
     }
 
     const data = await res.json();
     const bestMoves = Number.parseInt(data?.best_moves, 10);
-    fewestOtherMovesDisplay.textContent = Number.isFinite(bestMoves)
-      ? `Fewest move by other user: ${bestMoves}`
-      : "Fewest move by other user: --";
+    updateFewestOtherMovesDisplay(bestMoves);
   } catch (_) {
-    fewestOtherMovesDisplay.textContent = "Fewest move by other user: --";
+    updateFewestOtherMovesDisplay(null);
   }
 }
 
@@ -834,6 +856,7 @@ function loadPuzzle(puzzleData) {
     gameWon = false;
     levelMoveCount = 0;
     updateMoveCountDisplay();
+    updateFewestOtherMovesDisplay(null);
     visitedSquares.forEach(row => row.fill(false)); // Reset fog on load
     if (typeof enablePlayerControls === "function") {
         enablePlayerControls();
@@ -1090,9 +1113,10 @@ function updateFallingPieces() {
 function showLevelCompleteModal() {
   if (!levelCompleteModal) return;
   const hasNext = currentLevelIndex < LEVELS.length - 1;
+  updateLevelCompleteStatsDisplay();
   if (levelCompleteText) {
     levelCompleteText.textContent = hasNext
-      ? "Great job! What do you want to do next?"
+      ? "Great job!"
       : "Great job! You finished the final level. You can retry this level.";
   }
   if (levelCompleteNextBtn) {

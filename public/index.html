@@ -547,6 +547,14 @@
       gap: 10px;
       flex-wrap: wrap;
     }
+    .level-complete-stats {
+      margin-top: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      color: rgba(255, 255, 255, 0.95);
+      font-weight: 600;
+    }
     .level-complete-actions button {
       border: none;
       border-radius: 8px;
@@ -1348,7 +1356,11 @@
         <h2>Level Complete</h2>
         <button class="close-leaderboard" id="closeLevelCompleteModal">&times;</button>
       </div>
-      <p id="levelCompleteText">Great job! What do you want to do next?</p>
+      <p id="levelCompleteText">Great job!</p>
+      <div class="level-complete-stats">
+        <div id="levelCompleteMoveCount">Your move: 0</div>
+        <div id="levelCompleteFewestOtherMoves">Fewest move by other user: --</div>
+      </div>
       <div class="level-complete-actions">
         <button id="levelCompleteRetryBtn">Retry</button>
         <button id="levelCompleteNextBtn">Next Level</button>
@@ -2001,4 +2013,3 @@
 
 </body>
 </html>
-
