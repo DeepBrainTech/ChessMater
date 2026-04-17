@@ -429,8 +429,17 @@ const initTablesSql = `
     level_index INT NOT NULL,
     best_moves INT NOT NULL,
     best_path JSONB,
+    first_achieved_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW(),
     PRIMARY KEY (user_id, level_index)
+  );
+  CREATE TABLE IF NOT EXISTS level_best_replays (
+    level_index INT PRIMARY KEY,
+    best_moves INT NOT NULL,
+    best_path JSONB,
+    owner_user_id TEXT NOT NULL,
+    first_achieved_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
   );
   CREATE TABLE IF NOT EXISTS user_level_undo_rewards (
     user_id TEXT NOT NULL,
@@ -452,6 +461,27 @@ async function ensureTables() {
     await pool.query('ALTER TABLE user_progress ADD COLUMN IF NOT EXISTS undo_credits INT NOT NULL DEFAULT 0');
     await pool.query('ALTER TABLE user_progress ADD COLUMN IF NOT EXISTS antigravity_credits INT NOT NULL DEFAULT 2');
     await pool.query('ALTER TABLE user_level_stats ADD COLUMN IF NOT EXISTS best_path JSONB');
+    await pool.query('ALTER TABLE user_level_stats ADD COLUMN IF NOT EXISTS first_achieved_at TIMESTAMP');
+    await pool.query('UPDATE user_level_stats SET first_achieved_at = COALESCE(first_achieved_at, updated_at, NOW()) WHERE first_achieved_at IS NULL');
+    await pool.query('ALTER TABLE user_level_stats ALTER COLUMN first_achieved_at SET DEFAULT NOW()');
+    await pool.query(`
+      INSERT INTO level_best_replays (level_index, best_moves, best_path, owner_user_id, first_achieved_at, updated_at)
+      SELECT DISTINCT ON (uls.level_index)
+        uls.level_index,
+        uls.best_moves,
+        uls.best_path,
+        uls.user_id,
+        COALESCE(uls.first_achieved_at, uls.updated_at, NOW()),
+        NOW()
+      FROM user_level_stats uls
+      WHERE uls.best_path IS NOT NULL
+      ORDER BY
+        uls.level_index ASC,
+        uls.best_moves ASC,
+        COALESCE(uls.first_achieved_at, uls.updated_at, NOW()) ASC,
+        uls.user_id ASC
+      ON CONFLICT (level_index) DO NOTHING
+    `);
     console.log('✅ DB tables ensured (users, user_progress, levels)');
   } catch (err) {
     console.error('❌ Failed to create tables:', err.message);
@@ -464,6 +494,27 @@ app.get('/init', async (req, res) => {
     await pool.query('ALTER TABLE user_progress ADD COLUMN IF NOT EXISTS undo_credits INT NOT NULL DEFAULT 0');
     await pool.query('ALTER TABLE user_progress ADD COLUMN IF NOT EXISTS antigravity_credits INT NOT NULL DEFAULT 2');
     await pool.query('ALTER TABLE user_level_stats ADD COLUMN IF NOT EXISTS best_path JSONB');
+    await pool.query('ALTER TABLE user_level_stats ADD COLUMN IF NOT EXISTS first_achieved_at TIMESTAMP');
+    await pool.query('UPDATE user_level_stats SET first_achieved_at = COALESCE(first_achieved_at, updated_at, NOW()) WHERE first_achieved_at IS NULL');
+    await pool.query('ALTER TABLE user_level_stats ALTER COLUMN first_achieved_at SET DEFAULT NOW()');
+    await pool.query(`
+      INSERT INTO level_best_replays (level_index, best_moves, best_path, owner_user_id, first_achieved_at, updated_at)
+      SELECT DISTINCT ON (uls.level_index)
+        uls.level_index,
+        uls.best_moves,
+        uls.best_path,
+        uls.user_id,
+        COALESCE(uls.first_achieved_at, uls.updated_at, NOW()),
+        NOW()
+      FROM user_level_stats uls
+      WHERE uls.best_path IS NOT NULL
+      ORDER BY
+        uls.level_index ASC,
+        uls.best_moves ASC,
+        COALESCE(uls.first_achieved_at, uls.updated_at, NOW()) ASC,
+        uls.user_id ASC
+      ON CONFLICT (level_index) DO NOTHING
+    `);
     res.send('✅ Tables created');
   } catch (err) {
     console.error('Init failed:', err);
@@ -502,6 +553,7 @@ app.post('/progress', authenticate, async (req, res) => {
   const moves = Number.isFinite(parsedMoves) ? parsedMoves : null;
   const rawMoveTrace = Array.isArray(req.body?.moveTrace) ? req.body.moveTrace : null;
   const moveTrace = rawMoveTrace ? rawMoveTrace.slice(0, 500) : null;
+  const moveTraceJson = moveTrace ? JSON.stringify(moveTrace) : null;
 
   console.log('POST /progress - user:', req.user.user_id, 'maxUnlocked:', maxUnlocked, 'level:', level, 'moves:', moves, 'moveTraceLength:', moveTrace ? moveTrace.length : 0);
 
@@ -524,19 +576,35 @@ app.post('/progress', authenticate, async (req, res) => {
       console.log('Saving level stats for level:', level, 'with moves:', moves);
       await pool.query(
         `
-        INSERT INTO user_level_stats (user_id, level_index, best_moves, best_path, updated_at)
-        VALUES ($1, $2, $3, $4::jsonb, NOW())
+        INSERT INTO user_level_stats (user_id, level_index, best_moves, first_achieved_at, updated_at)
+        VALUES ($1, $2, $3, NOW(), NOW())
         ON CONFLICT (user_id, level_index)
         DO UPDATE SET
           best_moves = LEAST(user_level_stats.best_moves, EXCLUDED.best_moves),
-          best_path = CASE
-            WHEN EXCLUDED.best_moves < user_level_stats.best_moves THEN EXCLUDED.best_path
-            WHEN EXCLUDED.best_moves = user_level_stats.best_moves AND user_level_stats.best_path IS NULL THEN EXCLUDED.best_path
-            ELSE user_level_stats.best_path
+          first_achieved_at = CASE
+            WHEN EXCLUDED.best_moves < user_level_stats.best_moves THEN EXCLUDED.first_achieved_at
+            ELSE user_level_stats.first_achieved_at
           END,
           updated_at = NOW()
         `,
-        [req.user.user_id, level, moves, moveTrace ? JSON.stringify(moveTrace) : null]
+        [req.user.user_id, level, moves]
+      );
+
+      // Store replay path only when a new global best is achieved for this level.
+      await pool.query(
+        `
+        INSERT INTO level_best_replays (level_index, best_moves, best_path, owner_user_id, first_achieved_at, updated_at)
+        VALUES ($1, $2, $3::jsonb, $4, NOW(), NOW())
+        ON CONFLICT (level_index)
+        DO UPDATE SET
+          best_moves = EXCLUDED.best_moves,
+          best_path = EXCLUDED.best_path,
+          owner_user_id = EXCLUDED.owner_user_id,
+          first_achieved_at = EXCLUDED.first_achieved_at,
+          updated_at = NOW()
+        WHERE EXCLUDED.best_moves < level_best_replays.best_moves
+        `,
+        [level, moves, moveTraceJson, req.user.user_id]
       );
 
       // Grant level-clear undo reward only once per user per level.
@@ -822,17 +890,16 @@ app.get('/stats/fewest-other-moves', authenticate, async (req, res) => {
     const replayUnlocked = unlockResult.rows.length > 0;
 
     const result = await pool.query(
-      `SELECT uls.user_id, uls.best_moves, uls.best_path, u.username
-       FROM user_level_stats uls
+      `SELECT lbr.owner_user_id AS user_id, lbr.best_moves, lbr.best_path, u.username
+       FROM level_best_replays lbr
        LEFT JOIN LATERAL (
          SELECT username
          FROM users
-         WHERE portal_user_id = uls.user_id
+         WHERE portal_user_id = lbr.owner_user_id
          ORDER BY id DESC
          LIMIT 1
        ) u ON TRUE
-       WHERE uls.level_index = $1
-       ORDER BY uls.best_moves ASC, uls.user_id ASC
+       WHERE lbr.level_index = $1
        LIMIT 1`,
       [parsedLevel]
     );
@@ -883,7 +950,7 @@ app.get('/leaderboard', authenticate, async (req, res) => {
            LIMIT 1
          ) u ON TRUE
          WHERE uls.level_index = $1
-         ORDER BY uls.best_moves ASC, uls.user_id ASC
+         ORDER BY uls.best_moves ASC, uls.first_achieved_at ASC, uls.user_id ASC
          LIMIT 100`,
         [parsedLevel]
       );
