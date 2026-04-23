@@ -2558,9 +2558,11 @@ function transformPiece(playerIndex, newPieceType) {
 // Handle clicks on the transformer menu
 function handleTransformerMenuClick(e) {
   const rect = canvas.getBoundingClientRect();
-  const x = e.clientX - rect.left;
-  const y = e.clientY - rect.top;
-  
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  const x = (e.clientX - rect.left) * scaleX;
+  const y = (e.clientY - rect.top) * scaleY;
+
   // Always use center of board for menu positioning
   const centerX = (COLS * TILE_SIZE) / 2;
   const centerY = (ROWS * TILE_SIZE) / 2;
