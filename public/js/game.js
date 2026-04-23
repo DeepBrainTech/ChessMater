@@ -1512,6 +1512,9 @@ function resetPhaseBlocks() {
 function loadPuzzle(puzzleData) {
   currentPuzzleData = JSON.parse(JSON.stringify(puzzleData)); // Deep copy
   moveHistorySnapshots = [];
+  showTransformerMenu = false;
+  transformerPosition = null;
+  transformerPlayerIndex = -1;
   if (levelCompleteModal) {
     levelCompleteModal.classList.remove("active");
   }
