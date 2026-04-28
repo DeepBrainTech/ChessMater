@@ -1648,7 +1648,10 @@
 
       // Start the music when the Start button is clicked
       if (startButton) {
-        startButton.addEventListener("click", () => {
+        startButton.addEventListener("click", async () => {
+          await (window.authReady || Promise.resolve());
+          const canStart = !!(window.cmUser && (window.cmToken || window.cmSessionReady));
+          if (!canStart) return;
           if (!musicPlaying) {
             bgMusic.volume = 0.5;
             musicPlaying = true;
