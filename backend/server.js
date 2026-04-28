@@ -162,6 +162,51 @@ function extractPortalIdentity(decoded) {
   return { userId: normalizedUserId, username };
 }
 
+function buildLegacyUsername(baseUsername, rowId, portalUserId) {
+  const cleanBase = normalizePortalUsername(baseUsername || 'user') || 'user';
+  const suffix = `__legacy_p${String(portalUserId)}_r${String(rowId)}`;
+  const maxBaseLength = Math.max(1, 255 - suffix.length);
+  const base = cleanBase.slice(0, maxBaseLength);
+  return `${base}${suffix}`;
+}
+
+async function syncUsernameByPortalIdentity(db, targetUser, desiredUsername, portalUserId) {
+  const normalized = normalizePortalUsername(desiredUsername || '');
+  if (!targetUser || !normalized || targetUser.username === normalized) {
+    return targetUser;
+  }
+
+  const conflictCheck = await db.query(
+    'SELECT id, username, portal_user_id FROM users WHERE username = $1 LIMIT 1',
+    [normalized]
+  );
+  const conflictRow = conflictCheck.rows[0] || null;
+
+  if (conflictRow && Number(conflictRow.id) !== Number(targetUser.id)) {
+    if (String(conflictRow.portal_user_id || '') === String(portalUserId || '')) {
+      // Same portal user duplicated in DB; release username from the duplicate row.
+      const legacyName = buildLegacyUsername(conflictRow.username, conflictRow.id, portalUserId);
+      await db.query(
+        'UPDATE users SET username = $1 WHERE id = $2',
+        [legacyName, conflictRow.id]
+      );
+      console.warn(`⚠️ Released duplicate username "${normalized}" from duplicate row id=${conflictRow.id}, portal_user_id=${portalUserId}`);
+    } else {
+      // Another portal user owns this username; do not hijack.
+      console.warn(`⚠️ Username "${normalized}" already used by portal_user_id=${conflictRow.portal_user_id}; keep existing username="${targetUser.username}" for portal_user_id=${portalUserId}`);
+      return targetUser;
+    }
+  }
+
+  const updated = await db.query(
+    'UPDATE users SET username = $1 WHERE id = $2 RETURNING *',
+    [normalized, targetUser.id]
+  );
+  const nextUser = updated.rows[0] || targetUser;
+  console.log(`🔄 Username synced for portal_user_id=${portalUserId}: ${nextUser.username}`);
+  return nextUser;
+}
+
 function issueSessionToken(user) {
   const now = Math.floor(Date.now() / 1000);
   return jwt.sign(
@@ -357,22 +402,7 @@ app.post('/api/auth/verify', async (req, res) => {
       if (userResult.rows.length > 0) {
         // User exists: keep username in sync with portal token
         user = userResult.rows[0];
-        if (user.username !== username) {
-          const conflictCheck = await pool.query(
-            'SELECT id FROM users WHERE username = $1 LIMIT 1',
-            [username]
-          );
-          if (!conflictCheck.rows.length || Number(conflictCheck.rows[0].id) === Number(user.id)) {
-            const updated = await pool.query(
-              'UPDATE users SET username = $1 WHERE id = $2 RETURNING *',
-              [username, user.id]
-            );
-            user = updated.rows[0] || user;
-            console.log(`🔄 Username synced for portal_user_id=${portalUserId}: ${username}`);
-          } else {
-            console.warn(`⚠️ Username "${username}" already used by another row; keep existing username="${user.username}" for portal_user_id=${portalUserId}`);
-          }
-        }
+        user = await syncUsernameByPortalIdentity(pool, user, username, portalUserId);
         console.log(`✅ User exists: username=${user.username}, id=${user.id}, portal_user_id=${user.portal_user_id}`);
       } else {
         // Create user (portal_user_id used in temp password)
@@ -452,19 +482,8 @@ app.get('/api/auth/me', authenticate, async (req, res) => {
 
     // Keep username in sync even on cookie-restored sessions.
     if (dbUser && sessionUsername && dbUser.username !== sessionUsername) {
-      const conflictCheck = await pool.query(
-        'SELECT id FROM users WHERE username = $1 LIMIT 1',
-        [sessionUsername]
-      );
-      if (!conflictCheck.rows.length || Number(conflictCheck.rows[0].id) === Number(dbUser.id)) {
-        const updated = await pool.query(
-          'UPDATE users SET username = $1 WHERE id = $2 RETURNING id, username, portal_user_id',
-          [sessionUsername, dbUser.id]
-        );
-        if (updated.rows[0]) {
-          username = updated.rows[0].username;
-        }
-      }
+      const syncedUser = await syncUsernameByPortalIdentity(pool, dbUser, sessionUsername, portalUserId);
+      username = syncedUser?.username || username;
     }
 
     const user = {
