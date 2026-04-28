@@ -141,11 +141,11 @@ function normalizePortalUsername(raw) {
 
 function extractPortalIdentity(decoded) {
   const userId =
+    decoded?.portal_user_id ??
+    decoded?.sub ??
     decoded?.user_id ??
     decoded?.userId ??
     decoded?.uid ??
-    decoded?.portal_user_id ??
-    decoded?.sub ??
     null;
 
   const usernameRaw =
@@ -372,42 +372,26 @@ app.post('/api/auth/verify', async (req, res) => {
       });
     }
 
-    // Find or create user (portal_user_id is the stable identity)
+    // Upsert user by stable identity, and keep username in sync.
     let user;
     try {
-      console.log(`🔍 Looking for user by portal_user_id=${portalUserId}`);
-      const userResult = await pool.query(
-        `SELECT *
-         FROM users
-         WHERE portal_user_id = $1
-         ORDER BY id DESC
-         LIMIT 1`,
-        [portalUserId.toString()]
-      );
-
-      if (userResult.rows.length > 0) {
-        // User exists: keep username in sync with portal token
-        user = userResult.rows[0];
-        user = await syncUsernameByPortalIdentity(pool, user, username, portalUserId);
-        console.log(`✅ User exists: username=${user.username}, id=${user.id}, portal_user_id=${user.portal_user_id}`);
-      } else {
-        // Create user (portal_user_id used in temp password)
-        const tempPassword = `portal_sso_${portalUserId}`;
-        console.log(`➕ Creating new user: username=${username}, portal_user_id=${portalUserId}`);
-        const createResult = await pool.query(
+      const tempPassword = `portal_sso_${portalUserId}`;
+      user = (
+        await pool.query(
           `INSERT INTO users (username, password, portal_user_id)
            VALUES ($1, $2, $3)
+           ON CONFLICT (portal_user_id)
+           DO UPDATE SET username = EXCLUDED.username
            RETURNING *`,
           [username, tempPassword, portalUserId.toString()]
-        );
-        user = createResult.rows[0];
-        console.log(`✅ User created: username=${username}, db_id=${user.id}, portal_user_id=${user.portal_user_id}`);
-      }
+        )
+      ).rows[0];
+      console.log(`✅ User upserted: username=${user.username}, id=${user.id}, portal_user_id=${user.portal_user_id}`);
     } catch (dbErr) {
       console.error('❌ DB error during user find/create:', dbErr);
       return res.status(500).json({
         success: false,
-        message: `Failed to create user: ${dbErr.message}`
+        message: `Failed to upsert user: ${dbErr.message}`
       });
     }
 
@@ -552,9 +536,23 @@ const initTablesSql = `
   );
 `;
 
+async function ensurePortalUserIdUniqueIndex() {
+  try {
+    await pool.query(
+      'CREATE UNIQUE INDEX IF NOT EXISTS users_portal_user_id_unique_idx ON users (portal_user_id)'
+    );
+  } catch (err) {
+    console.warn(
+      '⚠️ Could not enforce unique portal_user_id. Please deduplicate users table first:',
+      err.message
+    );
+  }
+}
+
 async function ensureTables() {
   try {
     await pool.query(initTablesSql);
+    await ensurePortalUserIdUniqueIndex();
     await pool.query('ALTER TABLE user_progress ADD COLUMN IF NOT EXISTS undo_credits INT NOT NULL DEFAULT 0');
     await pool.query('ALTER TABLE user_progress ADD COLUMN IF NOT EXISTS antigravity_credits INT NOT NULL DEFAULT 2');
     await pool.query('ALTER TABLE user_level_stats ADD COLUMN IF NOT EXISTS best_path JSONB');
@@ -588,6 +586,7 @@ async function ensureTables() {
 app.get('/init', async (req, res) => {
   try {
     await pool.query(initTablesSql);
+    await ensurePortalUserIdUniqueIndex();
     await pool.query('ALTER TABLE user_progress ADD COLUMN IF NOT EXISTS undo_credits INT NOT NULL DEFAULT 0');
     await pool.query('ALTER TABLE user_progress ADD COLUMN IF NOT EXISTS antigravity_credits INT NOT NULL DEFAULT 2');
     await pool.query('ALTER TABLE user_level_stats ADD COLUMN IF NOT EXISTS best_path JSONB');
