@@ -493,46 +493,46 @@ const initTablesSql = `
     created_at TIMESTAMP DEFAULT NOW()
   );
   CREATE TABLE IF NOT EXISTS user_progress (
-    user_id TEXT PRIMARY KEY,
+    portal_user_id TEXT PRIMARY KEY,
     max_unlocked INT,
     undo_credits INT NOT NULL DEFAULT 0,
     antigravity_credits INT NOT NULL DEFAULT 2
   );
   CREATE TABLE IF NOT EXISTS levels (
     id SERIAL PRIMARY KEY,
-    user_id TEXT,
+    portal_user_id TEXT,
     level_name TEXT,
     level_data JSONB,
     created_at TIMESTAMP DEFAULT NOW()
   );
   CREATE TABLE IF NOT EXISTS user_level_stats (
-    user_id TEXT NOT NULL,
+    portal_user_id TEXT NOT NULL,
     level_index INT NOT NULL,
     best_moves INT NOT NULL,
     best_path JSONB,
     first_achieved_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW(),
-    PRIMARY KEY (user_id, level_index)
+    PRIMARY KEY (portal_user_id, level_index)
   );
   CREATE TABLE IF NOT EXISTS level_best_replays (
     level_index INT PRIMARY KEY,
     best_moves INT NOT NULL,
     best_path JSONB,
-    owner_user_id TEXT NOT NULL,
+    owner_portal_user_id TEXT NOT NULL,
     first_achieved_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW()
   );
   CREATE TABLE IF NOT EXISTS user_level_undo_rewards (
-    user_id TEXT NOT NULL,
+    portal_user_id TEXT NOT NULL,
     level_index INT NOT NULL,
     rewarded_at TIMESTAMP DEFAULT NOW(),
-    PRIMARY KEY (user_id, level_index)
+    PRIMARY KEY (portal_user_id, level_index)
   );
   CREATE TABLE IF NOT EXISTS user_level_replay_unlocks (
-    user_id TEXT NOT NULL,
+    portal_user_id TEXT NOT NULL,
     level_index INT NOT NULL,
     unlocked_at TIMESTAMP DEFAULT NOW(),
-    PRIMARY KEY (user_id, level_index)
+    PRIMARY KEY (portal_user_id, level_index)
   );
 `;
 
@@ -558,9 +558,44 @@ async function dropUsernameUniqueness() {
   }
 }
 
+async function renameColumnIfExists(tableName, oldColumnName, newColumnName) {
+  const oldExistsResult = await pool.query(
+    `SELECT EXISTS (
+       SELECT 1
+       FROM information_schema.columns
+       WHERE table_schema = 'public' AND table_name = $1 AND column_name = $2
+     ) AS exists`,
+    [tableName, oldColumnName]
+  );
+  const newExistsResult = await pool.query(
+    `SELECT EXISTS (
+       SELECT 1
+       FROM information_schema.columns
+       WHERE table_schema = 'public' AND table_name = $1 AND column_name = $2
+     ) AS exists`,
+    [tableName, newColumnName]
+  );
+  if (!oldExistsResult.rows[0]?.exists || newExistsResult.rows[0]?.exists) return;
+  await pool.query(`ALTER TABLE ${tableName} RENAME COLUMN ${oldColumnName} TO ${newColumnName}`);
+}
+
+async function ensurePortalUserIdColumnNames() {
+  try {
+    await renameColumnIfExists('user_progress', 'user_id', 'portal_user_id');
+    await renameColumnIfExists('levels', 'user_id', 'portal_user_id');
+    await renameColumnIfExists('user_level_stats', 'user_id', 'portal_user_id');
+    await renameColumnIfExists('user_level_undo_rewards', 'user_id', 'portal_user_id');
+    await renameColumnIfExists('user_level_replay_unlocks', 'user_id', 'portal_user_id');
+    await renameColumnIfExists('level_best_replays', 'owner_user_id', 'owner_portal_user_id');
+  } catch (err) {
+    console.warn('⚠️ Could not normalize portal_user_id column names:', err.message);
+  }
+}
+
 async function ensureTables() {
   try {
     await pool.query(initTablesSql);
+    await ensurePortalUserIdColumnNames();
     await dropUsernameUniqueness();
     await ensurePortalUserIdUniqueIndex();
     await pool.query('ALTER TABLE user_progress ADD COLUMN IF NOT EXISTS undo_credits INT NOT NULL DEFAULT 0');
@@ -570,12 +605,12 @@ async function ensureTables() {
     await pool.query('UPDATE user_level_stats SET first_achieved_at = COALESCE(first_achieved_at, updated_at, NOW()) WHERE first_achieved_at IS NULL');
     await pool.query('ALTER TABLE user_level_stats ALTER COLUMN first_achieved_at SET DEFAULT NOW()');
     await pool.query(`
-      INSERT INTO level_best_replays (level_index, best_moves, best_path, owner_user_id, first_achieved_at, updated_at)
+      INSERT INTO level_best_replays (level_index, best_moves, best_path, owner_portal_user_id, first_achieved_at, updated_at)
       SELECT DISTINCT ON (uls.level_index)
         uls.level_index,
         uls.best_moves,
         uls.best_path,
-        uls.user_id,
+        uls.portal_user_id,
         COALESCE(uls.first_achieved_at, uls.updated_at, NOW()),
         NOW()
       FROM user_level_stats uls
@@ -584,7 +619,7 @@ async function ensureTables() {
         uls.level_index ASC,
         uls.best_moves ASC,
         COALESCE(uls.first_achieved_at, uls.updated_at, NOW()) ASC,
-        uls.user_id ASC
+        uls.portal_user_id ASC
       ON CONFLICT (level_index) DO NOTHING
     `);
     console.log('✅ DB tables ensured (users, user_progress, levels)');
@@ -596,6 +631,7 @@ async function ensureTables() {
 app.get('/init', async (req, res) => {
   try {
     await pool.query(initTablesSql);
+    await ensurePortalUserIdColumnNames();
     await dropUsernameUniqueness();
     await ensurePortalUserIdUniqueIndex();
     await pool.query('ALTER TABLE user_progress ADD COLUMN IF NOT EXISTS undo_credits INT NOT NULL DEFAULT 0');
@@ -605,12 +641,12 @@ app.get('/init', async (req, res) => {
     await pool.query('UPDATE user_level_stats SET first_achieved_at = COALESCE(first_achieved_at, updated_at, NOW()) WHERE first_achieved_at IS NULL');
     await pool.query('ALTER TABLE user_level_stats ALTER COLUMN first_achieved_at SET DEFAULT NOW()');
     await pool.query(`
-      INSERT INTO level_best_replays (level_index, best_moves, best_path, owner_user_id, first_achieved_at, updated_at)
+      INSERT INTO level_best_replays (level_index, best_moves, best_path, owner_portal_user_id, first_achieved_at, updated_at)
       SELECT DISTINCT ON (uls.level_index)
         uls.level_index,
         uls.best_moves,
         uls.best_path,
-        uls.user_id,
+        uls.portal_user_id,
         COALESCE(uls.first_achieved_at, uls.updated_at, NOW()),
         NOW()
       FROM user_level_stats uls
@@ -619,7 +655,7 @@ app.get('/init', async (req, res) => {
         uls.level_index ASC,
         uls.best_moves ASC,
         COALESCE(uls.first_achieved_at, uls.updated_at, NOW()) ASC,
-        uls.user_id ASC
+        uls.portal_user_id ASC
       ON CONFLICT (level_index) DO NOTHING
     `);
     res.send('✅ Tables created');
@@ -633,7 +669,7 @@ app.get('/progress', authenticate, async (req, res) => {
   console.log('GET /progress for user:', req.user.user_id);
   try {
     const result = await pool.query(
-      'SELECT max_unlocked, undo_credits, antigravity_credits FROM user_progress WHERE user_id = $1',
+      'SELECT max_unlocked, undo_credits, antigravity_credits FROM user_progress WHERE portal_user_id = $1',
       [req.user.user_id]
     );
     const maxUnlocked = result.rows[0]?.max_unlocked || 1;
@@ -669,9 +705,9 @@ app.post('/progress', authenticate, async (req, res) => {
 
     await pool.query(
       `
-      INSERT INTO user_progress (user_id, max_unlocked)
+      INSERT INTO user_progress (portal_user_id, max_unlocked)
       VALUES ($1, $2)
-      ON CONFLICT (user_id)
+      ON CONFLICT (portal_user_id)
       DO UPDATE SET max_unlocked = GREATEST(user_progress.max_unlocked, EXCLUDED.max_unlocked)
       `,
       [req.user.user_id, maxUnlocked]
@@ -683,9 +719,9 @@ app.post('/progress', authenticate, async (req, res) => {
       console.log('Saving level stats for level:', level, 'with moves:', moves);
       await pool.query(
         `
-        INSERT INTO user_level_stats (user_id, level_index, best_moves, first_achieved_at, updated_at)
+        INSERT INTO user_level_stats (portal_user_id, level_index, best_moves, first_achieved_at, updated_at)
         VALUES ($1, $2, $3, NOW(), NOW())
-        ON CONFLICT (user_id, level_index)
+        ON CONFLICT (portal_user_id, level_index)
         DO UPDATE SET
           best_moves = LEAST(user_level_stats.best_moves, EXCLUDED.best_moves),
           first_achieved_at = CASE
@@ -700,13 +736,13 @@ app.post('/progress', authenticate, async (req, res) => {
       // Store replay path only when a new global best is achieved for this level.
       await pool.query(
         `
-        INSERT INTO level_best_replays (level_index, best_moves, best_path, owner_user_id, first_achieved_at, updated_at)
+        INSERT INTO level_best_replays (level_index, best_moves, best_path, owner_portal_user_id, first_achieved_at, updated_at)
         VALUES ($1, $2, $3::jsonb, $4, NOW(), NOW())
         ON CONFLICT (level_index)
         DO UPDATE SET
           best_moves = EXCLUDED.best_moves,
           best_path = EXCLUDED.best_path,
-          owner_user_id = EXCLUDED.owner_user_id,
+          owner_portal_user_id = EXCLUDED.owner_portal_user_id,
           first_achieved_at = EXCLUDED.first_achieved_at,
           updated_at = NOW()
         WHERE EXCLUDED.best_moves < level_best_replays.best_moves
@@ -717,10 +753,10 @@ app.post('/progress', authenticate, async (req, res) => {
       // Grant level-clear undo reward only once per user per level.
       const rewardInsert = await pool.query(
         `
-        INSERT INTO user_level_undo_rewards (user_id, level_index, rewarded_at)
+        INSERT INTO user_level_undo_rewards (portal_user_id, level_index, rewarded_at)
         VALUES ($1, $2, NOW())
-        ON CONFLICT (user_id, level_index) DO NOTHING
-        RETURNING user_id
+        ON CONFLICT (portal_user_id, level_index) DO NOTHING
+        RETURNING portal_user_id
         `,
         [req.user.user_id, level]
       );
@@ -731,7 +767,7 @@ app.post('/progress', authenticate, async (req, res) => {
           `
           UPDATE user_progress
           SET undo_credits = undo_credits + 1
-          WHERE user_id = $1
+          WHERE portal_user_id = $1
           `,
           [req.user.user_id]
         );
@@ -742,7 +778,7 @@ app.post('/progress', authenticate, async (req, res) => {
     }
 
     const creditsResult = await pool.query(
-      'SELECT undo_credits, antigravity_credits FROM user_progress WHERE user_id = $1',
+      'SELECT undo_credits, antigravity_credits FROM user_progress WHERE portal_user_id = $1',
       [req.user.user_id]
     );
     const undoCredits = Number.parseInt(creditsResult.rows[0]?.undo_credits, 10);
@@ -766,7 +802,7 @@ app.post('/progress', authenticate, async (req, res) => {
 app.get('/undo-credits', authenticate, async (req, res) => {
   try {
     const result = await pool.query(
-      'SELECT undo_credits FROM user_progress WHERE user_id = $1',
+      'SELECT undo_credits FROM user_progress WHERE portal_user_id = $1',
       [req.user.user_id]
     );
     const undoCredits = Number.parseInt(result.rows[0]?.undo_credits, 10);
@@ -784,9 +820,9 @@ app.post('/undo-credits/grant', authenticate, async (req, res) => {
   try {
     const result = await pool.query(
       `
-      INSERT INTO user_progress (user_id, max_unlocked, undo_credits)
+      INSERT INTO user_progress (portal_user_id, max_unlocked, undo_credits)
       VALUES ($1, 1, $2)
-      ON CONFLICT (user_id)
+      ON CONFLICT (portal_user_id)
       DO UPDATE SET undo_credits = user_progress.undo_credits + EXCLUDED.undo_credits
       RETURNING undo_credits
       `,
@@ -808,9 +844,9 @@ app.post('/undo-credits/use', authenticate, async (req, res) => {
   try {
     await pool.query(
       `
-      INSERT INTO user_progress (user_id, max_unlocked, undo_credits)
+      INSERT INTO user_progress (portal_user_id, max_unlocked, undo_credits)
       VALUES ($1, 1, 0)
-      ON CONFLICT (user_id) DO NOTHING
+      ON CONFLICT (portal_user_id) DO NOTHING
       `,
       [req.user.user_id]
     );
@@ -819,7 +855,7 @@ app.post('/undo-credits/use', authenticate, async (req, res) => {
       `
       UPDATE user_progress
       SET undo_credits = undo_credits - $2
-      WHERE user_id = $1 AND undo_credits >= $2
+      WHERE portal_user_id = $1 AND undo_credits >= $2
       RETURNING undo_credits
       `,
       [req.user.user_id, amount]
@@ -840,7 +876,7 @@ app.post('/undo-credits/use', authenticate, async (req, res) => {
 app.get('/antigravity-credits', authenticate, async (req, res) => {
   try {
     const result = await pool.query(
-      'SELECT antigravity_credits FROM user_progress WHERE user_id = $1',
+      'SELECT antigravity_credits FROM user_progress WHERE portal_user_id = $1',
       [req.user.user_id]
     );
     const credits = Number.parseInt(result.rows[0]?.antigravity_credits, 10);
@@ -858,9 +894,9 @@ app.post('/antigravity-credits/grant', authenticate, async (req, res) => {
   try {
     const result = await pool.query(
       `
-      INSERT INTO user_progress (user_id, max_unlocked, antigravity_credits)
+      INSERT INTO user_progress (portal_user_id, max_unlocked, antigravity_credits)
       VALUES ($1, 1, $2)
-      ON CONFLICT (user_id)
+      ON CONFLICT (portal_user_id)
       DO UPDATE SET antigravity_credits = user_progress.antigravity_credits + EXCLUDED.antigravity_credits
       RETURNING antigravity_credits
       `,
@@ -882,9 +918,9 @@ app.post('/antigravity-credits/use', authenticate, async (req, res) => {
   try {
     await pool.query(
       `
-      INSERT INTO user_progress (user_id, max_unlocked, antigravity_credits)
+      INSERT INTO user_progress (portal_user_id, max_unlocked, antigravity_credits)
       VALUES ($1, 1, 2)
-      ON CONFLICT (user_id) DO NOTHING
+      ON CONFLICT (portal_user_id) DO NOTHING
       `,
       [req.user.user_id]
     );
@@ -893,7 +929,7 @@ app.post('/antigravity-credits/use', authenticate, async (req, res) => {
       `
       UPDATE user_progress
       SET antigravity_credits = antigravity_credits - $2
-      WHERE user_id = $1 AND antigravity_credits >= $2
+      WHERE portal_user_id = $1 AND antigravity_credits >= $2
       RETURNING antigravity_credits
       `,
       [req.user.user_id, amount]
@@ -918,7 +954,7 @@ app.get('/replay-unlocks/status', authenticate, async (req, res) => {
       return res.status(400).json({ error: 'Invalid level parameter' });
     }
     const result = await pool.query(
-      `SELECT 1 FROM user_level_replay_unlocks WHERE user_id = $1 AND level_index = $2 LIMIT 1`,
+      `SELECT 1 FROM user_level_replay_unlocks WHERE portal_user_id = $1 AND level_index = $2 LIMIT 1`,
       [String(req.user.user_id), parsedLevel]
     );
     res.json({ level: parsedLevel, unlocked: result.rows.length > 0 });
@@ -936,9 +972,9 @@ app.post('/replay-unlocks/activate', authenticate, async (req, res) => {
     }
     await pool.query(
       `
-      INSERT INTO user_level_replay_unlocks (user_id, level_index, unlocked_at)
+      INSERT INTO user_level_replay_unlocks (portal_user_id, level_index, unlocked_at)
       VALUES ($1, $2, NOW())
-      ON CONFLICT (user_id, level_index) DO NOTHING
+      ON CONFLICT (portal_user_id, level_index) DO NOTHING
       `,
       [String(req.user.user_id), parsedLevel]
     );
@@ -954,7 +990,7 @@ app.post('/saveLevel', authenticate, async (req, res) => {
   console.log('POST /saveLevel for user:', req.user.user_id);
   try {
     await pool.query(
-      `INSERT INTO levels (user_id, level_name, level_data)
+      `INSERT INTO levels (portal_user_id, level_name, level_data)
        VALUES ($1, $2, $3)`,
       [req.user.user_id, levelName, levelData]
     );
@@ -970,7 +1006,7 @@ app.get('/loadLevels', authenticate, async (req, res) => {
   console.log('GET /loadLevels for user:', req.user.user_id);
   try {
     const result = await pool.query(
-      `SELECT level_name, level_data FROM levels WHERE user_id = $1
+      `SELECT level_name, level_data FROM levels WHERE portal_user_id = $1
        ORDER BY created_at DESC`,
       [req.user.user_id]
     );
@@ -991,18 +1027,18 @@ app.get('/stats/fewest-other-moves', authenticate, async (req, res) => {
 
     const currentUserId = String(req.user.user_id);
     const unlockResult = await pool.query(
-      `SELECT 1 FROM user_level_replay_unlocks WHERE user_id = $1 AND level_index = $2 LIMIT 1`,
+      `SELECT 1 FROM user_level_replay_unlocks WHERE portal_user_id = $1 AND level_index = $2 LIMIT 1`,
       [currentUserId, parsedLevel]
     );
     const replayUnlocked = unlockResult.rows.length > 0;
 
     const result = await pool.query(
-      `SELECT lbr.owner_user_id AS user_id, lbr.best_moves, lbr.best_path, u.username
+      `SELECT lbr.owner_portal_user_id AS user_id, lbr.best_moves, lbr.best_path, u.username
        FROM level_best_replays lbr
        LEFT JOIN LATERAL (
          SELECT username
          FROM users
-         WHERE portal_user_id = lbr.owner_user_id
+         WHERE portal_user_id = lbr.owner_portal_user_id
          ORDER BY id DESC
          LIMIT 1
        ) u ON TRUE
@@ -1047,32 +1083,32 @@ app.get('/leaderboard', authenticate, async (req, res) => {
         return res.status(400).json({ error: 'Invalid level parameter' });
       }
       result = await pool.query(
-        `SELECT uls.user_id, uls.level_index, uls.best_moves, u.username
+        `SELECT uls.portal_user_id AS user_id, uls.level_index, uls.best_moves, u.username
          FROM user_level_stats uls
          LEFT JOIN LATERAL (
            SELECT username
            FROM users
-           WHERE portal_user_id = uls.user_id
+           WHERE portal_user_id = uls.portal_user_id
            ORDER BY id DESC
            LIMIT 1
          ) u ON TRUE
          WHERE uls.level_index = $1
-         ORDER BY uls.best_moves ASC, uls.first_achieved_at ASC, uls.user_id ASC
+         ORDER BY uls.best_moves ASC, uls.first_achieved_at ASC, uls.portal_user_id ASC
          LIMIT 100`,
         [parsedLevel]
       );
     } else {
       result = await pool.query(
-        `SELECT up.user_id, up.max_unlocked, u.username
+        `SELECT up.portal_user_id AS user_id, up.max_unlocked, u.username
          FROM user_progress up
          LEFT JOIN LATERAL (
            SELECT username
            FROM users
-           WHERE portal_user_id = up.user_id
+           WHERE portal_user_id = up.portal_user_id
            ORDER BY id DESC
            LIMIT 1
          ) u ON TRUE
-         ORDER BY up.max_unlocked DESC, up.user_id ASC
+         ORDER BY up.max_unlocked DESC, up.portal_user_id ASC
          LIMIT 100`
       );
     }
