@@ -140,6 +140,7 @@ let undoCredits = 0;
 let antigravityCredits = 0;
 let replayUnlockedForLevel = false;
 let antigravityUnlockedThisRun = false;
+let autoRestartScheduled = false;
 
 function updateUndoButtonLabel() {
   if (!undoMoveButton) return;
@@ -3585,6 +3586,17 @@ function createExplosionParticles(x, y) {
   }
 }
 
+function scheduleAutoRestartAfterDeath(reasonText) {
+  if (autoRestartScheduled) return;
+  if (!currentPuzzleData) return;
+  autoRestartScheduled = true;
+  updateStatus(reasonText || "You died. Restarting level...");
+  setTimeout(() => {
+    autoRestartScheduled = false;
+    restartLevel();
+  }, 700);
+}
+
 //moving bomb function
 function moveBombs() {
   for (let i = bombs.length - 1; i >= 0; i--) {
@@ -3627,6 +3639,7 @@ function moveBombs() {
       players.splice(hitPlayerIndex, 1);
       updatePlayerCount();
       updateStatus("💣 A player was blown up!");
+      scheduleAutoRestartAfterDeath("💀 You were blown up! Restarting level...");
     }
 
     // Place bomb in new location
@@ -3672,6 +3685,7 @@ function updateBombs() {
       updateStatus("💣 A player was blown up!");
       updatePlayerCount();
       shakeAmount = 30; // shake intensity
+      scheduleAutoRestartAfterDeath("💀 You were blown up! Restarting level...");
       
       // Clear selection if the selected player was blown up
       if (selectedPlayerIndex === hitPlayerIndex) {
@@ -3761,6 +3775,7 @@ function handleBombCollision(player, playerIndex, bombRow, bombCol) {
   updateStatus("💣 A player was blown up by moving into a bomb!");
   updatePlayerCount();
   shakeAmount = 30; // shake intensity
+  scheduleAutoRestartAfterDeath("💀 You were blown up! Restarting level...");
 
   // Clear both the bomb and player from the board
   board[bombRow][bombCol] = CELL_TYPES.EMPTY;
@@ -4035,6 +4050,7 @@ function restartLevel() {
     updateStatus("No level is currently loaded.");
     return;
   }
+  autoRestartScheduled = false;
   loadPuzzle(currentPuzzleData);
 }
 
