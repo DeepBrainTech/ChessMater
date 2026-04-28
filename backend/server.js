@@ -487,7 +487,7 @@ app.get('/health', (req, res) => {
 const initTablesSql = `
   CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
-    username VARCHAR(255) NOT NULL UNIQUE,
+    username VARCHAR(255) NOT NULL,
     password VARCHAR(255) NOT NULL,
     portal_user_id TEXT NOT NULL,
     created_at TIMESTAMP DEFAULT NOW()
@@ -549,9 +549,19 @@ async function ensurePortalUserIdUniqueIndex() {
   }
 }
 
+async function dropUsernameUniqueness() {
+  try {
+    await pool.query('ALTER TABLE users DROP CONSTRAINT IF EXISTS users_username_key');
+    await pool.query('DROP INDEX IF EXISTS users_username_key');
+  } catch (err) {
+    console.warn('⚠️ Could not remove username uniqueness:', err.message);
+  }
+}
+
 async function ensureTables() {
   try {
     await pool.query(initTablesSql);
+    await dropUsernameUniqueness();
     await ensurePortalUserIdUniqueIndex();
     await pool.query('ALTER TABLE user_progress ADD COLUMN IF NOT EXISTS undo_credits INT NOT NULL DEFAULT 0');
     await pool.query('ALTER TABLE user_progress ADD COLUMN IF NOT EXISTS antigravity_credits INT NOT NULL DEFAULT 2');
@@ -586,6 +596,7 @@ async function ensureTables() {
 app.get('/init', async (req, res) => {
   try {
     await pool.query(initTablesSql);
+    await dropUsernameUniqueness();
     await ensurePortalUserIdUniqueIndex();
     await pool.query('ALTER TABLE user_progress ADD COLUMN IF NOT EXISTS undo_credits INT NOT NULL DEFAULT 0');
     await pool.query('ALTER TABLE user_progress ADD COLUMN IF NOT EXISTS antigravity_credits INT NOT NULL DEFAULT 2');
