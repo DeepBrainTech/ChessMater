@@ -162,14 +162,6 @@ function extractPortalIdentity(decoded) {
   return { userId: normalizedUserId, username };
 }
 
-function buildLegacyUsername(baseUsername, rowId, portalUserId) {
-  const cleanBase = normalizePortalUsername(baseUsername || 'user') || 'user';
-  const suffix = `__legacy_p${String(portalUserId)}_r${String(rowId)}`;
-  const maxBaseLength = Math.max(1, 255 - suffix.length);
-  const base = cleanBase.slice(0, maxBaseLength);
-  return `${base}${suffix}`;
-}
-
 async function syncUsernameByPortalIdentity(db, targetUser, desiredUsername, portalUserId) {
   const normalized = normalizePortalUsername(desiredUsername || '');
   if (!targetUser || !normalized || targetUser.username === normalized) {
@@ -183,19 +175,9 @@ async function syncUsernameByPortalIdentity(db, targetUser, desiredUsername, por
   const conflictRow = conflictCheck.rows[0] || null;
 
   if (conflictRow && Number(conflictRow.id) !== Number(targetUser.id)) {
-    if (String(conflictRow.portal_user_id || '') === String(portalUserId || '')) {
-      // Same portal user duplicated in DB; release username from the duplicate row.
-      const legacyName = buildLegacyUsername(conflictRow.username, conflictRow.id, portalUserId);
-      await db.query(
-        'UPDATE users SET username = $1 WHERE id = $2',
-        [legacyName, conflictRow.id]
-      );
-      console.warn(`⚠️ Released duplicate username "${normalized}" from duplicate row id=${conflictRow.id}, portal_user_id=${portalUserId}`);
-    } else {
-      // Another portal user owns this username; do not hijack.
-      console.warn(`⚠️ Username "${normalized}" already used by portal_user_id=${conflictRow.portal_user_id}; keep existing username="${targetUser.username}" for portal_user_id=${portalUserId}`);
-      return targetUser;
-    }
+    throw new Error(
+      `username_conflict:${normalized}:owner_portal_user_id=${conflictRow.portal_user_id}:target_portal_user_id=${portalUserId}`
+    );
   }
 
   const updated = await db.query(
@@ -398,9 +380,7 @@ app.post('/api/auth/verify', async (req, res) => {
         `SELECT *
          FROM users
          WHERE portal_user_id = $1
-         ORDER BY
-           CASE WHEN username LIKE '%__legacy_p%_r%' THEN 1 ELSE 0 END ASC,
-           id DESC
+         ORDER BY id DESC
          LIMIT 1`,
         [portalUserId.toString()]
       );
@@ -481,9 +461,7 @@ app.get('/api/auth/me', authenticate, async (req, res) => {
       `SELECT id, username, portal_user_id
        FROM users
        WHERE portal_user_id = $1
-       ORDER BY
-         CASE WHEN username LIKE '%__legacy_p%_r%' THEN 1 ELSE 0 END ASC,
-         id DESC
+       ORDER BY id DESC
        LIMIT 1`,
       [portalUserId]
     );
@@ -1015,9 +993,7 @@ app.get('/stats/fewest-other-moves', authenticate, async (req, res) => {
          SELECT username
          FROM users
          WHERE portal_user_id = lbr.owner_user_id
-         ORDER BY
-           CASE WHEN username LIKE '%__legacy_p%_r%' THEN 1 ELSE 0 END ASC,
-           id DESC
+         ORDER BY id DESC
          LIMIT 1
        ) u ON TRUE
        WHERE lbr.level_index = $1
@@ -1067,9 +1043,7 @@ app.get('/leaderboard', authenticate, async (req, res) => {
            SELECT username
            FROM users
            WHERE portal_user_id = uls.user_id
-           ORDER BY
-             CASE WHEN username LIKE '%__legacy_p%_r%' THEN 1 ELSE 0 END ASC,
-             id DESC
+           ORDER BY id DESC
            LIMIT 1
          ) u ON TRUE
          WHERE uls.level_index = $1
@@ -1085,9 +1059,7 @@ app.get('/leaderboard', authenticate, async (req, res) => {
            SELECT username
            FROM users
            WHERE portal_user_id = up.user_id
-           ORDER BY
-             CASE WHEN username LIKE '%__legacy_p%_r%' THEN 1 ELSE 0 END ASC,
-             id DESC
+           ORDER BY id DESC
            LIMIT 1
          ) u ON TRUE
          ORDER BY up.max_unlocked DESC, up.user_id ASC
