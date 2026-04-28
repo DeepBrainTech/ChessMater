@@ -168,12 +168,101 @@ function buildAuthHeaders() {
   return headers;
 }
 
+function getTokenExpSeconds(token) {
+  if (!token || typeof token !== "string") return null;
+  try {
+    const parts = token.split(".");
+    if (parts.length < 2) return null;
+    const payload = JSON.parse(atob(parts[1]));
+    const exp = Number.parseInt(payload?.exp, 10);
+    return Number.isFinite(exp) ? exp : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function shouldRefreshGameTokenSoon(token, bufferSeconds = 45) {
+  const exp = getTokenExpSeconds(token);
+  if (!exp) return true;
+  const now = Math.floor(Date.now() / 1000);
+  return exp - now <= bufferSeconds;
+}
+
+async function refreshGameTokenFromPortal(force = false) {
+  if (!force && !shouldRefreshGameTokenSoon(window.cmToken)) return !!window.cmToken;
+  if (window.cmRefreshPromise) return window.cmRefreshPromise;
+
+  window.cmRefreshPromise = (async () => {
+    const portalToken = window.cmPortalToken;
+    const base = normalizePortalApiBase(window.cmPortalApiBase || "");
+    if (!portalToken || !base) return false;
+
+    try {
+      const res = await fetch(`${base}/api/games/chessmater/token`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${portalToken}`,
+          "Content-Type": "application/json",
+          "X-User-Timezone": Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"
+        }
+      });
+      if (!res.ok) return false;
+      const data = await res.json().catch(() => null);
+      const freshToken =
+        data?.data?.game_token ||
+        data?.data?.token ||
+        data?.game_token ||
+        data?.token ||
+        null;
+      if (!freshToken || typeof freshToken !== "string") return false;
+      window.cmToken = freshToken;
+      return true;
+    } catch (_) {
+      return false;
+    } finally {
+      window.cmRefreshPromise = null;
+    }
+  })();
+
+  return window.cmRefreshPromise;
+}
+
+async function apiFetchWithAuthRetry(path, options = {}) {
+  await (window.authReady || Promise.resolve());
+
+  const firstHeaders = { ...(options.headers || {}) };
+  if (!firstHeaders.Authorization && window.cmToken) {
+    firstHeaders.Authorization = `Bearer ${window.cmToken}`;
+  }
+
+  let response = await fetch(`${getApiBaseUrl()}${path}`, {
+    ...options,
+    credentials: "include",
+    headers: firstHeaders
+  });
+
+  if (response.status !== 401) return response;
+
+  const refreshed = await refreshGameTokenFromPortal(true);
+  if (!refreshed) return response;
+
+  const retryHeaders = { ...(options.headers || {}) };
+  if (window.cmToken) {
+    retryHeaders.Authorization = `Bearer ${window.cmToken}`;
+  }
+
+  response = await fetch(`${getApiBaseUrl()}${path}`, {
+    ...options,
+    credentials: "include",
+    headers: retryHeaders
+  });
+  return response;
+}
+
 async function syncUndoCreditsFromServer() {
   try {
-    await (window.authReady || Promise.resolve());
-    const res = await fetch(`${getApiBaseUrl()}/undo-credits`, {
+    const res = await apiFetchWithAuthRetry("/undo-credits", {
       method: "GET",
-      credentials: "include",
       headers: buildAuthHeaders()
     });
     if (!res.ok) return false;
@@ -189,10 +278,8 @@ async function syncUndoCreditsFromServer() {
 
 async function syncAntigravityCreditsFromServer() {
   try {
-    await (window.authReady || Promise.resolve());
-    const res = await fetch(`${getApiBaseUrl()}/antigravity-credits`, {
+    const res = await apiFetchWithAuthRetry("/antigravity-credits", {
       method: "GET",
-      credentials: "include",
       headers: buildAuthHeaders()
     });
     if (!res.ok) return false;
@@ -211,10 +298,8 @@ async function grantUndoCredit(amount = 1) {
   if (!Number.isFinite(parsed) || parsed <= 0) return;
 
   try {
-    await (window.authReady || Promise.resolve());
-    const res = await fetch(`${getApiBaseUrl()}/undo-credits/grant`, {
+    const res = await apiFetchWithAuthRetry("/undo-credits/grant", {
       method: "POST",
-      credentials: "include",
       headers: buildAuthHeaders(),
       body: JSON.stringify({ amount: parsed })
     });
@@ -236,10 +321,8 @@ async function consumeUndoCredit(amount = 1) {
   if (!Number.isFinite(parsed) || parsed <= 0) return false;
 
   try {
-    await (window.authReady || Promise.resolve());
-    const res = await fetch(`${getApiBaseUrl()}/undo-credits/use`, {
+    const res = await apiFetchWithAuthRetry("/undo-credits/use", {
       method: "POST",
-      credentials: "include",
       headers: buildAuthHeaders(),
       body: JSON.stringify({ amount: parsed })
     });
@@ -265,10 +348,8 @@ async function grantAntigravityCreditsFromServerOnly(amount = 1) {
   const parsed = Number.parseInt(amount, 10);
   if (!Number.isFinite(parsed) || parsed <= 0) return false;
   try {
-    await (window.authReady || Promise.resolve());
-    const res = await fetch(`${getApiBaseUrl()}/antigravity-credits/grant`, {
+    const res = await apiFetchWithAuthRetry("/antigravity-credits/grant", {
       method: "POST",
-      credentials: "include",
       headers: buildAuthHeaders(),
       body: JSON.stringify({ amount: parsed })
     });
@@ -287,10 +368,8 @@ async function consumeAntigravityCredit(amount = 1) {
   const parsed = Number.parseInt(amount, 10);
   if (!Number.isFinite(parsed) || parsed <= 0) return false;
   try {
-    await (window.authReady || Promise.resolve());
-    const res = await fetch(`${getApiBaseUrl()}/antigravity-credits/use`, {
+    const res = await apiFetchWithAuthRetry("/antigravity-credits/use", {
       method: "POST",
-      credentials: "include",
       headers: buildAuthHeaders(),
       body: JSON.stringify({ amount: parsed })
     });
@@ -396,10 +475,8 @@ async function grantUndoCreditsFromServerOnly(amount = 1) {
   const parsed = Number.parseInt(amount, 10);
   if (!Number.isFinite(parsed) || parsed <= 0) return false;
   try {
-    await (window.authReady || Promise.resolve());
-    const res = await fetch(`${getApiBaseUrl()}/undo-credits/grant`, {
+    const res = await apiFetchWithAuthRetry("/undo-credits/grant", {
       method: "POST",
-      credentials: "include",
       headers: buildAuthHeaders(),
       body: JSON.stringify({ amount: parsed })
     });
@@ -564,10 +641,8 @@ async function fetchReplayUnlockStatusForLevel(levelNumber) {
   const lvl = Number.parseInt(levelNumber, 10);
   if (!Number.isFinite(lvl) || lvl <= 0) return false;
   try {
-    await (window.authReady || Promise.resolve());
-    const res = await fetch(`${getApiBaseUrl()}/replay-unlocks/status?level=${encodeURIComponent(lvl)}`, {
+    const res = await apiFetchWithAuthRetry(`/replay-unlocks/status?level=${encodeURIComponent(lvl)}`, {
       method: "GET",
-      credentials: "include",
       headers: buildAuthHeaders()
     });
     if (!res.ok) return false;
@@ -582,10 +657,8 @@ async function activateReplayUnlockForLevel(levelNumber) {
   const lvl = Number.parseInt(levelNumber, 10);
   if (!Number.isFinite(lvl) || lvl <= 0) return false;
   try {
-    await (window.authReady || Promise.resolve());
-    const res = await fetch(`${getApiBaseUrl()}/replay-unlocks/activate`, {
+    const res = await apiFetchWithAuthRetry("/replay-unlocks/activate", {
       method: "POST",
-      credentials: "include",
       headers: buildAuthHeaders(),
       body: JSON.stringify({ level: lvl })
     });
