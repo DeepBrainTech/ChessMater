@@ -2021,12 +2021,10 @@
       let currentLevelButton = null;
       let maxUnlockedButton = null;
 
-      // 使用传入的进度,或使用缓存的进度,或从服务器获取
+      // 使用传入的进度；否则每次进入都从服务器刷新
       let maxUnlocked;
       if (optionalMaxUnlocked !== undefined) {
         maxUnlocked = mergeMaxUnlocked(optionalMaxUnlocked);
-      } else if (window.currentMaxUnlocked > 1) {
-        maxUnlocked = mergeMaxUnlocked(window.currentMaxUnlocked);
       } else {
         maxUnlocked = await fetchProgress();
       }
