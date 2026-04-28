@@ -395,7 +395,13 @@ app.post('/api/auth/verify', async (req, res) => {
     try {
       console.log(`🔍 Looking for user by portal_user_id=${portalUserId}`);
       const userResult = await pool.query(
-        'SELECT * FROM users WHERE portal_user_id = $1 ORDER BY id ASC LIMIT 1',
+        `SELECT *
+         FROM users
+         WHERE portal_user_id = $1
+         ORDER BY
+           CASE WHEN username LIKE '%__legacy_p%_r%' THEN 1 ELSE 0 END ASC,
+           id DESC
+         LIMIT 1`,
         [portalUserId.toString()]
       );
 
@@ -472,7 +478,13 @@ app.get('/api/auth/me', authenticate, async (req, res) => {
     }
 
     const userResult = await pool.query(
-      'SELECT id, username, portal_user_id FROM users WHERE portal_user_id = $1 ORDER BY id ASC LIMIT 1',
+      `SELECT id, username, portal_user_id
+       FROM users
+       WHERE portal_user_id = $1
+       ORDER BY
+         CASE WHEN username LIKE '%__legacy_p%_r%' THEN 1 ELSE 0 END ASC,
+         id DESC
+       LIMIT 1`,
       [portalUserId]
     );
 
@@ -1003,7 +1015,9 @@ app.get('/stats/fewest-other-moves', authenticate, async (req, res) => {
          SELECT username
          FROM users
          WHERE portal_user_id = lbr.owner_user_id
-         ORDER BY id DESC
+         ORDER BY
+           CASE WHEN username LIKE '%__legacy_p%_r%' THEN 1 ELSE 0 END ASC,
+           id DESC
          LIMIT 1
        ) u ON TRUE
        WHERE lbr.level_index = $1
@@ -1053,7 +1067,9 @@ app.get('/leaderboard', authenticate, async (req, res) => {
            SELECT username
            FROM users
            WHERE portal_user_id = uls.user_id
-           ORDER BY id DESC
+           ORDER BY
+             CASE WHEN username LIKE '%__legacy_p%_r%' THEN 1 ELSE 0 END ASC,
+             id DESC
            LIMIT 1
          ) u ON TRUE
          WHERE uls.level_index = $1
@@ -1069,7 +1085,9 @@ app.get('/leaderboard', authenticate, async (req, res) => {
            SELECT username
            FROM users
            WHERE portal_user_id = up.user_id
-           ORDER BY id DESC
+           ORDER BY
+             CASE WHEN username LIKE '%__legacy_p%_r%' THEN 1 ELSE 0 END ASC,
+             id DESC
            LIMIT 1
          ) u ON TRUE
          ORDER BY up.max_unlocked DESC, up.user_id ASC
