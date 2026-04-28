@@ -196,10 +196,36 @@ async function refreshGameTokenFromPortal(force = false) {
   window.cmRefreshPromise = (async () => {
     const portalToken = window.cmPortalToken;
     const base = normalizePortalApiBase(window.cmPortalApiBase || "");
-    if (!portalToken || !base) return false;
+    if (!base) return false;
 
     try {
-      const res = await fetch(`${base}/api/games/chessmater/token`, {
+      const sessionHeaders = {};
+      if (portalToken) {
+        sessionHeaders.Authorization = `Bearer ${portalToken}`;
+      }
+      const sessionRes = await fetch(`${base}/api/games/chessmater/session`, {
+        method: "GET",
+        credentials: "include",
+        headers: sessionHeaders
+      });
+      const sessionData = await sessionRes.json().catch(() => null);
+      const sessionToken =
+        sessionData?.data?.game_token ||
+        sessionData?.data?.token ||
+        sessionData?.game_token ||
+        sessionData?.token ||
+        null;
+      if (sessionRes.ok && sessionToken && typeof sessionToken === "string") {
+        window.cmToken = sessionToken;
+        if (sessionData?.data?.user) {
+          window.cmUser = sessionData.data.user;
+        }
+        return true;
+      }
+
+      if (!portalToken) return false;
+
+      const tokenRes = await fetch(`${base}/api/games/chessmater/token`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${portalToken}`,
@@ -207,16 +233,19 @@ async function refreshGameTokenFromPortal(force = false) {
           "X-User-Timezone": Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"
         }
       });
-      if (!res.ok) return false;
-      const data = await res.json().catch(() => null);
+      if (!tokenRes.ok) return false;
+      const tokenData = await tokenRes.json().catch(() => null);
       const freshToken =
-        data?.data?.game_token ||
-        data?.data?.token ||
-        data?.game_token ||
-        data?.token ||
+        tokenData?.data?.game_token ||
+        tokenData?.data?.token ||
+        tokenData?.game_token ||
+        tokenData?.token ||
         null;
       if (!freshToken || typeof freshToken !== "string") return false;
       window.cmToken = freshToken;
+      if (tokenData?.data?.user) {
+        window.cmUser = tokenData.data.user;
+      }
       return true;
     } catch (_) {
       return false;

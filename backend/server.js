@@ -129,6 +129,39 @@ function verifySessionToken(token) {
   });
 }
 
+function normalizePortalUsername(raw) {
+  const value = raw == null ? '' : String(raw).trim();
+  if (!value) return '';
+  if (value.includes('@')) {
+    const local = value.split('@')[0].trim();
+    return local || value;
+  }
+  return value;
+}
+
+function extractPortalIdentity(decoded) {
+  const userId =
+    decoded?.user_id ??
+    decoded?.userId ??
+    decoded?.uid ??
+    decoded?.portal_user_id ??
+    decoded?.sub ??
+    null;
+
+  const usernameRaw =
+    decoded?.username ??
+    decoded?.name ??
+    decoded?.preferred_username ??
+    decoded?.nickname ??
+    decoded?.displayName ??
+    decoded?.email ??
+    null;
+
+  const username = normalizePortalUsername(usernameRaw);
+  const normalizedUserId = userId == null ? null : String(userId);
+  return { userId: normalizedUserId, username };
+}
+
 function issueSessionToken(user) {
   const now = Math.floor(Date.now() / 1000);
   return jwt.sign(
@@ -192,9 +225,10 @@ function authenticate(req, res, next) {
   if (sessionToken) {
     try {
       const decoded = verifySessionToken(sessionToken);
+      const identity = extractPortalIdentity(decoded);
       req.user = {
-        user_id: decoded.user_id,
-        username: decoded.username,
+        user_id: identity.userId || decoded.user_id,
+        username: identity.username || decoded.username || '',
         sub: decoded.sub
       };
       return next();
@@ -206,9 +240,10 @@ function authenticate(req, res, next) {
   if (bearerToken) {
     try {
       const decoded = verifyPortalToken(bearerToken);
+      const identity = extractPortalIdentity(decoded);
       req.user = {
-        user_id: decoded.user_id,
-        username: decoded.username,
+        user_id: identity.userId || decoded.user_id,
+        username: identity.username || decoded.username || '',
         sub: decoded.sub
       };
       return next();
@@ -298,8 +333,9 @@ app.post('/api/auth/verify', async (req, res) => {
       });
     }
 
-    const username = decoded.username;
-    const portalUserId = decoded.user_id;
+    const identity = extractPortalIdentity(decoded);
+    const username = identity.username;
+    const portalUserId = identity.userId;
 
     if (!username || !portalUserId) {
       console.error('❌ Missing username or user_id in JWT payload:', decoded);
@@ -411,7 +447,26 @@ app.get('/api/auth/me', authenticate, async (req, res) => {
     );
 
     const dbUser = userResult.rows[0] || null;
-    const username = dbUser?.username || req.user.username || String(req.user.sub || '');
+    const sessionUsername = normalizePortalUsername(req.user?.username || '');
+    let username = dbUser?.username || sessionUsername || String(req.user.sub || '');
+
+    // Keep username in sync even on cookie-restored sessions.
+    if (dbUser && sessionUsername && dbUser.username !== sessionUsername) {
+      const conflictCheck = await pool.query(
+        'SELECT id FROM users WHERE username = $1 LIMIT 1',
+        [sessionUsername]
+      );
+      if (!conflictCheck.rows.length || Number(conflictCheck.rows[0].id) === Number(dbUser.id)) {
+        const updated = await pool.query(
+          'UPDATE users SET username = $1 WHERE id = $2 RETURNING id, username, portal_user_id',
+          [sessionUsername, dbUser.id]
+        );
+        if (updated.rows[0]) {
+          username = updated.rows[0].username;
+        }
+      }
+    }
+
     const user = {
       id: dbUser?.id || null,
       username,

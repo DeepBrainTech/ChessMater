@@ -1250,10 +1250,18 @@
     const locale = hashParams.locale || 'en';
     const portalTokenParam = hashParams.portal_token || hashParams.portalToken || null;
     const portalApiParam = hashParams.portal_api || hashParams.portalApi || null;
-    window.cmPortalToken = portalTokenParam || null;
+    const storedPortalToken = sessionStorage.getItem("cm_portal_token");
+    const storedPortalApiBase = sessionStorage.getItem("cm_portal_api_base");
+    window.cmPortalToken = portalTokenParam || storedPortalToken || null;
     window.cmPortalApiBase = portalApiParam
       ? String(portalApiParam).replace(/\/+$/, '')
-      : '';
+      : (storedPortalApiBase || '');
+    if (portalTokenParam) {
+      sessionStorage.setItem("cm_portal_token", portalTokenParam);
+    }
+    if (portalApiParam) {
+      sessionStorage.setItem("cm_portal_api_base", String(portalApiParam).replace(/\/+$/, ""));
+    }
 
     // If new token in URL, clear old local data (QuantumGo-style)
     if (gameToken) {
@@ -1358,27 +1366,77 @@
         window.authReady = Promise.resolve();
       }
     } else {
-      window.authReady = fetch(`${window.API_BASE_URL}/api/auth/me`, {
-        method: 'GET',
-        credentials: 'include'
-      })
-      .then(response => response.json().catch(() => null))
-      .then(data => {
-        if (data && data.success && data.user) {
-          window.cmUser = data.user;
-          window.cmSessionReady = true;
-        } else {
-          window.cmSessionReady = false;
+      window.authReady = (async () => {
+        const portalBase = window.cmPortalApiBase ? String(window.cmPortalApiBase).replace(/\/+$/, "") : "";
+        const portalToken = window.cmPortalToken || null;
+        let restored = false;
+
+        if (portalBase) {
+          try {
+            const portalHeaders = {};
+            if (portalToken) {
+              portalHeaders.Authorization = `Bearer ${portalToken}`;
+            }
+            const sessionRes = await fetch(`${portalBase}/api/games/chessmater/session`, {
+              method: "GET",
+              credentials: "include",
+              headers: portalHeaders
+            });
+            const sessionData = await sessionRes.json().catch(() => null);
+            const freshGameToken =
+              sessionData?.data?.game_token ||
+              sessionData?.data?.token ||
+              sessionData?.game_token ||
+              sessionData?.token ||
+              null;
+            const portalUser = sessionData?.data?.user || null;
+            if (sessionRes.ok && typeof freshGameToken === "string" && freshGameToken) {
+              window.cmToken = freshGameToken;
+              if (portalUser) {
+                window.cmUser = portalUser;
+              }
+              const verifyRes = await fetch(`${window.API_BASE_URL}/api/auth/verify`, {
+                method: "POST",
+                credentials: "include",
+                headers: {
+                  "Content-Type": "application/json",
+                  "Authorization": `Bearer ${freshGameToken}`
+                }
+              });
+              const verifyData = await verifyRes.json().catch(() => null);
+              if (verifyData?.success && verifyData?.user) {
+                window.cmUser = verifyData.user;
+                window.cmSessionReady = true;
+                restored = true;
+              } else if (window.cmUser) {
+                window.cmSessionReady = false;
+                restored = true;
+              }
+            }
+          } catch (_) {}
         }
+
+        if (!restored) {
+          const response = await fetch(`${window.API_BASE_URL}/api/auth/me`, {
+            method: "GET",
+            credentials: "include"
+          }).catch(() => null);
+          const data = response ? await response.json().catch(() => null) : null;
+          if (data && data.success && data.user) {
+            window.cmUser = data.user;
+            window.cmSessionReady = true;
+          } else {
+            window.cmSessionReady = false;
+          }
+          updateCurrentUserName();
+          if (typeof window.updateLoginPromptVisibility === "function") window.updateLoginPromptVisibility();
+          return data;
+        }
+
         updateCurrentUserName();
-        if (typeof window.updateLoginPromptVisibility === 'function') window.updateLoginPromptVisibility();
-        return data;
-      })
-      .catch(() => {
-        window.cmSessionReady = false;
-        updateCurrentUserName();
-        if (typeof window.updateLoginPromptVisibility === 'function') window.updateLoginPromptVisibility();
-      });
+        if (typeof window.updateLoginPromptVisibility === "function") window.updateLoginPromptVisibility();
+        return { success: true, user: window.cmUser };
+      })();
     }
 
     window.checkTokenStatus = function() { /* debug: token status */ };
