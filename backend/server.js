@@ -142,10 +142,10 @@ function normalizePortalUsername(raw) {
 function extractPortalIdentity(decoded) {
   const userId =
     decoded?.portal_user_id ??
-    decoded?.sub ??
     decoded?.user_id ??
     decoded?.userId ??
     decoded?.uid ??
+    decoded?.sub ??
     null;
 
   const usernameRaw =
