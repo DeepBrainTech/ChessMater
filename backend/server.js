@@ -397,6 +397,39 @@ app.post('/api/auth/verify', async (req, res) => {
   }
 });
 
+// Restore user session from httpOnly cookie (for hard refresh / direct open without hash token)
+app.get('/api/auth/me', authenticate, async (req, res) => {
+  try {
+    const portalUserId = req.user?.user_id != null ? String(req.user.user_id) : null;
+    if (!portalUserId) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+
+    const userResult = await pool.query(
+      'SELECT id, username, portal_user_id FROM users WHERE portal_user_id = $1 ORDER BY id ASC LIMIT 1',
+      [portalUserId]
+    );
+
+    const dbUser = userResult.rows[0] || null;
+    const username = dbUser?.username || req.user.username || String(req.user.sub || '');
+    const user = {
+      id: dbUser?.id || null,
+      username,
+      portal_user_id: dbUser?.portal_user_id || portalUserId,
+      user_id: req.user.user_id
+    };
+
+    return res.json({
+      success: true,
+      sessionExpiresIn: CHESSMATER_SESSION_EXPIRE_SECONDS,
+      user
+    });
+  } catch (err) {
+    console.error('❌ Session restore failed:', err.message);
+    return res.status(500).json({ success: false, message: 'Failed to restore session' });
+  }
+});
+
 // Health check (no DB, no auth) - use to verify server and CORS
 app.get('/health', (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');

@@ -260,6 +260,9 @@ async function apiFetchWithAuthRetry(path, options = {}) {
   return response;
 }
 
+window.refreshGameTokenFromPortal = refreshGameTokenFromPortal;
+window.apiFetchWithAuthRetry = apiFetchWithAuthRetry;
+
 async function syncUndoCreditsFromServer() {
   try {
     const res = await apiFetchWithAuthRetry("/undo-credits", {
@@ -2136,7 +2139,6 @@ function syncProgressAfterWin() {
   };
   const jsonBody = JSON.stringify(progressData);
 
-  const apiBaseUrl = window.API_BASE_URL || 'https://chessmater-production.up.railway.app';
   const headers = {
     "Content-Type": "application/json"
   };
@@ -2144,9 +2146,8 @@ function syncProgressAfterWin() {
     headers.Authorization = `Bearer ${window.cmToken}`;
   }
 
-  fetch(`${apiBaseUrl}/progress`, {
+  apiFetchWithAuthRetry("/progress", {
     method: "POST",
-    credentials: 'include',
     headers,
     body: jsonBody
   })

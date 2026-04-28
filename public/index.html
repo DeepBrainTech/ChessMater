@@ -1358,8 +1358,27 @@
         window.authReady = Promise.resolve();
       }
     } else {
-      window.cmSessionReady = false;
-      window.authReady = Promise.resolve();
+      window.authReady = fetch(`${window.API_BASE_URL}/api/auth/me`, {
+        method: 'GET',
+        credentials: 'include'
+      })
+      .then(response => response.json().catch(() => null))
+      .then(data => {
+        if (data && data.success && data.user) {
+          window.cmUser = data.user;
+          window.cmSessionReady = true;
+        } else {
+          window.cmSessionReady = false;
+        }
+        updateCurrentUserName();
+        if (typeof window.updateLoginPromptVisibility === 'function') window.updateLoginPromptVisibility();
+        return data;
+      })
+      .catch(() => {
+        window.cmSessionReady = false;
+        updateCurrentUserName();
+        if (typeof window.updateLoginPromptVisibility === 'function') window.updateLoginPromptVisibility();
+      });
     }
 
     window.checkTokenStatus = function() { /* debug: token status */ };
@@ -1768,6 +1787,35 @@
         });
       }
 
+      async function fetchWithUnifiedAuthRetry(path, options = {}) {
+        if (typeof window.apiFetchWithAuthRetry === "function") {
+          return window.apiFetchWithAuthRetry(path, options);
+        }
+        const base = window.API_BASE_URL || "https://chessmater-production.up.railway.app";
+        const firstHeaders = { ...(options.headers || {}) };
+        if (!firstHeaders.Authorization && window.cmToken) {
+          firstHeaders.Authorization = `Bearer ${window.cmToken}`;
+        }
+        let response = await fetch(`${base}${path}`, {
+          ...options,
+          credentials: "include",
+          headers: firstHeaders,
+        });
+        if (response.status !== 401) return response;
+        if (typeof window.refreshGameTokenFromPortal !== "function") return response;
+        const refreshed = await window.refreshGameTokenFromPortal(true);
+        if (!refreshed) return response;
+        const retryHeaders = { ...(options.headers || {}) };
+        if (window.cmToken) {
+          retryHeaders.Authorization = `Bearer ${window.cmToken}`;
+        }
+        return fetch(`${base}${path}`, {
+          ...options,
+          credentials: "include",
+          headers: retryHeaders,
+        });
+      }
+
       // Load leaderboard data
       async function loadLeaderboard() {
         if (!leaderboardList) return;
@@ -1784,10 +1832,12 @@
             headers.Authorization = `Bearer ${window.cmToken}`;
           }
 
-          const res = await fetch(getLeaderboardRequestUrl(), {
-            credentials: 'include',
-            headers,
-          });
+          const leaderboardUrl = getLeaderboardRequestUrl();
+          const leaderboardPath = leaderboardUrl.replace(
+            window.API_BASE_URL || "https://chessmater-production.up.railway.app",
+            ""
+          );
+          const res = await fetchWithUnifiedAuthRetry(leaderboardPath, { headers });
 
           if (res.status === 401) {
             // 游戏中不清除token，只显示友好提示
@@ -1886,10 +1936,7 @@
         }
 
         // 尝试从服务器获取进度（优先会话 cookie，cookie 受限时回退到 Bearer token）
-        const res = await fetch(`${window.API_BASE_URL || 'https://chessmater-production.up.railway.app'}/progress`, {
-          credentials: 'include',
-          headers,
-        });
+        const res = await fetchWithUnifiedAuthRetry("/progress", { headers });
 
         if (!res.ok) {
           return mergeMaxUnlocked(1);
@@ -2022,7 +2069,7 @@
     }
     
     function isLoggedIn() {
-      return !!(window.cmToken && window.cmUser);
+      return !!(window.cmUser && (window.cmToken || window.cmSessionReady));
     }
     function updateLoginPromptVisibility() {
       const el = document.getElementById("loginPrompt");
