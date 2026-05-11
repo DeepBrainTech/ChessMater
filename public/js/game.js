@@ -194,20 +194,23 @@ async function refreshGameTokenFromPortal(force = false) {
   if (window.cmRefreshPromise) return window.cmRefreshPromise;
 
   window.cmRefreshPromise = (async () => {
-    const portalToken = window.cmPortalToken;
     const base = normalizePortalApiBase(window.cmPortalApiBase || "");
     if (!base) return false;
 
     try {
-      const sessionHeaders = {};
-      if (portalToken) {
-        sessionHeaders.Authorization = `Bearer ${portalToken}`;
-      }
       const sessionRes = await fetch(`${base}/api/games/chessmater/session`, {
         method: "GET",
-        credentials: "include",
-        headers: sessionHeaders
+        credentials: "include"
       });
+      if (sessionRes.status === 401) {
+        if (typeof window.cmGetPortalLoginUrl === "function") {
+          window.location.href = window.cmGetPortalLoginUrl();
+        } else {
+          const next = encodeURIComponent(location.href);
+          window.location.href = "https://deepbraintechnology.com/zh/login?next=" + next;
+        }
+        return false;
+      }
       const sessionData = await sessionRes.json().catch(() => null);
       const sessionToken =
         sessionData?.data?.game_token ||
@@ -222,31 +225,7 @@ async function refreshGameTokenFromPortal(force = false) {
         }
         return true;
       }
-
-      if (!portalToken) return false;
-
-      const tokenRes = await fetch(`${base}/api/games/chessmater/token`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${portalToken}`,
-          "Content-Type": "application/json",
-          "X-User-Timezone": Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"
-        }
-      });
-      if (!tokenRes.ok) return false;
-      const tokenData = await tokenRes.json().catch(() => null);
-      const freshToken =
-        tokenData?.data?.game_token ||
-        tokenData?.data?.token ||
-        tokenData?.game_token ||
-        tokenData?.token ||
-        null;
-      if (!freshToken || typeof freshToken !== "string") return false;
-      window.cmToken = freshToken;
-      if (tokenData?.data?.user) {
-        window.cmUser = tokenData.data.user;
-      }
-      return true;
+      return false;
     } catch (_) {
       return false;
     } finally {
@@ -437,19 +416,17 @@ function normalizePortalApiBase(base) {
 }
 
 function portalUndoShopAvailable() {
-  const token = window.cmPortalToken;
   const base = normalizePortalApiBase(window.cmPortalApiBase || "");
-  return !!(token && base);
+  return !!base;
 }
 
 async function getPortalAssets() {
-  const token = window.cmPortalToken;
   const base = normalizePortalApiBase(window.cmPortalApiBase || "");
-  if (!token || !base) return null;
+  if (!base) return null;
   try {
     const res = await fetch(`${base}/api/user/assets`, {
+      credentials: "include",
       headers: {
-        Authorization: `Bearer ${token}`,
         "X-User-Timezone": Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"
       }
     });
@@ -475,15 +452,14 @@ async function postPortalRedeemUndo() {
 }
 
 async function postPortalRedeemItem(itemId) {
-  const token = window.cmPortalToken;
   const base = normalizePortalApiBase(window.cmPortalApiBase || "");
-  if (!token || !base) return { ok: false, message: "Portal session not available." };
+  if (!base) return { ok: false, message: "Portal session not available." };
   const url = `${base}/api/user/shop/redeem?item_id=${encodeURIComponent(itemId)}&game_mode=${encodeURIComponent(PORTAL_UNDO_GAME_MODE)}`;
   try {
     const res = await fetch(url, {
       method: "POST",
+      credentials: "include",
       headers: {
-        Authorization: `Bearer ${token}`,
         "X-User-Timezone": Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"
       }
     });
