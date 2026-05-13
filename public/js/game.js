@@ -460,30 +460,29 @@ function formatShopCostForExchangeLineHtml(cost) {
   const parts = [];
   if (c.coins > 0) {
     parts.push(
-      `<span class="undo-exchange-cost-part">${currencyIconImgHtml("coin")}<span class="undo-exchange-cost-num">${c.coins}</span> <span class="undo-exchange-cost-unit">${c.coins === 1 ? "coin" : "coins"}</span></span>`
+      `<span class="undo-exchange-cost-part">${currencyIconImgHtml("coin")}<span class="undo-exchange-cost-num">${c.coins}</span></span>`
     );
   }
   if (c.diamonds > 0) {
     parts.push(
-      `<span class="undo-exchange-cost-part">${currencyIconImgHtml("diamond")}<span class="undo-exchange-cost-num">${c.diamonds}</span> <span class="undo-exchange-cost-unit">${c.diamonds === 1 ? "diamond" : "diamonds"}</span></span>`
+      `<span class="undo-exchange-cost-part">${currencyIconImgHtml("diamond")}<span class="undo-exchange-cost-num">${c.diamonds}</span></span>`
     );
   }
   if (c.flowers > 0) {
     parts.push(
-      `<span class="undo-exchange-cost-part">${currencyIconImgHtml("flower")}<span class="undo-exchange-cost-num">${c.flowers}</span> <span class="undo-exchange-cost-unit">${c.flowers === 1 ? "flower" : "flowers"}</span></span>`
+      `<span class="undo-exchange-cost-part">${currencyIconImgHtml("flower")}<span class="undo-exchange-cost-num">${c.flowers}</span></span>`
     );
   }
-  if (!parts.length) return "No currency cost";
+  if (!parts.length) return "—";
   return parts.join('<span class="undo-exchange-cost-sep">, </span>');
 }
 
 function refreshLevelCompleteReplayLockCostEl() {
   if (!levelCompleteReplayLockCostEl) return;
-  levelCompleteReplayLockCostEl.textContent = "Cost: …";
+  levelCompleteReplayLockCostEl.textContent = "…";
   void (async () => {
     const cost = await ensureShopCostCached(PORTAL_REPLAY_ITEM_ID);
-    const inner = formatShopCostForExchangeLineHtml(cost);
-    levelCompleteReplayLockCostEl.innerHTML = inner === "No currency cost" ? inner : `Cost: ${inner}`;
+    levelCompleteReplayLockCostEl.innerHTML = formatShopCostForExchangeLineHtml(cost);
   })();
 }
 

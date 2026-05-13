@@ -732,13 +732,10 @@
       object-fit: contain;
       vertical-align: middle;
     }
-    .undo-exchange-balance-label {
-      min-width: 4.5em;
-      opacity: 0.92;
-    }
     .undo-exchange-balance-value {
       font-weight: 600;
       color: #fff;
+      margin-left: auto;
     }
     .undo-exchange-cost-part {
       display: inline-flex;
@@ -1575,7 +1572,7 @@
           <canvas id="levelCompleteReplayCanvas" width="320" height="220" aria-label="Replay mini board"></canvas>
           <div class="level-complete-replay-lock" id="levelCompleteReplayLock">
             <div class="level-complete-replay-lock-icon">🔒</div>
-            <div class="level-complete-replay-lock-text">Unlock replay for this level<br/><span id="levelCompleteReplayLockCost" class="level-complete-replay-lock-cost">Cost: …</span></div>
+            <div class="level-complete-replay-lock-text">Unlock replay for this level<br/><span id="levelCompleteReplayLockCost" class="level-complete-replay-lock-cost">…</span></div>
           </div>
         </div>
         <p class="level-complete-replay-hint" id="levelCompleteReplayHint">Use Arrow Keys: ←/→ step, ↑ first, ↓ last</p>
@@ -1602,21 +1599,18 @@
   <div id="undoExchangeModal" class="undo-exchange-modal" aria-hidden="true">
     <div class="undo-exchange-panel" role="dialog" aria-labelledby="undoExchangeTitle">
       <h2 class="undo-exchange-title" id="undoExchangeTitle">Use Undo</h2>
-      <p class="undo-exchange-cost-line">Cost: <strong id="undoExchangeCostText">…</strong></p>
+      <p class="undo-exchange-cost-line"><strong id="undoExchangeCostText">…</strong></p>
       <div class="undo-exchange-balances">
         <p class="undo-exchange-balance-row">
-          <img class="undo-exchange-currency-icon" src="assets/images/coin.svg" width="22" height="22" alt="" aria-hidden="true" />
-          <span class="undo-exchange-balance-label">Coins</span>
+          <img class="undo-exchange-currency-icon" src="assets/images/coin.svg" width="22" height="22" alt="Coins" />
           <span id="undoExchangeCoins" class="undo-exchange-balance-value">—</span>
         </p>
         <p class="undo-exchange-balance-row">
-          <img class="undo-exchange-currency-icon" src="assets/images/diamond.svg" width="22" height="22" alt="" aria-hidden="true" />
-          <span class="undo-exchange-balance-label">Diamonds</span>
+          <img class="undo-exchange-currency-icon" src="assets/images/diamond.svg" width="22" height="22" alt="Diamonds" />
           <span id="undoExchangeDiamonds" class="undo-exchange-balance-value">—</span>
         </p>
         <p class="undo-exchange-balance-row">
-          <img class="undo-exchange-currency-icon" src="assets/images/flower.svg" width="22" height="22" alt="" aria-hidden="true" />
-          <span class="undo-exchange-balance-label">Flowers</span>
+          <img class="undo-exchange-currency-icon" src="assets/images/flower.svg" width="22" height="22" alt="Flowers" />
           <span id="undoExchangeFlowers" class="undo-exchange-balance-value">—</span>
         </p>
       </div>
@@ -1631,21 +1625,18 @@
   <div id="antigravityExchangeModal" class="undo-exchange-modal" aria-hidden="true">
     <div class="undo-exchange-panel" role="dialog" aria-labelledby="antigravityExchangeTitle">
       <h2 class="undo-exchange-title" id="antigravityExchangeTitle">Use Antigravity</h2>
-      <p class="undo-exchange-cost-line">Cost: <strong id="antigravityExchangeCostText">…</strong></p>
+      <p class="undo-exchange-cost-line"><strong id="antigravityExchangeCostText">…</strong></p>
       <div class="undo-exchange-balances">
         <p class="undo-exchange-balance-row">
-          <img class="undo-exchange-currency-icon" src="assets/images/coin.svg" width="22" height="22" alt="" aria-hidden="true" />
-          <span class="undo-exchange-balance-label">Coins</span>
+          <img class="undo-exchange-currency-icon" src="assets/images/coin.svg" width="22" height="22" alt="Coins" />
           <span id="antigravityExchangeCoins" class="undo-exchange-balance-value">—</span>
         </p>
         <p class="undo-exchange-balance-row">
-          <img class="undo-exchange-currency-icon" src="assets/images/diamond.svg" width="22" height="22" alt="" aria-hidden="true" />
-          <span class="undo-exchange-balance-label">Diamonds</span>
+          <img class="undo-exchange-currency-icon" src="assets/images/diamond.svg" width="22" height="22" alt="Diamonds" />
           <span id="antigravityExchangeDiamonds" class="undo-exchange-balance-value">—</span>
         </p>
         <p class="undo-exchange-balance-row">
-          <img class="undo-exchange-currency-icon" src="assets/images/flower.svg" width="22" height="22" alt="" aria-hidden="true" />
-          <span class="undo-exchange-balance-label">Flowers</span>
+          <img class="undo-exchange-currency-icon" src="assets/images/flower.svg" width="22" height="22" alt="Flowers" />
           <span id="antigravityExchangeFlowers" class="undo-exchange-balance-value">—</span>
         </p>
       </div>
@@ -1660,21 +1651,18 @@
   <div id="replayExchangeModal" class="undo-exchange-modal" aria-hidden="true">
     <div class="undo-exchange-panel" role="dialog" aria-labelledby="replayExchangeTitle">
       <h2 class="undo-exchange-title" id="replayExchangeTitle">Unlock Replay</h2>
-      <p class="undo-exchange-cost-line">Cost: <strong id="replayExchangeCostText">…</strong></p>
+      <p class="undo-exchange-cost-line"><strong id="replayExchangeCostText">…</strong></p>
       <div class="undo-exchange-balances">
         <p class="undo-exchange-balance-row">
-          <img class="undo-exchange-currency-icon" src="assets/images/coin.svg" width="22" height="22" alt="" aria-hidden="true" />
-          <span class="undo-exchange-balance-label">Coins</span>
+          <img class="undo-exchange-currency-icon" src="assets/images/coin.svg" width="22" height="22" alt="Coins" />
           <span id="replayExchangeCoins" class="undo-exchange-balance-value">—</span>
         </p>
         <p class="undo-exchange-balance-row">
-          <img class="undo-exchange-currency-icon" src="assets/images/diamond.svg" width="22" height="22" alt="" aria-hidden="true" />
-          <span class="undo-exchange-balance-label">Diamonds</span>
+          <img class="undo-exchange-currency-icon" src="assets/images/diamond.svg" width="22" height="22" alt="Diamonds" />
           <span id="replayExchangeDiamonds" class="undo-exchange-balance-value">—</span>
         </p>
         <p class="undo-exchange-balance-row">
-          <img class="undo-exchange-currency-icon" src="assets/images/flower.svg" width="22" height="22" alt="" aria-hidden="true" />
-          <span class="undo-exchange-balance-label">Flowers</span>
+          <img class="undo-exchange-currency-icon" src="assets/images/flower.svg" width="22" height="22" alt="Flowers" />
           <span id="replayExchangeFlowers" class="undo-exchange-balance-value">—</span>
         </p>
       </div>
