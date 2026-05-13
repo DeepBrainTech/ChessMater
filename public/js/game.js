@@ -33,6 +33,7 @@ const levelCompleteReplaySubtitle = document.getElementById("levelCompleteReplay
 const levelCompleteReplayHint = document.getElementById("levelCompleteReplayHint");
 const levelCompleteReplayStep = document.getElementById("levelCompleteReplayStep");
 const levelCompleteReplayEvent = document.getElementById("levelCompleteReplayEvent");
+const levelCompleteReplayLockCostEl = document.getElementById("levelCompleteReplayLockCost");
 const closeLevelCompleteModalBtn = document.getElementById("closeLevelCompleteModal");
 const levelCompleteRetryBtn = document.getElementById("levelCompleteRetryBtn");
 const levelCompleteNextBtn = document.getElementById("levelCompleteNextBtn");
@@ -406,9 +407,16 @@ const PORTAL_UNDO_ITEM_ID = "chess_mater_undo";
 const PORTAL_ANTIGRAVITY_ITEM_ID = "chess_mater_antigravity";
 const PORTAL_REPLAY_ITEM_ID = "chess_mater_reply";
 const PORTAL_UNDO_GAME_MODE = "chessmater";
-const UNDO_SHOP_HINT_COINS = 5;
-const ANTIGRAVITY_SHOP_HINT_COINS = 5;
-const REPLAY_SHOP_HINT_DIAMONDS = 2;
+
+/** Fallback display prices when portal catalog/item fetch fails or API base is unset (align with shop_items.py). */
+const SHOP_ITEM_FALLBACK_COST = {
+  [PORTAL_UNDO_ITEM_ID]: { coins: 5, diamonds: 0, flowers: 0 },
+  [PORTAL_ANTIGRAVITY_ITEM_ID]: { coins: 5, diamonds: 0, flowers: 0 },
+  [PORTAL_REPLAY_ITEM_ID]: { coins: 0, diamonds: 2, flowers: 0 }
+};
+
+const shopPriceCache = {};
+let shopCatalogWarmPromise = null;
 
 function normalizePortalApiBase(base) {
   if (!base || typeof base !== "string") return "";
@@ -418,6 +426,114 @@ function normalizePortalApiBase(base) {
 function portalUndoShopAvailable() {
   const base = normalizePortalApiBase(window.cmPortalApiBase || "");
   return !!base;
+}
+
+function normalizePortalShopCost(raw) {
+  const coins = Number(raw?.coins);
+  const diamonds = Number(raw?.diamonds);
+  const flowers = Number(raw?.flowers);
+  return {
+    coins: Number.isFinite(coins) ? Math.max(0, Math.floor(coins)) : 0,
+    diamonds: Number.isFinite(diamonds) ? Math.max(0, Math.floor(diamonds)) : 0,
+    flowers: Number.isFinite(flowers) ? Math.max(0, Math.floor(flowers)) : 0
+  };
+}
+
+function getFallbackShopCost(itemId) {
+  return SHOP_ITEM_FALLBACK_COST[itemId] || { coins: 0, diamonds: 0, flowers: 0 };
+}
+
+const CM_CURRENCY_ICON_SRC = {
+  coin: "assets/images/coin.svg",
+  diamond: "assets/images/diamond.svg",
+  flower: "assets/images/flower.svg"
+};
+
+function currencyIconImgHtml(kind) {
+  const src = CM_CURRENCY_ICON_SRC[kind];
+  if (!src) return "";
+  return `<img class="undo-exchange-currency-icon" src="${src}" alt="" aria-hidden="true" width="18" height="18" />`;
+}
+
+function formatShopCostForExchangeLineHtml(cost) {
+  const c = normalizePortalShopCost(cost);
+  const parts = [];
+  if (c.coins > 0) {
+    parts.push(
+      `<span class="undo-exchange-cost-part">${currencyIconImgHtml("coin")}<span class="undo-exchange-cost-num">${c.coins}</span> <span class="undo-exchange-cost-unit">${c.coins === 1 ? "coin" : "coins"}</span></span>`
+    );
+  }
+  if (c.diamonds > 0) {
+    parts.push(
+      `<span class="undo-exchange-cost-part">${currencyIconImgHtml("diamond")}<span class="undo-exchange-cost-num">${c.diamonds}</span> <span class="undo-exchange-cost-unit">${c.diamonds === 1 ? "diamond" : "diamonds"}</span></span>`
+    );
+  }
+  if (c.flowers > 0) {
+    parts.push(
+      `<span class="undo-exchange-cost-part">${currencyIconImgHtml("flower")}<span class="undo-exchange-cost-num">${c.flowers}</span> <span class="undo-exchange-cost-unit">${c.flowers === 1 ? "flower" : "flowers"}</span></span>`
+    );
+  }
+  if (!parts.length) return "No currency cost";
+  return parts.join('<span class="undo-exchange-cost-sep">, </span>');
+}
+
+function refreshLevelCompleteReplayLockCostEl() {
+  if (!levelCompleteReplayLockCostEl) return;
+  levelCompleteReplayLockCostEl.textContent = "Cost: …";
+  void (async () => {
+    const cost = await ensureShopCostCached(PORTAL_REPLAY_ITEM_ID);
+    const inner = formatShopCostForExchangeLineHtml(cost);
+    levelCompleteReplayLockCostEl.innerHTML = inner === "No currency cost" ? inner : `Cost: ${inner}`;
+  })();
+}
+
+async function warmShopPriceCache() {
+  const base = normalizePortalApiBase(window.cmPortalApiBase || "");
+  if (!base) return;
+  if (!shopCatalogWarmPromise) {
+    shopCatalogWarmPromise = (async () => {
+      try {
+        const res = await fetch(
+          `${base}/api/games/shop/catalog?game_mode=${encodeURIComponent(PORTAL_UNDO_GAME_MODE)}`,
+          { method: "GET" }
+        );
+        const json = await res.json().catch(() => null);
+        if (!res.ok || json == null || json.success === false || !json.data || typeof json.data.items !== "object") {
+          return;
+        }
+        for (const [id, row] of Object.entries(json.data.items)) {
+          if (row && row.cost && typeof row.cost === "object") {
+            shopPriceCache[id] = normalizePortalShopCost(row.cost);
+          }
+        }
+      } catch (_) {}
+    })();
+  }
+  await shopCatalogWarmPromise;
+}
+
+async function ensureShopCostCached(itemId) {
+  if (shopPriceCache[itemId]) return shopPriceCache[itemId];
+  const base = normalizePortalApiBase(window.cmPortalApiBase || "");
+  if (!base) return getFallbackShopCost(itemId);
+
+  await warmShopPriceCache();
+  if (shopPriceCache[itemId]) return shopPriceCache[itemId];
+
+  try {
+    const res = await fetch(
+      `${base}/api/games/shop/item?item_id=${encodeURIComponent(itemId)}&game_mode=${encodeURIComponent(PORTAL_UNDO_GAME_MODE)}`,
+      { method: "GET" }
+    );
+    const json = await res.json().catch(() => null);
+    if (res.ok && json && json.success !== false && json.data && json.data.cost && typeof json.data.cost === "object") {
+      const c = normalizePortalShopCost(json.data.cost);
+      shopPriceCache[itemId] = c;
+      return c;
+    }
+  } catch (_) {}
+
+  return getFallbackShopCost(itemId);
 }
 
 async function getPortalAssets() {
@@ -574,14 +690,16 @@ async function refreshUndoExchangeAssetsDisplay() {
 
 async function openUndoExchangeModal() {
   if (!undoExchangeModal) return;
-  if (undoExchangeCostTextEl) {
-    undoExchangeCostTextEl.textContent = `${UNDO_SHOP_HINT_COINS} coins`;
-  }
+  if (undoExchangeCostTextEl) undoExchangeCostTextEl.textContent = "…";
   setUndoExchangeMessage("");
   undoExchangeModal.classList.add("active");
   undoExchangeModal.setAttribute("aria-hidden", "false");
   setUndoExchangeBusy(false);
-  await refreshUndoExchangeAssetsDisplay();
+  const [, cost] = await Promise.all([
+    refreshUndoExchangeAssetsDisplay(),
+    ensureShopCostCached(PORTAL_UNDO_ITEM_ID)
+  ]);
+  if (undoExchangeCostTextEl) undoExchangeCostTextEl.innerHTML = formatShopCostForExchangeLineHtml(cost);
 }
 
 async function handleUndoExchangeRedeem() {
@@ -630,6 +748,10 @@ function setupUndoExchangeModal() {
 
 setupUndoExchangeModal();
 window.openUndoExchangeModal = openUndoExchangeModal;
+window.warmShopPriceCache = warmShopPriceCache;
+queueMicrotask(() => {
+  if (portalUndoShopAvailable()) void warmShopPriceCache();
+});
 
 function setGenericExchangeBalanceCells(coinsEl, diamondsEl, flowersEl, coinsText, diamondsText, flowersText) {
   if (coinsEl) coinsEl.textContent = coinsText;
@@ -707,14 +829,16 @@ function setAntigravityExchangeBusy(busy) {
 
 async function openAntigravityExchangeModal() {
   if (!antigravityExchangeModal) return;
-  if (antigravityExchangeCostTextEl) {
-    antigravityExchangeCostTextEl.textContent = `${ANTIGRAVITY_SHOP_HINT_COINS} coins`;
-  }
+  if (antigravityExchangeCostTextEl) antigravityExchangeCostTextEl.textContent = "…";
   setGenericExchangeMessage(antigravityExchangeMessageEl, "");
   antigravityExchangeModal.classList.add("active");
   antigravityExchangeModal.setAttribute("aria-hidden", "false");
   setAntigravityExchangeBusy(false);
-  await refreshAntigravityExchangeAssetsDisplay();
+  const [, cost] = await Promise.all([
+    refreshAntigravityExchangeAssetsDisplay(),
+    ensureShopCostCached(PORTAL_ANTIGRAVITY_ITEM_ID)
+  ]);
+  if (antigravityExchangeCostTextEl) antigravityExchangeCostTextEl.innerHTML = formatShopCostForExchangeLineHtml(cost);
 }
 
 async function handleAntigravityExchangeRedeem() {
@@ -786,12 +910,16 @@ function setReplayExchangeBusy(busy) {
 
 async function openReplayExchangeModal() {
   if (!replayExchangeModal) return;
-  if (replayExchangeCostTextEl) replayExchangeCostTextEl.textContent = `${REPLAY_SHOP_HINT_DIAMONDS} diamonds`;
+  if (replayExchangeCostTextEl) replayExchangeCostTextEl.textContent = "…";
   setGenericExchangeMessage(replayExchangeMessageEl, "");
   replayExchangeModal.classList.add("active");
   replayExchangeModal.setAttribute("aria-hidden", "false");
   setReplayExchangeBusy(false);
-  await refreshReplayExchangeAssetsDisplay();
+  const [, cost] = await Promise.all([
+    refreshReplayExchangeAssetsDisplay(),
+    ensureShopCostCached(PORTAL_REPLAY_ITEM_ID)
+  ]);
+  if (replayExchangeCostTextEl) replayExchangeCostTextEl.innerHTML = formatShopCostForExchangeLineHtml(cost);
 }
 
 async function handleReplayExchangeRedeem() {
@@ -1446,6 +1574,7 @@ function updateLevelCompleteReplayDisplay() {
     if (levelCompleteReplayStep) levelCompleteReplayStep.style.display = "block";
     if (levelCompleteReplayEvent) levelCompleteReplayEvent.style.display = "block";
     if (levelCompleteReplayLock) levelCompleteReplayLock.style.display = "flex";
+    refreshLevelCompleteReplayLockCostEl();
     if (hasReplay) {
       drawLevelCompleteReplaySnapshot(levelCompleteReplayIndex);
     }

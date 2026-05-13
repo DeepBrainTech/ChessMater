@@ -335,6 +335,26 @@
       width: min(92vw, 400px);
     }
     .undo-exchange-title { margin: 0 0 14px; font-size: 1.25rem; }
+    .undo-exchange-balance-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 6px 0;
+    }
+    .undo-exchange-currency-icon {
+      width: 22px;
+      height: 22px;
+      flex-shrink: 0;
+      object-fit: contain;
+    }
+    .undo-exchange-balance-label {
+      min-width: 4.5em;
+      opacity: 0.92;
+    }
+    .undo-exchange-balance-value {
+      font-weight: 600;
+      color: #fff;
+    }
     .undo-exchange-footer {
       display: flex;
       justify-content: flex-end;
@@ -515,11 +535,23 @@
   <div id="undoExchangeModal" class="undo-exchange-modal" aria-hidden="true">
     <div class="undo-exchange-panel" role="dialog">
       <h2 class="undo-exchange-title" id="undoExchangeTitle">Use Undo</h2>
-      <p>Cost: <strong id="undoExchangeCostText">5 coins</strong></p>
+      <p>Cost: <strong id="undoExchangeCostText">…</strong></p>
       <div class="undo-exchange-balances">
-        <p>Coins: <span id="undoExchangeCoins">—</span></p>
-        <p>Diamonds: <span id="undoExchangeDiamonds">—</span></p>
-        <p>Flowers: <span id="undoExchangeFlowers">—</span></p>
+        <p class="undo-exchange-balance-row">
+          <img class="undo-exchange-currency-icon" src="assets/images/coin.svg" width="22" height="22" alt="" aria-hidden="true" />
+          <span class="undo-exchange-balance-label">Coins</span>
+          <span id="undoExchangeCoins" class="undo-exchange-balance-value">—</span>
+        </p>
+        <p class="undo-exchange-balance-row">
+          <img class="undo-exchange-currency-icon" src="assets/images/diamond.svg" width="22" height="22" alt="" aria-hidden="true" />
+          <span class="undo-exchange-balance-label">Diamonds</span>
+          <span id="undoExchangeDiamonds" class="undo-exchange-balance-value">—</span>
+        </p>
+        <p class="undo-exchange-balance-row">
+          <img class="undo-exchange-currency-icon" src="assets/images/flower.svg" width="22" height="22" alt="" aria-hidden="true" />
+          <span class="undo-exchange-balance-label">Flowers</span>
+          <span id="undoExchangeFlowers" class="undo-exchange-balance-value">—</span>
+        </p>
       </div>
       <p id="undoExchangeMessage" class="undo-exchange-message" role="status"></p>
       <div class="undo-exchange-footer">
