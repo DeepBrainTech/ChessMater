@@ -335,11 +335,34 @@
       width: min(92vw, 400px);
     }
     .undo-exchange-title { margin: 0 0 14px; font-size: 1.25rem; }
+    .undo-exchange-section { margin-bottom: 0; }
+    .undo-exchange-section--cost { margin-bottom: 14px; }
+    .undo-exchange-section--assets {
+      padding-top: 14px;
+      border-top: 1px solid rgba(255, 255, 255, 0.12);
+    }
+    .undo-exchange-section-label {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: rgba(168, 185, 212, 0.95);
+      margin: 0 0 8px;
+    }
+    .undo-exchange-section-body.undo-exchange-cost-line {
+      margin: 0;
+      font-size: 1.05rem;
+    }
+    .undo-exchange-cost-line strong { font-weight: 700; color: #fff; }
+    .undo-exchange-balances { margin: 0; font-size: 0.98rem; line-height: 1.5; }
+    .undo-exchange-balances p { margin: 4px 0; }
+    .undo-exchange-balances span { font-weight: 600; color: #fff; }
     .undo-exchange-balance-row {
       display: flex;
       align-items: center;
-      gap: 10px;
-      margin: 6px 0;
+      justify-content: flex-start;
+      gap: 6px;
+      margin: 5px 0;
     }
     .undo-exchange-currency-icon {
       width: 22px;
@@ -350,7 +373,19 @@
     .undo-exchange-balance-value {
       font-weight: 600;
       color: #fff;
-      margin-left: auto;
+    }
+    .undo-exchange-cost-part {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      vertical-align: middle;
+    }
+    .undo-exchange-cost-part .undo-exchange-currency-icon {
+      width: 18px;
+      height: 18px;
+    }
+    .undo-exchange-cost-num {
+      font-weight: 700;
     }
     .undo-exchange-footer {
       display: flex;
@@ -532,20 +567,28 @@
   <div id="undoExchangeModal" class="undo-exchange-modal" aria-hidden="true">
     <div class="undo-exchange-panel" role="dialog">
       <h2 class="undo-exchange-title" id="undoExchangeTitle">Use Undo</h2>
-      <p><strong id="undoExchangeCostText">…</strong></p>
-      <div class="undo-exchange-balances">
-        <p class="undo-exchange-balance-row">
-          <img class="undo-exchange-currency-icon" src="assets/images/coin.svg" width="22" height="22" alt="Coins" />
-          <span id="undoExchangeCoins" class="undo-exchange-balance-value">—</span>
-        </p>
-        <p class="undo-exchange-balance-row">
-          <img class="undo-exchange-currency-icon" src="assets/images/diamond.svg" width="22" height="22" alt="Diamonds" />
-          <span id="undoExchangeDiamonds" class="undo-exchange-balance-value">—</span>
-        </p>
-        <p class="undo-exchange-balance-row">
-          <img class="undo-exchange-currency-icon" src="assets/images/flower.svg" width="22" height="22" alt="Flowers" />
-          <span id="undoExchangeFlowers" class="undo-exchange-balance-value">—</span>
-        </p>
+      <div class="undo-exchange-section undo-exchange-section--cost">
+        <div class="undo-exchange-section-label">Cost</div>
+        <div class="undo-exchange-section-body undo-exchange-cost-line">
+          <strong id="undoExchangeCostText">…</strong>
+        </div>
+      </div>
+      <div class="undo-exchange-section undo-exchange-section--assets">
+        <div class="undo-exchange-section-label">Your assets</div>
+        <div class="undo-exchange-balances">
+          <p class="undo-exchange-balance-row">
+            <img class="undo-exchange-currency-icon" src="assets/images/coin.svg" width="22" height="22" alt="Coins" />
+            <span id="undoExchangeCoins" class="undo-exchange-balance-value">—</span>
+          </p>
+          <p class="undo-exchange-balance-row">
+            <img class="undo-exchange-currency-icon" src="assets/images/diamond.svg" width="22" height="22" alt="Diamonds" />
+            <span id="undoExchangeDiamonds" class="undo-exchange-balance-value">—</span>
+          </p>
+          <p class="undo-exchange-balance-row">
+            <img class="undo-exchange-currency-icon" src="assets/images/flower.svg" width="22" height="22" alt="Flowers" />
+            <span id="undoExchangeFlowers" class="undo-exchange-balance-value">—</span>
+          </p>
+        </div>
       </div>
       <p id="undoExchangeMessage" class="undo-exchange-message" role="status"></p>
       <div class="undo-exchange-footer">
