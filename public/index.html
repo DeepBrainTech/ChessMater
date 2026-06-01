@@ -380,6 +380,21 @@
       text-align: left;
       white-space: nowrap;
     }
+    #blockTipToggle {
+      background: #9b59b6;
+      position: relative;
+    }
+    #blockTipToggle.hint-toggle--notify::after {
+      content: "";
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #f1c40f;
+      box-shadow: 0 0 0 2px #9b59b6;
+    }
     #blockTipStats {
       margin-top: 8px;
       color: #2c3e50;
@@ -880,6 +895,62 @@
       font-size: 20px;
       line-height: 1;
       cursor: pointer;
+    }
+
+    .hint-section {
+      margin-top: 16px;
+    }
+    .hint-section:first-of-type {
+      margin-top: 0;
+    }
+    .hint-section-title {
+      margin: 0 0 8px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: #6c7a89;
+    }
+    #blockDescription {
+      margin: 0;
+      line-height: 1.5;
+      font-size: 0.95rem;
+    }
+    .hint-solution-divider {
+      border: none;
+      border-top: 1px solid #e2e8f0;
+      margin: 18px 0;
+    }
+    .hint-solution-summary {
+      margin: 0 0 10px;
+      font-size: 0.95rem;
+      line-height: 1.45;
+    }
+    .hint-solution-note {
+      margin: 8px 0 0;
+      font-size: 0.84rem;
+      color: #6c7a89;
+      line-height: 1.4;
+    }
+    .hint-solution-action {
+      display: inline-block;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 16px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #fff;
+      background: linear-gradient(180deg, #b07cc6 0%, #9b59b6 100%);
+      cursor: pointer;
+      box-shadow: 0 2px 10px rgba(155, 89, 182, 0.35);
+    }
+    .hint-solution-action:hover:not(:disabled) {
+      filter: brightness(1.05);
+    }
+    .hint-solution-action:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      box-shadow: none;
     }
 
     .leaderboard-content {
@@ -1571,6 +1642,28 @@
     </div>
   </div>
 
+  <div id="inGameWalkthroughModal" class="leaderboard-modal" aria-hidden="true">
+    <div class="leaderboard-content level-complete-content">
+      <div class="leaderboard-header">
+        <h2>Walkthrough</h2>
+        <button type="button" class="close-leaderboard" id="closeInGameWalkthroughModal" aria-label="Close walkthrough">&times;</button>
+      </div>
+      <div class="level-complete-replay" id="inGameWalkthroughPanel">
+        <p class="level-complete-replay-title" id="inGameWalkthroughTitle">Best route</p>
+        <p class="level-complete-replay-subtitle" id="inGameWalkthroughSubtitle"></p>
+        <div class="level-complete-replay-canvas-wrap">
+          <canvas id="inGameWalkthroughCanvas" width="320" height="220" aria-label="Walkthrough mini board"></canvas>
+        </div>
+        <p class="level-complete-replay-hint" id="inGameWalkthroughHint">Use Arrow Keys: ←/→ step, ↑ first, ↓ last</p>
+        <p class="level-complete-replay-step" id="inGameWalkthroughStep">Step: --/--</p>
+        <p class="level-complete-replay-event" id="inGameWalkthroughEvent"></p>
+      </div>
+      <div class="level-complete-actions">
+        <button type="button" id="inGameWalkthroughCloseBtn">Close</button>
+      </div>
+    </div>
+  </div>
+
   <div id="levelCompleteModal" class="leaderboard-modal">
     <div class="leaderboard-content level-complete-content">
       <div class="leaderboard-header">
@@ -1580,7 +1673,7 @@
       <p id="levelCompleteText">Great job!</p>
       <div class="level-complete-stats">
         <div id="levelCompleteMoveCount">Your move: 0</div>
-        <div id="levelCompleteFewestOtherMoves">Fewest move by other user: --</div>
+        <div id="levelCompleteFewestOtherMoves">Others' best: --</div>
       </div>
       <p id="levelCompleteAchievement" class="level-complete-achievement"></p>
       <div class="level-complete-replay" id="levelCompleteReplayPanel">
@@ -1604,13 +1697,23 @@
     </div>
   </div>
 
-  <div id="blockTipModal" class="block-tip-modal">
-    <div class="block-tip-content">
+  <div id="blockTipModal" class="block-tip-modal" aria-hidden="true">
+    <div class="block-tip-content" role="dialog" aria-labelledby="hintModalTitle">
       <div class="block-tip-header">
-        <h3>Block Tip</h3>
-        <button class="close-block-tip" id="closeBlockTip" aria-label="Close block tip">&times;</button>
+        <h3 id="hintModalTitle">Hint</h3>
+        <button type="button" class="close-block-tip" id="closeBlockTip" aria-label="Close hint">&times;</button>
       </div>
-      <p id="blockDescription">Welcome! Start the first level to learn about blocks.</p>
+      <section class="hint-section" aria-labelledby="hintLevelTipsHeading">
+        <h4 class="hint-section-title" id="hintLevelTipsHeading">Level tips</h4>
+        <p id="blockDescription">Welcome! Start the first level to learn about blocks.</p>
+      </section>
+      <hr class="hint-solution-divider" />
+      <section class="hint-section" id="hintSolutionSection" aria-labelledby="hintSolutionHeading">
+        <h4 class="hint-section-title" id="hintSolutionHeading">Solution guide</h4>
+        <p class="hint-solution-summary" id="hintSolutionSummary">Others' best: --</p>
+        <button type="button" class="hint-solution-action" id="hintSolutionActionBtn" style="display: none;">Unlock guide</button>
+        <p class="hint-solution-note" id="hintSolutionNote"></p>
+      </section>
     </div>
   </div>
 
@@ -1723,14 +1826,14 @@
       <div class="controls-left">
         <div class="top-stats">
           <div class="move-count" id="moveCount">Your move: 0</div>
-          <div class="fewest-other-moves" id="fewestOtherMoves">Fewest move by other user: --</div>
+          <div class="fewest-other-moves" id="fewestOtherMoves">Others' best: --</div>
         </div>
         <button id="undoMoveBtn">Undo(0)</button>
         <button id="restartLevelBtn">Restart Level</button>
         <button id="antigravityToggle" onclick="toggleAntigravity()">Antigravity(0)</button>
       </div>
       <div class="controls-right">
-        <button type="button" id="blockTipToggle">Block Tip</button>
+        <button type="button" id="blockTipToggle">Hint</button>
         <button id="musicToggle">Music</button>
       </div>
     </div>
@@ -2352,7 +2455,7 @@
   </script>
   
   <!-- Link to external JS -->
-  <script src="js/game.js?v=20260213"></script>
+  <script src="js/game.js?v=20260602"></script>
   <script src="js/levels.js"></script>
 
   <audio id="bgMusic" loop preload="none">
