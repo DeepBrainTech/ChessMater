@@ -4569,6 +4569,10 @@ function isAnyGameModalOpen() {
   return !!document.querySelector(MODAL_SCROLL_LOCK_SELECTOR);
 }
 
+function measureScrollbarWidth() {
+  return Math.max(0, window.innerWidth - document.documentElement.clientWidth);
+}
+
 function syncPageScrollLock() {
   const open = isAnyGameModalOpen();
   const root = document.documentElement;
@@ -4576,9 +4580,11 @@ function syncPageScrollLock() {
   if (open) {
     if (!body.classList.contains("modal-scroll-lock")) {
       pageScrollLockY = window.scrollY || root.scrollTop || 0;
-      root.classList.add("modal-scroll-lock");
+      const scrollbarWidth = measureScrollbarWidth();
+      root.style.setProperty("--modal-scrollbar-width", `${scrollbarWidth}px`);
       body.classList.add("modal-scroll-lock");
       body.style.top = `-${pageScrollLockY}px`;
+      root.classList.add("modal-scroll-lock");
     }
     return;
   }
@@ -4586,6 +4592,7 @@ function syncPageScrollLock() {
     root.classList.remove("modal-scroll-lock");
     body.classList.remove("modal-scroll-lock");
     body.style.top = "";
+    root.style.removeProperty("--modal-scrollbar-width");
     window.scrollTo(0, pageScrollLockY);
   }
 }

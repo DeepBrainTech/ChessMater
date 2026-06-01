@@ -9,9 +9,15 @@
       padding: 0;
     }
 
+    html {
+      min-height: 100%;
+      background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d);
+      background-attachment: fixed;
+    }
+
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d);
+      background: transparent;
       box-sizing: border-box;
       padding: 20px;
       color: #333;
@@ -227,6 +233,9 @@
       overflow-y: auto;
       overflow-x: hidden;
       padding-right: 4px;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
+      touch-action: pan-y;
     }
     
     .level-button {
@@ -530,11 +539,19 @@
       overflow: hidden !important;
       overscroll-behavior: none;
     }
+    html.modal-scroll-lock {
+      height: 100%;
+    }
     body.modal-scroll-lock {
       position: fixed;
       width: 100%;
       left: 0;
       right: 0;
+      min-height: 100dvh;
+      box-sizing: border-box;
+      padding-right: calc(20px + var(--modal-scrollbar-width, 0px));
+      background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d);
+      background-attachment: fixed;
     }
 
     .leaderboard-modal {
@@ -1179,11 +1196,13 @@
       flex: 1 1 0;
       width: auto;
       min-width: 0;
+      min-height: 0;
       background: transparent;
       border-radius: 0;
       padding: 0;
       box-sizing: border-box;
       overflow: hidden;
+      overscroll-behavior: contain;
     }
 
     .canvas-container {
@@ -2551,7 +2570,7 @@
   </script>
   
   <!-- Link to external JS -->
-  <script src="js/game.js?v=20260604"></script>
+  <script src="js/game.js?v=20260609"></script>
   <script src="js/levels.js"></script>
 
   <audio id="bgMusic" loop preload="none">
