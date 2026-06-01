@@ -525,6 +525,18 @@
       color: #f39c12;
     }
 
+    html.modal-scroll-lock,
+    body.modal-scroll-lock {
+      overflow: hidden !important;
+      overscroll-behavior: none;
+    }
+    body.modal-scroll-lock {
+      position: fixed;
+      width: 100%;
+      left: 0;
+      right: 0;
+    }
+
     .leaderboard-modal {
       display: none;
       position: fixed;
@@ -533,10 +545,21 @@
       z-index: 10001;
       justify-content: center;
       align-items: center;
+      overflow: hidden;
+      overscroll-behavior: none;
+      touch-action: none;
     }
 
     .leaderboard-modal.active {
       display: flex;
+    }
+
+    .leaderboard-modal.active .leaderboard-content,
+    .leaderboard-modal.active .guide-content,
+    .leaderboard-modal.active .level-complete-content {
+      touch-action: pan-y;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
     }
     .guide-content h2 {
       margin: 16px 0 8px;
@@ -736,9 +759,19 @@
       align-items: center;
       padding: 16px;
       box-sizing: border-box;
+      overflow: hidden;
+      overscroll-behavior: none;
+      touch-action: none;
     }
     .undo-exchange-modal.active {
       display: flex;
+    }
+    .undo-exchange-modal.active .undo-exchange-panel {
+      touch-action: pan-y;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
+      max-height: min(85vh, 100%);
+      overflow-y: auto;
     }
     .undo-exchange-panel {
       background: linear-gradient(165deg, #1e2d45 0%, #141c2e 55%, #121a2c 100%);
@@ -898,10 +931,19 @@
       z-index: 10001;
       justify-content: center;
       align-items: center;
+      overflow: hidden;
+      overscroll-behavior: none;
+      touch-action: none;
     }
 
     .block-tip-modal.active {
       display: flex;
+    }
+
+    .block-tip-modal.active .block-tip-content {
+      touch-action: pan-y;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
     }
 
     .block-tip-content {
@@ -2509,7 +2551,7 @@
   </script>
   
   <!-- Link to external JS -->
-  <script src="js/game.js?v=20260603"></script>
+  <script src="js/game.js?v=20260604"></script>
   <script src="js/levels.js"></script>
 
   <audio id="bgMusic" loop preload="none">

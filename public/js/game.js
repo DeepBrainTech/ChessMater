@@ -4558,6 +4558,71 @@ if (window.visualViewport) {
   window.visualViewport.addEventListener("resize", resizeCanvas);
 }
 
+let pageScrollLockY = 0;
+
+const MODAL_SCROLL_LOCK_SELECTOR =
+  ".leaderboard-modal.active, .block-tip-modal.active, .undo-exchange-modal.active";
+const MODAL_SCROLLABLE_SELECTOR =
+  ".leaderboard-content, .guide-content, .level-complete-content, .block-tip-content, .undo-exchange-panel";
+
+function isAnyGameModalOpen() {
+  return !!document.querySelector(MODAL_SCROLL_LOCK_SELECTOR);
+}
+
+function syncPageScrollLock() {
+  const open = isAnyGameModalOpen();
+  const root = document.documentElement;
+  const body = document.body;
+  if (open) {
+    if (!body.classList.contains("modal-scroll-lock")) {
+      pageScrollLockY = window.scrollY || root.scrollTop || 0;
+      root.classList.add("modal-scroll-lock");
+      body.classList.add("modal-scroll-lock");
+      body.style.top = `-${pageScrollLockY}px`;
+    }
+    return;
+  }
+  if (body.classList.contains("modal-scroll-lock")) {
+    root.classList.remove("modal-scroll-lock");
+    body.classList.remove("modal-scroll-lock");
+    body.style.top = "";
+    window.scrollTo(0, pageScrollLockY);
+  }
+}
+
+function initModalScrollLock() {
+  document
+    .querySelectorAll(".leaderboard-modal, .block-tip-modal, .undo-exchange-modal")
+    .forEach((modal) => {
+      const observer = new MutationObserver(() => syncPageScrollLock());
+      observer.observe(modal, { attributes: true, attributeFilter: ["class"] });
+    });
+
+  document.addEventListener(
+    "touchmove",
+    (e) => {
+      if (!document.body.classList.contains("modal-scroll-lock")) return;
+      if (!e.target.closest(MODAL_SCROLLABLE_SELECTOR)) {
+        e.preventDefault();
+      }
+    },
+    { passive: false }
+  );
+
+  document.addEventListener(
+    "wheel",
+    (e) => {
+      if (!document.body.classList.contains("modal-scroll-lock")) return;
+      if (!e.target.closest(MODAL_SCROLLABLE_SELECTOR)) {
+        e.preventDefault();
+      }
+    },
+    { passive: false }
+  );
+}
+
+initModalScrollLock();
+
 // Initialize the game
 initializeCanvas();
 resizeCanvas();
