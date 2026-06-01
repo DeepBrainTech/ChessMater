@@ -1777,9 +1777,27 @@
     document.addEventListener("DOMContentLoaded", () => {
       const bgMusic = document.getElementById("bgMusic");
       const musicToggle = document.getElementById("musicToggle");
-      const startButton = document.getElementById("startButton");
-      let musicPlaying = false;
       window.cmAudioMuted = false;
+      window.cmMusicPlaying = false;
+
+      function isHomepageVisible() {
+        const startScreen = document.getElementById("startScreen");
+        if (!startScreen) return true;
+        return window.getComputedStyle(startScreen).display !== "none";
+      }
+
+      function syncBgMusic() {
+        if (!bgMusic) return;
+        const shouldPlay =
+          window.cmMusicPlaying && !window.cmAudioMuted && !isHomepageVisible();
+        if (!shouldPlay) {
+          bgMusic.pause();
+          return;
+        }
+        bgMusic.volume = 0.5;
+        bgMusic.play().catch(() => {});
+      }
+      window.syncBgMusic = syncBgMusic;
 
       function applyGlobalMute(muted) {
         window.cmAudioMuted = !!muted;
@@ -1788,42 +1806,20 @@
           audioEl.muted = window.cmAudioMuted;
         });
 
-        if (bgMusic) {
-          if (window.cmAudioMuted) {
-            bgMusic.pause();
-          } else if (musicPlaying) {
-            bgMusic.play().catch(() => {});
-          }
-        }
+        syncBgMusic();
 
         if (musicToggle) {
           musicToggle.textContent = window.cmAudioMuted ? "🔇 Muted" : "🔊 Music";
         }
       }
 
-      // Start the music when the Start button is clicked
-      if (startButton) {
-        startButton.addEventListener("click", async () => {
-          await (window.authReady || Promise.resolve());
-          const canStart = !!(window.cmUser && (window.cmToken || window.cmSessionReady));
-          if (!canStart) return;
-          if (!musicPlaying) {
-            bgMusic.volume = 0.5;
-            musicPlaying = true;
-            if (!window.cmAudioMuted) {
-              bgMusic.play().catch(() => {});
-            }
-          }
-        });
-      }
-
-      // Toggle global audio on/off
       if (musicToggle) {
         musicToggle.addEventListener("click", () => {
           applyGlobalMute(!window.cmAudioMuted);
         });
       }
 
+      if (bgMusic) bgMusic.pause();
       applyGlobalMute(false);
     });
 
@@ -2245,6 +2241,10 @@
         startScreen.style.display = inGame ? "none" : "flex";
       }
       document.body.classList.toggle("in-game", !!inGame);
+      window.cmMusicPlaying = !!inGame;
+      if (typeof window.syncBgMusic === "function") {
+        window.syncBgMusic();
+      }
       if (typeof window.updatePortalButton === "function") {
         window.updatePortalButton();
       }
@@ -2355,7 +2355,7 @@
   <script src="js/game.js?v=20260213"></script>
   <script src="js/levels.js"></script>
 
-  <audio id="bgMusic" loop preload="auto">
+  <audio id="bgMusic" loop preload="none">
     <source src="assets/audio/background1.mp3" type="audio/mpeg">
   </audio>
 
