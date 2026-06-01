@@ -30,8 +30,10 @@ const inGameWalkthroughCanvas = document.getElementById("inGameWalkthroughCanvas
 const inGameWalkthroughHint = document.getElementById("inGameWalkthroughHint");
 const inGameWalkthroughStep = document.getElementById("inGameWalkthroughStep");
 const inGameWalkthroughEvent = document.getElementById("inGameWalkthroughEvent");
+const inGameReplayStepNav = document.getElementById("inGameReplayStepNav");
 const closeInGameWalkthroughModalBtn = document.getElementById("closeInGameWalkthroughModal");
 const inGameWalkthroughCloseBtn = document.getElementById("inGameWalkthroughCloseBtn");
+const levelCompleteReplayStepNav = document.getElementById("levelCompleteReplayStepNav");
 const undoMoveButton = document.getElementById("undoMoveBtn");
 const antigravityToggleButton = document.getElementById("antigravityToggle");
 const levelCompleteModal = document.getElementById("levelCompleteModal");
@@ -1027,6 +1029,7 @@ function setupHintModal() {
 setupAntigravityExchangeModal();
 setupReplayExchangeModal();
 setupInGameWalkthrough();
+setupReplayStepNav();
 setupHintModal();
 window.openAntigravityExchangeModal = openAntigravityExchangeModal;
 window.openReplayExchangeModal = openReplayExchangeModal;
@@ -1589,6 +1592,43 @@ function drawInGameWalkthroughSnapshot(index) {
   );
 }
 
+function stepReplayNavigation(action) {
+  const walkthroughModalActive =
+    inGameWalkthroughModal && inGameWalkthroughModal.classList.contains("active");
+  const levelCompleteModalActive =
+    levelCompleteModal && levelCompleteModal.classList.contains("active");
+  if (!fewestOtherMovesReplayPath || !fewestOtherMovesReplayPath.length) return;
+  if (levelCompleteModalActive && !replayUnlockedForLevel) return;
+
+  const maxIndex = fewestOtherMovesReplayPath.length - 1;
+  let nextIndex = levelCompleteReplayIndex;
+  if (action === "prev") nextIndex = levelCompleteReplayIndex - 1;
+  else if (action === "next") nextIndex = levelCompleteReplayIndex + 1;
+  else if (action === "first") nextIndex = 0;
+  else if (action === "last") nextIndex = maxIndex;
+  else return;
+
+  if (walkthroughModalActive) {
+    drawInGameWalkthroughSnapshot(nextIndex);
+  } else if (levelCompleteModalActive) {
+    drawLevelCompleteReplaySnapshot(nextIndex);
+  }
+}
+
+function setReplayStepNavVisible(navEl, visible) {
+  if (!navEl) return;
+  navEl.style.display = visible ? "grid" : "none";
+}
+
+function setupReplayStepNav() {
+  document.querySelectorAll("[data-replay-step]").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      stepReplayNavigation(btn.getAttribute("data-replay-step"));
+    });
+  });
+}
+
 function updateHintSolutionSection() {
   const hasBenchmark = Number.isFinite(fewestOtherMovesForLevel);
   const hasReplay = !!(fewestOtherMovesReplayPath && fewestOtherMovesReplayPath.length >= 2);
@@ -1697,6 +1737,7 @@ function updateInGameWalkthroughPanel() {
   if (inGameWalkthroughHint) inGameWalkthroughHint.style.display = "block";
   if (inGameWalkthroughStep) inGameWalkthroughStep.style.display = "block";
   if (inGameWalkthroughEvent) inGameWalkthroughEvent.style.display = "block";
+  setReplayStepNavVisible(inGameReplayStepNav, true);
 }
 
 function openInGameWalkthroughModal() {
@@ -1739,6 +1780,7 @@ function updateLevelCompleteReplayDisplay() {
     if (levelCompleteReplayCanvas) levelCompleteReplayCanvas.style.display = "none";
     if (levelCompleteReplayHint) levelCompleteReplayHint.style.display = "none";
     if (levelCompleteReplayStep) levelCompleteReplayStep.style.display = "none";
+    setReplayStepNavVisible(levelCompleteReplayStepNav, false);
     if (levelCompleteReplayEvent) {
       levelCompleteReplayEvent.style.display = "none";
       levelCompleteReplayEvent.textContent = "";
@@ -1759,6 +1801,7 @@ function updateLevelCompleteReplayDisplay() {
     if (levelCompleteReplayCanvas) levelCompleteReplayCanvas.style.display = "block";
     if (levelCompleteReplayHint) levelCompleteReplayHint.style.display = "block";
     if (levelCompleteReplayStep) levelCompleteReplayStep.style.display = "block";
+    setReplayStepNavVisible(levelCompleteReplayStepNav, false);
     if (levelCompleteReplayEvent) levelCompleteReplayEvent.style.display = "block";
     if (levelCompleteReplayLock) levelCompleteReplayLock.style.display = "flex";
     refreshLevelCompleteReplayLockCostEl();
@@ -1779,6 +1822,7 @@ function updateLevelCompleteReplayDisplay() {
     if (levelCompleteReplayCanvas) levelCompleteReplayCanvas.style.display = "none";
     if (levelCompleteReplayHint) levelCompleteReplayHint.style.display = "none";
     if (levelCompleteReplayStep) levelCompleteReplayStep.style.display = "none";
+    setReplayStepNavVisible(levelCompleteReplayStepNav, false);
     if (levelCompleteReplayEvent) {
       levelCompleteReplayEvent.style.display = "none";
       levelCompleteReplayEvent.textContent = "";
@@ -1799,6 +1843,7 @@ function updateLevelCompleteReplayDisplay() {
   if (levelCompleteReplayCanvas) levelCompleteReplayCanvas.style.display = "block";
   if (levelCompleteReplayHint) levelCompleteReplayHint.style.display = "block";
   if (levelCompleteReplayStep) levelCompleteReplayStep.style.display = "block";
+  setReplayStepNavVisible(levelCompleteReplayStepNav, true);
   if (levelCompleteReplayEvent) levelCompleteReplayEvent.style.display = "block";
   drawLevelCompleteReplaySnapshot(levelCompleteReplayIndex);
 }
@@ -4398,32 +4443,24 @@ document.addEventListener("keydown", (e) => {
     (walkthroughModalActive || levelCompleteModalActive);
 
   if (replayViewerActive) {
-    const maxIndex = fewestOtherMovesReplayPath.length - 1;
-    const drawReplayStep = (nextIndex) => {
-      if (walkthroughModalActive) {
-        drawInGameWalkthroughSnapshot(nextIndex);
-      } else {
-        drawLevelCompleteReplaySnapshot(nextIndex);
-      }
-    };
     if (e.key === "ArrowLeft") {
       e.preventDefault();
-      drawReplayStep(levelCompleteReplayIndex - 1);
+      stepReplayNavigation("prev");
       return;
     }
     if (e.key === "ArrowRight") {
       e.preventDefault();
-      drawReplayStep(levelCompleteReplayIndex + 1);
+      stepReplayNavigation("next");
       return;
     }
     if (e.key === "ArrowUp") {
       e.preventDefault();
-      drawReplayStep(0);
+      stepReplayNavigation("first");
       return;
     }
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      drawReplayStep(maxIndex);
+      stepReplayNavigation("last");
       return;
     }
   }

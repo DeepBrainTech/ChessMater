@@ -663,6 +663,48 @@
       font-weight: 700;
       color: rgba(255, 255, 255, 0.96);
     }
+    .replay-step-nav {
+      display: grid;
+      grid-template-columns: repeat(3, 48px);
+      grid-template-rows: repeat(3, 44px);
+      gap: 6px;
+      justify-content: center;
+      margin: 12px auto 4px;
+      max-width: 180px;
+    }
+    .replay-step-nav-btn {
+      border: none;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.92);
+      color: #1a2a6c;
+      font-size: 1.25rem;
+      font-weight: 700;
+      line-height: 1;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .replay-step-nav-btn:active {
+      transform: scale(0.96);
+      background: rgba(255, 255, 255, 0.78);
+    }
+    .replay-step-nav-btn--up {
+      grid-column: 2;
+      grid-row: 1;
+    }
+    .replay-step-nav-btn--left {
+      grid-column: 1;
+      grid-row: 2;
+    }
+    .replay-step-nav-btn--right {
+      grid-column: 3;
+      grid-row: 2;
+    }
+    .replay-step-nav-btn--down {
+      grid-column: 2;
+      grid-row: 3;
+    }
     .level-complete-replay-event {
       color: #ffe58a;
       font-weight: 700;
@@ -1654,8 +1696,14 @@
         <div class="level-complete-replay-canvas-wrap">
           <canvas id="inGameWalkthroughCanvas" width="320" height="220" aria-label="Walkthrough mini board"></canvas>
         </div>
-        <p class="level-complete-replay-hint" id="inGameWalkthroughHint">Use Arrow Keys: ←/→ step, ↑ first, ↓ last</p>
+        <p class="level-complete-replay-hint" id="inGameWalkthroughHint">←/→ step · ↑ first · ↓ last (keys or buttons below)</p>
         <p class="level-complete-replay-step" id="inGameWalkthroughStep">Step: --/--</p>
+        <div class="replay-step-nav" id="inGameReplayStepNav" role="group" aria-label="Walkthrough step controls">
+          <button type="button" class="replay-step-nav-btn replay-step-nav-btn--up" data-replay-step="first" aria-label="First step">↑</button>
+          <button type="button" class="replay-step-nav-btn replay-step-nav-btn--left" data-replay-step="prev" aria-label="Previous step">←</button>
+          <button type="button" class="replay-step-nav-btn replay-step-nav-btn--right" data-replay-step="next" aria-label="Next step">→</button>
+          <button type="button" class="replay-step-nav-btn replay-step-nav-btn--down" data-replay-step="last" aria-label="Last step">↓</button>
+        </div>
         <p class="level-complete-replay-event" id="inGameWalkthroughEvent"></p>
       </div>
       <div class="level-complete-actions">
@@ -1686,8 +1734,14 @@
             <div class="level-complete-replay-lock-text">Unlock replay for this level<br/><span id="levelCompleteReplayLockCost" class="level-complete-replay-lock-cost">…</span></div>
           </div>
         </div>
-        <p class="level-complete-replay-hint" id="levelCompleteReplayHint">Use Arrow Keys: ←/→ step, ↑ first, ↓ last</p>
+        <p class="level-complete-replay-hint" id="levelCompleteReplayHint">←/→ step · ↑ first · ↓ last (keys or buttons below)</p>
         <p class="level-complete-replay-step" id="levelCompleteReplayStep">Step: --/--</p>
+        <div class="replay-step-nav" id="levelCompleteReplayStepNav" role="group" aria-label="Replay step controls">
+          <button type="button" class="replay-step-nav-btn replay-step-nav-btn--up" data-replay-step="first" aria-label="First step">↑</button>
+          <button type="button" class="replay-step-nav-btn replay-step-nav-btn--left" data-replay-step="prev" aria-label="Previous step">←</button>
+          <button type="button" class="replay-step-nav-btn replay-step-nav-btn--right" data-replay-step="next" aria-label="Next step">→</button>
+          <button type="button" class="replay-step-nav-btn replay-step-nav-btn--down" data-replay-step="last" aria-label="Last step">↓</button>
+        </div>
         <p class="level-complete-replay-event" id="levelCompleteReplayEvent"></p>
       </div>
       <div class="level-complete-actions">
@@ -2455,7 +2509,7 @@
   </script>
   
   <!-- Link to external JS -->
-  <script src="js/game.js?v=20260602"></script>
+  <script src="js/game.js?v=20260603"></script>
   <script src="js/levels.js"></script>
 
   <audio id="bgMusic" loop preload="none">
