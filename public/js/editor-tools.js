@@ -29,6 +29,18 @@
   const MAX_EDITOR_UNDO = 80;
   /** Snapshot taken when leaving Edit for Play test; restored when returning to Edit. */
   let playTestBaseline = null;
+  let movingPlatformSettingsConfirmed = false;
+  let horizontalMovingPlatformSettingsConfirmed = false;
+
+  function setMovingPlatformSettingsConfirmed(confirmed) {
+    movingPlatformSettingsConfirmed = !!confirmed;
+    if (typeof drawBoard === "function") drawBoard();
+  }
+
+  function setHorizontalMovingPlatformSettingsConfirmed(confirmed) {
+    horizontalMovingPlatformSettingsConfirmed = !!confirmed;
+    if (typeof drawBoard === "function") drawBoard();
+  }
 
   function cloneEditorState() {
     return {
@@ -39,6 +51,8 @@
       objectivesCompleted,
       totalObjectives,
       bombs: JSON.parse(JSON.stringify(bombs)),
+      ducks: JSON.parse(JSON.stringify(ducks)),
+      movingPlatforms: JSON.parse(JSON.stringify(movingPlatforms)),
       teleportBlocks: JSON.parse(JSON.stringify(teleportBlocks)),
       phaseBlockStates: JSON.parse(JSON.stringify(phaseBlockStates)),
       fogEnabled
@@ -60,6 +74,8 @@
     objectivesCompleted = s.objectivesCompleted;
     totalObjectives = s.totalObjectives;
     bombs = JSON.parse(JSON.stringify(s.bombs));
+    ducks = JSON.parse(JSON.stringify(s.ducks || []));
+    movingPlatforms = JSON.parse(JSON.stringify(s.movingPlatforms || []));
     teleportBlocks = JSON.parse(JSON.stringify(s.teleportBlocks));
     phaseBlockStates = JSON.parse(JSON.stringify(s.phaseBlockStates));
     gameWon = false;
@@ -110,6 +126,9 @@
     pushEditorUndoCheckpoint();
     board = Array.from({ length: ROWS }, () => Array(COLS).fill(CELL_TYPES.EMPTY));
     players = [];
+    bombs = [];
+    ducks = [];
+    movingPlatforms = [];
     goal = null;
     objectives = [];
     objectivesCompleted = 0;
@@ -154,6 +173,8 @@
       goal: goal,
       objectives: objectives,
       bombs: bombs,
+      ducks: ducks,
+      movingPlatforms: movingPlatforms,
       fog: fogEnabled,
       createdAt: new Date().toISOString()
     };
@@ -428,6 +449,21 @@
         updatePlayerCount();
       }
 
+      const bombIndex = bombs.findIndex((b) => b.row === row && b.col === col);
+      if (bombIndex !== -1) {
+        bombs.splice(bombIndex, 1);
+      }
+
+      const duckIndex = ducks.findIndex((duck) => duck.row === row && duck.col === col);
+      if (duckIndex !== -1) {
+        ducks.splice(duckIndex, 1);
+      }
+
+      const platformIndex = movingPlatforms.findIndex((platform) => platform.row === row && platform.col === col);
+      if (platformIndex !== -1) {
+        movingPlatforms.splice(platformIndex, 1);
+      }
+
       if (goal && goal.row === row && goal.col === col) {
         goal = null;
       }
@@ -441,11 +477,27 @@
       }
 
       updateStatus(`Cell cleared at (${row}, ${col})`);
+    } else if (editMode === "player_boom_right" || editMode === "player_boom_left") {
+      if (board[row][col] === CELL_TYPES.EMPTY) {
+        pushEditorUndoCheckpoint();
+        const type = editMode.slice("player_".length);
+        board[row][col] = CELL_TYPES.BOMB;
+        bombs.push({
+          row,
+          col,
+          type,
+          rowDirection: 1,
+          colDirection: type === "boom_left" ? -1 : 1
+        });
+        updateStatus(`${type === "boom_left" ? "Boom Left" : "Boom Right"} placed at (${row}, ${col})`);
+      } else {
+        updateStatus("Cannot place boom on occupied cell");
+      }
     } else if (editMode.startsWith("player_")) {
       pushEditorUndoCheckpoint();
-      const piece = editMode.split("_")[1];
+      const piece = editMode.slice("player_".length);
       board[row][col] = CELL_TYPES.PLAYER;
-      players.push({ row, col, pieceType: piece });
+      players.push({ row, col, pieceType: piece, hasMoved: false });
       updatePlayerCount();
       updateStatus(
         `${piece.charAt(0).toUpperCase() + piece.slice(1)} placed at (${row}, ${col}). Total: ${players.length}`
@@ -498,6 +550,95 @@
         updateStatus(`Bomb placed at (${row}, ${col})`);
       } else {
         updateStatus("Cannot place bomb on occupied cell");
+      }
+    } else if (editMode === "duck_right" || editMode === "duck_left") {
+      pushEditorUndoCheckpoint();
+      const direction = editMode === "duck_left" ? -1 : 1;
+      ducks = ducks.filter((duck) => duck.row !== row);
+
+      const firstCol = direction === 1 ? 0 : COLS - 1;
+      let placedCount = 0;
+      for (
+        let duckCol = firstCol;
+        duckCol >= 0 && duckCol < COLS;
+        duckCol += direction * DUCK_COLUMN_STEP
+      ) {
+        if (board[row][duckCol] !== CELL_TYPES.EMPTY) continue;
+        ducks.push({ row, col: duckCol, direction });
+        placedCount++;
+      }
+
+      updateStatus(
+        `${placedCount} ducks placed on row ${row}, moving ${direction === 1 ? "right" : "left"}, with three empty cells between them.`
+      );
+    } else if (editMode === "moving_platform") {
+      if (!movingPlatformSettingsConfirmed) {
+        updateStatus("Confirm the platform range before placing.");
+        return;
+      }
+
+      if (board[row][col] === CELL_TYPES.EMPTY) {
+        const bottomInput = document.getElementById("platformBottomLevel");
+        const topInput = document.getElementById("platformTopLevel");
+        const bottomLevel = clampPlatformLevel(bottomInput ? bottomInput.value : 0);
+        const topLevel = clampPlatformLevel(topInput ? topInput.value : ROWS - 1);
+        const minLevel = Math.min(bottomLevel, topLevel);
+        const maxLevel = Math.max(bottomLevel, topLevel);
+        const currentLevel = rowToPlatformLevel(row);
+
+        if (currentLevel < minLevel || currentLevel > maxLevel) {
+          updateStatus(`Platform must be placed between level ${minLevel} and ${maxLevel}`);
+          return;
+        }
+
+        pushEditorUndoCheckpoint();
+        board[row][col] = CELL_TYPES.MOVING_PLATFORM;
+        movingPlatforms.push({
+          row,
+          col,
+          minLevel,
+          maxLevel,
+          currentLevel,
+          direction: 1
+        });
+        updateStatus(`Moving platform placed at level ${currentLevel} (${row}, ${col})`);
+      } else {
+        updateStatus("Cannot place moving platform on occupied cell");
+      }
+    } else if (editMode === "moving_platform_horizontal") {
+      if (!horizontalMovingPlatformSettingsConfirmed) {
+        updateStatus("Confirm the horizontal platform range before placing.");
+        return;
+      }
+
+      if (board[row][col] === CELL_TYPES.EMPTY) {
+        const leftInput = document.getElementById("platformLeftCol");
+        const rightInput = document.getElementById("platformRightCol");
+        const leftCol = clampPlatformCol(leftInput ? leftInput.value : 0);
+        const rightCol = clampPlatformCol(rightInput ? rightInput.value : COLS - 1);
+        const minCol = Math.min(leftCol, rightCol);
+        const maxCol = Math.max(leftCol, rightCol);
+        const currentCol = clampPlatformCol(col);
+
+        if (currentCol < minCol || currentCol > maxCol) {
+          updateStatus(`Platform must be placed between column ${minCol} and ${maxCol}`);
+          return;
+        }
+
+        pushEditorUndoCheckpoint();
+        board[row][col] = CELL_TYPES.MOVING_PLATFORM;
+        movingPlatforms.push({
+          axis: "horizontal",
+          row,
+          col,
+          minCol,
+          maxCol,
+          currentCol,
+          direction: 1
+        });
+        updateStatus(`Horizontal moving platform placed at column ${currentCol} (${row}, ${col})`);
+      } else {
+        updateStatus("Cannot place horizontal moving platform on occupied cell");
       }
     }
   }
@@ -556,9 +697,61 @@
       editMode = e.target.value;
       const cg = document.getElementById("counterGoalSettings");
       if (cg) cg.style.display = editMode === "counter_goal" ? "block" : "none";
+      const platformSettings = document.getElementById("movingPlatformSettings");
+      if (platformSettings) platformSettings.style.display = editMode === "moving_platform" ? "block" : "none";
+      const horizontalPlatformSettings = document.getElementById("horizontalMovingPlatformSettings");
+      if (horizontalPlatformSettings) horizontalPlatformSettings.style.display = editMode === "moving_platform_horizontal" ? "block" : "none";
+      setMovingPlatformSettingsConfirmed(editMode !== "moving_platform");
+      setHorizontalMovingPlatformSettingsConfirmed(editMode !== "moving_platform_horizontal");
     });
     editMode = editModeSelect.value;
+    const platformSettings = document.getElementById("movingPlatformSettings");
+    if (platformSettings) platformSettings.style.display = editMode === "moving_platform" ? "block" : "none";
+    const horizontalPlatformSettings = document.getElementById("horizontalMovingPlatformSettings");
+    if (horizontalPlatformSettings) horizontalPlatformSettings.style.display = editMode === "moving_platform_horizontal" ? "block" : "none";
+    setMovingPlatformSettingsConfirmed(editMode !== "moving_platform");
+    setHorizontalMovingPlatformSettingsConfirmed(editMode !== "moving_platform_horizontal");
   }
+
+  const confirmPlatformSettingsBtn = document.getElementById("confirmPlatformSettings");
+  if (confirmPlatformSettingsBtn) {
+    confirmPlatformSettingsBtn.addEventListener("click", () => {
+      setMovingPlatformSettingsConfirmed(true);
+      updateStatus("Moving platform range confirmed. Click an empty cell to place it.");
+    });
+  }
+
+  const confirmHorizontalPlatformSettingsBtn = document.getElementById("confirmHorizontalPlatformSettings");
+  if (confirmHorizontalPlatformSettingsBtn) {
+    confirmHorizontalPlatformSettingsBtn.addEventListener("click", () => {
+      setHorizontalMovingPlatformSettingsConfirmed(true);
+      updateStatus("Horizontal moving platform range confirmed. Click an empty cell to place it.");
+    });
+  }
+
+  ["platformBottomLevel", "platformTopLevel"].forEach((id) => {
+    const input = document.getElementById(id);
+    if (input) {
+      input.addEventListener("input", () => {
+        if (editMode === "moving_platform") {
+          setMovingPlatformSettingsConfirmed(false);
+          updateStatus("Platform range changed. Confirm it before placing.");
+        }
+      });
+    }
+  });
+
+  ["platformLeftCol", "platformRightCol"].forEach((id) => {
+    const input = document.getElementById(id);
+    if (input) {
+      input.addEventListener("input", () => {
+        if (editMode === "moving_platform_horizontal") {
+          setHorizontalMovingPlatformSettingsConfirmed(false);
+          updateStatus("Horizontal platform range changed. Confirm it before placing.");
+        }
+      });
+    }
+  });
 
   const downloadBtn = document.getElementById("downloadBtn");
   if (downloadBtn) {
