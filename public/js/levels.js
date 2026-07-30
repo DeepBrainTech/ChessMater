@@ -2881,32 +2881,38 @@ const LEVELS = [
       ],
       "fog": false,
       "createdAt": "2026-06-04T18:20:00.000Z",
-      "blockTip": "Puzzle 60: Castling is the key. Normal king moves only jam the corridor; use the castle rook to cross the lower route, ride the platform, then finish the upper objective."
+      
     },
 
     // puzzle 61
-    {
+        {
       "version": "1.3",
       "name": "Puzzle 61",
       "rows": 10,
       "cols": 16,
       "board": [
         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 13],
-        [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 15, 0, 1],
-        [0, 0, 0, 0, 0, 0, 1, 0, 7, 0, 0, 1, 0, 0, 0, 0],
-        [0, 0, 0, 1, 13, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
-        [0, 0, 7, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 0, 1, 0, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 2, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 7, 0, 0, 0, 7, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1, 0, 3, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0],
+        [0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 1, 2, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0],
         [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
       ],
       "players": [
         {
           "row": 8,
-          "col": 1,
+          "col": 4,
           "pieceType": "knight",
+          "hasMoved": false
+        },
+        {
+          "row": 8,
+          "col": 11,
+          "pieceType": "bishop",
           "hasMoved": false
         }
       ],
@@ -2921,30 +2927,23 @@ const LEVELS = [
           "completed": false
         },
         {
-          "row": 7,
+          "row": 1,
           "col": 4,
           "completed": false
         },
         {
-          "row": 4,
+          "row": 1,
           "col": 8,
           "completed": false
         }
       ],
+      "targetPieces": [],
       "bombs": [],
-      "movingPlatforms": [
-        {
-          "row": 3,
-          "col": 13,
-          "minLevel": 3,
-          "maxLevel": 6,
-          "currentLevel": 6,
-          "direction": -1
-        }
-      ],
+      "laserBlocks": [],
+      "ducks": [],
+      "movingPlatforms": [],
       "fog": false,
-      "createdAt": "2026-06-04T18:35:00.000Z",
-      "blockTip": "Puzzle 61: Follow the knight pads carefully, collect the lower detour objective, and watch the moving goal. The orange portal is a tempting detour, but the cleaner route is usually faster."
+      "createdAt": "2026-07-30T16:39:29.890Z"
     },
 
     // puzzle 62
@@ -4791,14 +4790,14 @@ const LEVELS = [
       "rows": 10,
       "cols": 16,
       "board": [
-        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0],
-        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0],
-        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0],
-        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 13, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1],
-        [0, 0, 0, 13, 0, 0, 14, 7, 0, 0, 0, 0, 0, 1, 0, 0],
-        [0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 15, 0, 0, 0],
+        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 15, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 15, 0, 0, 0, 0, 7, 0, 14],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0],
+        [0, 0, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 14, 0],
+        [0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 15, 0, 0, 0, 0, 0],
         [0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
         [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
       ],
@@ -4812,36 +4811,66 @@ const LEVELS = [
       ],
       "goal": {
         "row": 1,
-        "col": 14
+        "col": 11
       },
       "objectives": [
         {
-          "row": 5,
-          "col": 7,
+          "row": 6,
+          "col": 2,
+          "completed": false
+        },
+        {
+          "row": 4,
+          "col": 13,
           "completed": false
         }
       ],
+      "targetPieces": [],
       "bombs": [
         {
-          "row": 5,
-          "col": 6,
-          "direction": -1
+          "row": 4,
+          "col": 15,
+          "direction": 1
+        },
+        {
+          "row": 6,
+          "col": 14,
+          "direction": 1
         }
       ],
+      "laserBlocks": [],
       "ducks": [],
       "movingPlatforms": [
         {
           "axis": "horizontal",
           "row": 7,
-          "col": 12,
-          "minCol": 0,
+          "col": 10,
+          "minCol": 3,
           "maxCol": 15,
-          "currentCol": 12,
+          "currentCol": 10,
+          "direction": -1
+        },
+        {
+          "axis": "horizontal",
+          "row": 4,
+          "col": 8,
+          "minCol": 1,
+          "maxCol": 15,
+          "currentCol": 8,
+          "direction": 1
+        },
+        {
+          "axis": "horizontal",
+          "row": 2,
+          "col": 11,
+          "minCol": 1,
+          "maxCol": 15,
+          "currentCol": 11,
           "direction": 1
         }
       ],
       "fog": false,
-      "createdAt": "2026-07-02T16:51:01.404Z"
+      "createdAt": "2026-07-23T16:54:25.048Z"
     },
 
     // puzzle 90
@@ -5024,7 +5053,7 @@ const LEVELS = [
       "rows": 10,
       "cols": 16,
       "board": [
-        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
         [0, 0, 0, 0, 0, 0, 0, 0, 9, 0, 0, 0, 0, 0, 0, 0],
         [0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0],
         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -5061,11 +5090,13 @@ const LEVELS = [
           "completed": false
         }
       ],
+      "targetPieces": [],
       "bombs": [],
+      "laserBlocks": [],
       "ducks": [],
       "movingPlatforms": [],
       "fog": false,
-      "createdAt": "2026-07-16T02:48:27.095Z"
+      "createdAt": "2026-07-30T16:50:30.976Z"
     },
 
     // puzzle 94
@@ -5076,7 +5107,7 @@ const LEVELS = [
       "cols": 16,
       "board": [
         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 9, 0, 0, 0, 0],
         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
         [0, 0, 0, 0, 0, 0, 0, 1, 7, 1, 0, 0, 0, 0, 0, 0],
@@ -5102,7 +5133,9 @@ const LEVELS = [
       ],
       "goal": {
         "row": 1,
-        "col": 11
+        "col": 11,
+        "type": "counter",
+        "counter": 5
       },
       "objectives": [
         {
@@ -5116,11 +5149,13 @@ const LEVELS = [
           "completed": false
         }
       ],
+      "targetPieces": [],
       "bombs": [],
+      "laserBlocks": [],
       "ducks": [],
       "movingPlatforms": [],
       "fog": false,
-      "createdAt": "2026-07-16T03:15:00.000Z"
+      "createdAt": "2026-07-30T16:52:01.993Z"
     },
 
     // puzzle 95
@@ -5176,11 +5211,13 @@ const LEVELS = [
           "completed": false
         }
       ],
+      "targetPieces": [],
       "bombs": [],
+      "laserBlocks": [],
       "ducks": [],
       "movingPlatforms": [],
-      "fog": false,
-      "createdAt": "2026-07-16T03:30:00.000Z"
+      "fog": true,
+      "createdAt": "2026-07-30T16:55:31.040Z"
     },
 
     // puzzle 96
@@ -5413,6 +5450,7 @@ const LEVELS = [
         {
       "version": "1.3",
       "name": "Puzzle 99",
+      "blockTip": "Same layout as the previous puzzle, but now with fog of war. Time to test your memory.",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -5595,6 +5633,433 @@ const LEVELS = [
       "movingPlatforms": [],
       "fog": false,
       "createdAt": "2026-07-16T16:29:35.717Z"
+    },
+
+
+    // puzzle 101
+        {
+      "version": "1.3",
+      "name": "Puzzle 101",
+      "rows": 10,
+      "cols": 16,
+      "board": [
+        [1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1],
+        [1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 1, 1, 1],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1],
+        [1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1],
+        [0, 0, 2, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1],
+        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+      ],
+      "players": [
+        {
+          "row": 7,
+          "col": 2,
+          "pieceType": "king",
+          "hasMoved": false
+        }
+      ],
+      "goal": {
+        "row": 2,
+        "col": 0
+      },
+      "objectives": [],
+      "targetPieces": [],
+      "bombs": [],
+      "laserBlocks": [
+        {
+          "row": 6,
+          "col": 7,
+          "directions": [
+            "down"
+          ],
+          "fireEverySteps": 2
+        },
+        {
+          "row": 4,
+          "col": 9,
+          "directions": [
+            "up",
+            "right"
+          ],
+          "fireEverySteps": 3
+        },
+        {
+          "row": 2,
+          "col": 12,
+          "directions": [
+            "down"
+          ],
+          "fireEverySteps": 2
+        },
+        {
+          "row": 0,
+          "col": 6,
+          "directions": [
+            "up",
+            "down",
+            "left",
+            "right"
+          ],
+          "fireEverySteps": 2
+        },
+        {
+          "row": 0,
+          "col": 4,
+          "directions": [
+            "up",
+            "down",
+            "left",
+            "right"
+          ],
+          "fireEverySteps": 2
+        },
+        {
+          "row": 0,
+          "col": 2,
+          "directions": [
+            "up",
+            "down",
+            "left",
+            "right"
+          ],
+          "fireEverySteps": 2
+        }
+      ],
+      "ducks": [],
+      "movingPlatforms": [],
+      "fog": false,
+      "createdAt": "2026-07-30T16:56:46.680Z",
+      "blockTip": "Laser Blocks fire from their bright edges on move intervals. Count your steps, then move the king across safely."
+    },
+
+    // puzzle 102
+        {
+      "version": "1.3",
+      "name": "Puzzle 102",
+      "rows": 10,
+      "cols": 16,
+      "board": [
+        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+        [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [1, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 1],
+        [1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [4, 0, 0, 0, 0, 0, 0, 15, 0, 0, 0, 0, 0, 0, 0, 1],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 1, 0],
+        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+      ],
+      "players": [
+        {
+          "row": 7,
+          "col": 13,
+          "pieceType": "rook",
+          "hasMoved": false
+        }
+      ],
+      "goal": {
+        "row": 1,
+        "col": 0
+      },
+      "objectives": [],
+      "targetPieces": [],
+      "bombs": [],
+      "laserBlocks": [
+        {
+          "row": 3,
+          "col": 4,
+          "directions": [
+            "down"
+          ],
+          "fireEverySteps": 2
+        },
+        {
+          "row": 3,
+          "col": 11,
+          "directions": [
+            "down"
+          ],
+          "fireEverySteps": 3
+        },
+        {
+          "row": 0,
+          "col": 4,
+          "directions": [
+            "up",
+            "down",
+            "left",
+            "right"
+          ],
+          "fireEverySteps": 2
+        },
+        {
+          "row": 0,
+          "col": 11,
+          "directions": [
+            "up",
+            "down",
+            "left",
+            "right"
+          ],
+          "fireEverySteps": 2
+        },
+        {
+          "row": 2,
+          "col": 15,
+          "directions": [
+            "up",
+            "left",
+            "right"
+          ],
+          "fireEverySteps": 2
+        }
+      ],
+      "ducks": [],
+      "movingPlatforms": [
+        {
+          "axis": "horizontal",
+          "row": 6,
+          "col": 7,
+          "minCol": 0,
+          "maxCol": 15,
+          "currentCol": 7,
+          "direction": -1
+        }
+      ],
+      "fog": false,
+      "createdAt": "2026-07-30T17:00:04.693Z"
+    },
+
+
+    // puzzle 103
+        {
+      "version": "1.3",
+      "name": "Puzzle 103",
+      "rows": 10,
+      "cols": 16,
+      "board": [
+        [1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [3, 0, 0, 0, 0, 16, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0],
+        [2, 0, 2, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0],
+        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+      ],
+      "players": [
+        {
+          "row": 7,
+          "col": 2,
+          "pieceType": "king",
+          "hasMoved": false
+        },
+        {
+          "row": 7,
+          "col": 0,
+          "pieceType": "rook",
+          "hasMoved": false
+        }
+      ],
+      "goal": {
+        "row": 1,
+        "col": 0
+      },
+      "objectives": [],
+      "targetPieces": [
+        {
+          "row": 1,
+          "col": 5,
+          "pieceType": "pawn",
+          "captured": false
+        }
+      ],
+      "bombs": [],
+      "laserBlocks": [
+        {
+          "row": 0,
+          "col": 2,
+          "directions": [
+            "down"
+          ],
+          "fireEverySteps": 2
+        },
+        {
+          "row": 0,
+          "col": 4,
+          "directions": [
+            "down"
+          ],
+          "fireEverySteps": 2
+        },
+        {
+          "row": 0,
+          "col": 1,
+          "directions": [
+            "down"
+          ],
+          "fireEverySteps": 2
+        }
+      ],
+      "ducks": [],
+      "movingPlatforms": [],
+      "fog": false,
+      "createdAt": "2026-07-30T17:08:10.689Z"
+    },
+
+
+    // puzzle 104
+        {
+      "version": "1.3",
+      "name": "Puzzle 104",
+      "blockTip": "Puzzle 104: Lasers fire by move count, not time. If the next square fires on this move, hop in place to shift the count before crossing.",
+      "rows": 10,
+      "cols": 16,
+      "board": [
+        [0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 2, 0, 0, 0, 7, 0, 0, 0, 0, 7, 0, 0, 0, 3, 0],
+        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+      ],
+      "players": [
+        {
+          "row": 8,
+          "col": 1,
+          "pieceType": "king",
+          "hasMoved": false
+        }
+      ],
+      "goal": {
+        "row": 8,
+        "col": 14
+      },
+      "objectives": [
+        {
+          "row": 8,
+          "col": 5,
+          "completed": false
+        },
+        {
+          "row": 8,
+          "col": 10,
+          "completed": false
+        }
+      ],
+      "targetPieces": [],
+      "bombs": [],
+      "laserBlocks": [
+        {
+          "row": 0,
+          "col": 3,
+          "directions": [
+            "down"
+          ],
+          "fireEverySteps": 2
+        },
+        {
+          "row": 0,
+          "col": 7,
+          "directions": [
+            "down"
+          ],
+          "fireEverySteps": 7
+        },
+        {
+          "row": 0,
+          "col": 11,
+          "directions": [
+            "down"
+          ],
+          "fireEverySteps": 4
+        }
+      ],
+      "ducks": [],
+      "movingPlatforms": [],
+      "fog": false,
+      "createdAt": "2026-07-30T00:00:00.000Z"
+    },
+
+    // puzzle 105
+        {
+      "version": "1.3",
+      "name": "Puzzle 105",
+      "rows": 10,
+      "cols": 16,
+      "board": [
+        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+        [1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1],
+        [1, 1, 1, 16, 1, 0, 0, 1, 16, 0, 1, 0, 0, 0, 0, 1],
+        [1, 1, 0, 1, 0, 1, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1],
+        [1, 1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 0, 0, 0, 1, 1],
+        [1, 1, 0, 1, 0, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1],
+        [1, 6, 0, 0, 1, 0, 0, 0, 0, 1, 1, 1, 0, 16, 0, 1],
+        [1, 0, 0, 7, 0, 0, 0, 0, 0, 0, 1, 1, 7, 1, 0, 3],
+        [1, 1, 1, 1, 1, 1, 0, 0, 0, 1, 1, 1, 1, 1, 2, 1]
+      ],
+      "players": [
+        {
+          "row": 9,
+          "col": 14,
+          "pieceType": "knight",
+          "hasMoved": false
+        }
+      ],
+      "goal": {
+        "row": 8,
+        "col": 15
+      },
+      "objectives": [
+        {
+          "row": 8,
+          "col": 12,
+          "completed": false
+        },
+        {
+          "row": 8,
+          "col": 3,
+          "completed": false
+        }
+      ],
+      "targetPieces": [
+        {
+          "row": 7,
+          "col": 13,
+          "pieceType": "rook",
+          "captured": false
+        },
+        {
+          "row": 3,
+          "col": 8,
+          "pieceType": "pawn",
+          "captured": false
+        },
+        {
+          "row": 3,
+          "col": 3,
+          "pieceType": "queen",
+          "captured": false
+        }
+      ],
+      "bombs": [],
+      "laserBlocks": [],
+      "ducks": [],
+      "movingPlatforms": [],
+      "fog": false,
+      "createdAt": "2026-07-23T15:15:27.099Z"
     },
 
 

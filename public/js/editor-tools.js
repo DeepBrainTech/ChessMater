@@ -42,6 +42,64 @@
     if (typeof drawBoard === "function") drawBoard();
   }
 
+  function getLaserDirectionFromCellOffset(localX, localY) {
+    const edgeZone = Math.max(10, TILE_SIZE * 0.24);
+    const distances = [
+      { direction: "up", distance: localY },
+      { direction: "down", distance: TILE_SIZE - localY },
+      { direction: "left", distance: localX },
+      { direction: "right", distance: TILE_SIZE - localX }
+    ].sort((a, b) => a.distance - b.distance);
+
+    return distances[0].distance <= edgeZone ? distances[0].direction : null;
+  }
+
+  function getSelectedLaserFireEverySteps() {
+    const input = document.getElementById("laserFireEverySteps");
+    const value = input ? input.value : undefined;
+    if (typeof normalizeLaserFireEverySteps === "function") {
+      return normalizeLaserFireEverySteps(value);
+    }
+    const parsed = Number.parseInt(value, 10);
+    return Number.isFinite(parsed) ? Math.max(2, Math.min(99, parsed)) : 2;
+  }
+
+  function toggleLaserBlockDirection(row, col, localX, localY) {
+    const direction = getLaserDirectionFromCellOffset(localX, localY);
+    const laser = laserBlocks.find((item) => item.row === row && item.col === col);
+    if (!laser) return;
+
+    const fallbackDirections = typeof DEFAULT_LASER_DIRECTIONS !== "undefined"
+      ? DEFAULT_LASER_DIRECTIONS
+      : ["up", "down", "left", "right"];
+    const directions = Array.isArray(laser.directions)
+      ? laser.directions.slice()
+      : fallbackDirections.slice();
+    const index = directions.indexOf(direction);
+    const fireEverySteps = getSelectedLaserFireEverySteps();
+
+    pushEditorUndoCheckpoint();
+    laser.fireEverySteps = fireEverySteps;
+
+    if (!direction) {
+      updateStatus(`Laser at (${row}, ${col}) will fire every ${fireEverySteps} moves.`);
+      if (typeof drawBoard === "function") drawBoard();
+      return;
+    }
+
+    if (index === -1) {
+      directions.push(direction);
+    } else {
+      directions.splice(index, 1);
+    }
+
+    laser.directions = directions;
+    updateStatus(
+      `${direction} laser ${index === -1 ? "enabled" : "disabled"} at (${row}, ${col}); fires every ${fireEverySteps} moves.`
+    );
+    if (typeof drawBoard === "function") drawBoard();
+  }
+
   function cloneEditorState() {
     return {
       board: board.map((row) => row.slice()),
@@ -50,7 +108,11 @@
       objectives: JSON.parse(JSON.stringify(objectives)),
       objectivesCompleted,
       totalObjectives,
+      targetPieces: JSON.parse(JSON.stringify(targetPieces)),
+      targetPiecesCaptured,
+      totalTargetPieces,
       bombs: JSON.parse(JSON.stringify(bombs)),
+      laserBlocks: JSON.parse(JSON.stringify(laserBlocks)),
       ducks: JSON.parse(JSON.stringify(ducks)),
       movingPlatforms: JSON.parse(JSON.stringify(movingPlatforms)),
       teleportBlocks: JSON.parse(JSON.stringify(teleportBlocks)),
@@ -73,7 +135,11 @@
     objectives = JSON.parse(JSON.stringify(s.objectives));
     objectivesCompleted = s.objectivesCompleted;
     totalObjectives = s.totalObjectives;
+    targetPieces = JSON.parse(JSON.stringify(s.targetPieces || []));
+    targetPiecesCaptured = s.targetPiecesCaptured || targetPieces.filter((piece) => piece.captured).length;
+    totalTargetPieces = s.totalTargetPieces || targetPieces.length;
     bombs = JSON.parse(JSON.stringify(s.bombs));
+    laserBlocks = JSON.parse(JSON.stringify(s.laserBlocks || []));
     ducks = JSON.parse(JSON.stringify(s.ducks || []));
     movingPlatforms = JSON.parse(JSON.stringify(s.movingPlatforms || []));
     teleportBlocks = JSON.parse(JSON.stringify(s.teleportBlocks));
@@ -98,6 +164,7 @@
     }
     updatePlayerCount();
     updateObjectiveCount();
+    updateTargetPieceCount();
   }
 
   function updateEditorUndoButton() {
@@ -127,6 +194,10 @@
     board = Array.from({ length: ROWS }, () => Array(COLS).fill(CELL_TYPES.EMPTY));
     players = [];
     bombs = [];
+    laserBlocks = [];
+    targetPieces = [];
+    targetPiecesCaptured = 0;
+    totalTargetPieces = 0;
     ducks = [];
     movingPlatforms = [];
     goal = null;
@@ -147,6 +218,7 @@
     visitedSquares.forEach((row) => row.fill(false));
     updatePlayerCount();
     updateObjectiveCount();
+    updateTargetPieceCount();
     updateStatus(`Board cleared! Size: ${ROWS}x${COLS}`);
     updateEditorUndoButton();
   }
@@ -172,7 +244,9 @@
       players: players,
       goal: goal,
       objectives: objectives,
+      targetPieces: targetPieces,
       bombs: bombs,
+      laserBlocks: laserBlocks,
       ducks: ducks,
       movingPlatforms: movingPlatforms,
       fog: fogEnabled,
@@ -402,22 +476,47 @@
   }
 
   /** Canvas edit-mode cell placement (called from game.js handleMove). */
-  function cmEditorOnEditCell(row, col) {
+  function cmEditorOnEditCell(row, col, localX = TILE_SIZE / 2, localY = TILE_SIZE / 2) {
     if (editMode === "block") {
       pushEditorUndoCheckpoint();
       board[row][col] = CELL_TYPES.SOLID_BLOCK;
+      removeLaserBlockAt(row, col);
+      removeTargetPieceAt(row, col);
       updateStatus(`Solid block placed at (${row}, ${col})`);
+    } else if (editMode === "laser_block") {
+      if (isLaserBlockAt(row, col)) {
+        toggleLaserBlockDirection(row, col, localX, localY);
+        return;
+      }
+
+      if (board[row][col] !== CELL_TYPES.EMPTY && board[row][col] !== CELL_TYPES.SOLID_BLOCK) {
+        updateStatus("Laser block can only be placed on an empty cell or solid block.");
+        return;
+      }
+
+      pushEditorUndoCheckpoint();
+      board[row][col] = CELL_TYPES.SOLID_BLOCK;
+      removeTargetPieceAt(row, col);
+      const fireEverySteps = getSelectedLaserFireEverySteps();
+      addLaserBlock(row, col, undefined, fireEverySteps);
+      updateStatus(`Laser block placed at (${row}, ${col}); fires every ${fireEverySteps} moves. Click its edges to toggle lasers.`);
     } else if (editMode === "phase_block") {
       pushEditorUndoCheckpoint();
       board[row][col] = CELL_TYPES.PHASE_BLOCK;
+      removeLaserBlockAt(row, col);
+      removeTargetPieceAt(row, col);
       updateStatus(`Phase-through block placed at (${row}, ${col})`);
     } else if (editMode === "transformer") {
       pushEditorUndoCheckpoint();
       board[row][col] = CELL_TYPES.TRANSFORMER;
+      removeLaserBlockAt(row, col);
+      removeTargetPieceAt(row, col);
       updateStatus(`Transformer block placed at (${row}, ${col})`);
     } else if (editMode === "teleport") {
       pushEditorUndoCheckpoint();
       board[row][col] = CELL_TYPES.TELEPORT;
+      removeLaserBlockAt(row, col);
+      removeTargetPieceAt(row, col);
       if (!teleportBlocks.some((tp) => tp.row === row && tp.col === col)) {
         teleportBlocks.push({ row, col });
       }
@@ -427,12 +526,28 @@
       if (!existingObjective) {
         pushEditorUndoCheckpoint();
         board[row][col] = CELL_TYPES.OBJECTIVE;
+        removeLaserBlockAt(row, col);
+        removeTargetPieceAt(row, col);
         objectives.push({ row, col, completed: false });
         totalObjectives = objectives.length;
         updateObjectiveCount();
         updateStatus(`Objective placed at (${row}, ${col}). Total: ${totalObjectives}`);
       } else {
         updateStatus("Objective already exists at this position");
+      }
+    } else if (editMode === "black_target") {
+      if (board[row][col] === CELL_TYPES.EMPTY) {
+        pushEditorUndoCheckpoint();
+        const pieceSelect = document.getElementById("blackTargetPieceType");
+        const pieceType = pieceSelect ? pieceSelect.value : "rook";
+        board[row][col] = CELL_TYPES.BLACK_TARGET_PIECE;
+        targetPieces.push({ row, col, pieceType, captured: false });
+        totalTargetPieces = targetPieces.length;
+        targetPiecesCaptured = targetPieces.filter((piece) => piece.captured).length;
+        updateTargetPieceCount();
+        updateStatus(`Black ${pieceType} target placed at (${row}, ${col}). Total: ${totalTargetPieces}`);
+      } else {
+        updateStatus("Cannot place black target piece on occupied cell");
       }
     } else if (editMode === "erase") {
       pushEditorUndoCheckpoint();
@@ -453,6 +568,9 @@
       if (bombIndex !== -1) {
         bombs.splice(bombIndex, 1);
       }
+
+      removeLaserBlockAt(row, col);
+      removeTargetPieceAt(row, col);
 
       const duckIndex = ducks.findIndex((duck) => duck.row === row && duck.col === col);
       if (duckIndex !== -1) {
@@ -482,6 +600,8 @@
         pushEditorUndoCheckpoint();
         const type = editMode.slice("player_".length);
         board[row][col] = CELL_TYPES.BOMB;
+        removeLaserBlockAt(row, col);
+        removeTargetPieceAt(row, col);
         bombs.push({
           row,
           col,
@@ -497,6 +617,8 @@
       pushEditorUndoCheckpoint();
       const piece = editMode.slice("player_".length);
       board[row][col] = CELL_TYPES.PLAYER;
+      removeLaserBlockAt(row, col);
+      removeTargetPieceAt(row, col);
       players.push({ row, col, pieceType: piece, hasMoved: false });
       updatePlayerCount();
       updateStatus(
@@ -517,6 +639,8 @@
       if (teleportType) {
         pushEditorUndoCheckpoint();
         board[row][col] = teleportType;
+        removeLaserBlockAt(row, col);
+        removeTargetPieceAt(row, col);
         if (!teleportBlocks.some((tp) => tp.row === row && tp.col === col)) {
           teleportBlocks.push({ row, col, type: teleportType });
         }
@@ -526,6 +650,8 @@
       pushEditorUndoCheckpoint();
       if (goal) board[goal.row][goal.col] = CELL_TYPES.EMPTY;
       board[row][col] = CELL_TYPES.GOAL;
+      removeLaserBlockAt(row, col);
+      removeTargetPieceAt(row, col);
       goal = { row, col };
       updateStatus(`Goal placed at (${row}, ${col})`);
       if (gravityEnabled) {
@@ -539,6 +665,8 @@
       const moves = cgInput ? parseInt(cgInput.value, 10) || 5 : 5;
 
       board[row][col] = CELL_TYPES.COUNTER_GOAL;
+      removeLaserBlockAt(row, col);
+      removeTargetPieceAt(row, col);
       goal = { row, col, type: "counter", counter: moves };
 
       updateStatus(`Counter Goal placed at (${row}, ${col}) with ${goal.counter} moves`);
@@ -546,6 +674,8 @@
       if (board[row][col] === CELL_TYPES.EMPTY) {
         pushEditorUndoCheckpoint();
         board[row][col] = CELL_TYPES.BOMB;
+        removeLaserBlockAt(row, col);
+        removeTargetPieceAt(row, col);
         bombs.push({ row, col, direction: 1 });
         updateStatus(`Bomb placed at (${row}, ${col})`);
       } else {
@@ -593,6 +723,8 @@
 
         pushEditorUndoCheckpoint();
         board[row][col] = CELL_TYPES.MOVING_PLATFORM;
+        removeLaserBlockAt(row, col);
+        removeTargetPieceAt(row, col);
         movingPlatforms.push({
           row,
           col,
@@ -627,6 +759,8 @@
 
         pushEditorUndoCheckpoint();
         board[row][col] = CELL_TYPES.MOVING_PLATFORM;
+        removeLaserBlockAt(row, col);
+        removeTargetPieceAt(row, col);
         movingPlatforms.push({
           axis: "horizontal",
           row,
@@ -697,6 +831,10 @@
       editMode = e.target.value;
       const cg = document.getElementById("counterGoalSettings");
       if (cg) cg.style.display = editMode === "counter_goal" ? "block" : "none";
+      const blackTargetSettings = document.getElementById("blackTargetSettings");
+      if (blackTargetSettings) blackTargetSettings.style.display = editMode === "black_target" ? "block" : "none";
+      const laserSettings = document.getElementById("laserSettings");
+      if (laserSettings) laserSettings.style.display = editMode === "laser_block" ? "block" : "none";
       const platformSettings = document.getElementById("movingPlatformSettings");
       if (platformSettings) platformSettings.style.display = editMode === "moving_platform" ? "block" : "none";
       const horizontalPlatformSettings = document.getElementById("horizontalMovingPlatformSettings");
@@ -705,6 +843,10 @@
       setHorizontalMovingPlatformSettingsConfirmed(editMode !== "moving_platform_horizontal");
     });
     editMode = editModeSelect.value;
+    const blackTargetSettings = document.getElementById("blackTargetSettings");
+    if (blackTargetSettings) blackTargetSettings.style.display = editMode === "black_target" ? "block" : "none";
+    const laserSettings = document.getElementById("laserSettings");
+    if (laserSettings) laserSettings.style.display = editMode === "laser_block" ? "block" : "none";
     const platformSettings = document.getElementById("movingPlatformSettings");
     if (platformSettings) platformSettings.style.display = editMode === "moving_platform" ? "block" : "none";
     const horizontalPlatformSettings = document.getElementById("horizontalMovingPlatformSettings");
