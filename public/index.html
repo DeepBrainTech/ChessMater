@@ -406,13 +406,13 @@
     }
     #blockTipStats {
       margin-top: 8px;
-      color: #2c3e50;
-      font-size: 14px;
-      font-weight: 600;
+      color: #000;
+      font-size: 28px;
+      font-weight: 900;
       display: flex;
       flex-direction: column;
       align-items: flex-start;
-      gap: 4px;
+      gap: 8px;
       width: 100%;
       box-sizing: border-box;
     }
@@ -1732,9 +1732,11 @@
         <li><strong>Phase Block</strong>: can be passed from below in specific situations.</li>
         <li><strong>Transformer</strong>: lets you change the selected piece type.</li>
         <li><strong>Objective</strong>: must be stepped on before finishing when present.</li>
+        <li><strong>Black Target Pieces</strong>: must be captured before the goal unlocks.</li>
         <li><strong>Counter Goal</strong>: goal with a move countdown limit.</li>
         <li><strong>Teleporters</strong>: same-color pair teleports pieces.</li>
         <li><strong>Bomb</strong>: can destroy pieces and alter board state.</li>
+        <li><strong>Laser Block</strong>: solid block with selectable edge lasers that fire on configured move intervals; touching an active beam fails the level.</li>
       </ul>
 
       <h2>Win And Lose</h2>
@@ -1962,6 +1964,7 @@
           <div id="blockTipStats">
             <div class="player-count" id="playerCount">Players: 0</div>
             <div class="objective-count" id="objectiveCount">Objectives: 0/0</div>
+            <div class="objective-count" id="targetPieceCount">Target Pieces: 0/0</div>
           </div>
           <div class="level-selector">
             <div class="level-grid" id="levelGrid">
