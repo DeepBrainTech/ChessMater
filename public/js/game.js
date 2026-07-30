@@ -19,6 +19,22 @@ const objectiveCount = document.getElementById("objectiveCount");
 const targetPieceCount = document.getElementById("targetPieceCount");
 const moveCountDisplay = document.getElementById("moveCount");
 const fewestOtherMovesDisplay = document.getElementById("fewestOtherMoves");
+const blockTipToggle = document.getElementById("blockTipToggle");
+const blockTipModal = document.getElementById("blockTipModal");
+const hintSolutionSummary = document.getElementById("hintSolutionSummary");
+const hintSolutionActionBtn = document.getElementById("hintSolutionActionBtn");
+const hintSolutionNote = document.getElementById("hintSolutionNote");
+const inGameWalkthroughModal = document.getElementById("inGameWalkthroughModal");
+const inGameWalkthroughTitle = document.getElementById("inGameWalkthroughTitle");
+const inGameWalkthroughSubtitle = document.getElementById("inGameWalkthroughSubtitle");
+const inGameWalkthroughCanvas = document.getElementById("inGameWalkthroughCanvas");
+const inGameWalkthroughHint = document.getElementById("inGameWalkthroughHint");
+const inGameWalkthroughStep = document.getElementById("inGameWalkthroughStep");
+const inGameWalkthroughEvent = document.getElementById("inGameWalkthroughEvent");
+const inGameReplayStepNav = document.getElementById("inGameReplayStepNav");
+const closeInGameWalkthroughModalBtn = document.getElementById("closeInGameWalkthroughModal");
+const inGameWalkthroughCloseBtn = document.getElementById("inGameWalkthroughCloseBtn");
+const levelCompleteReplayStepNav = document.getElementById("levelCompleteReplayStepNav");
 const undoMoveButton = document.getElementById("undoMoveBtn");
 const antigravityToggleButton = document.getElementById("antigravityToggle");
 const levelCompleteModal = document.getElementById("levelCompleteModal");
@@ -1046,6 +1062,12 @@ async function handleReplayExchangeRedeem() {
   await refreshReplayExchangeAssetsDisplay();
   setReplayExchangeBusy(false);
   closeReplayExchangeModal();
+  closeHintModal();
+  const onLevelComplete =
+    levelCompleteModal && levelCompleteModal.classList.contains("active");
+  if (!onLevelComplete) {
+    openInGameWalkthroughModal();
+  }
 }
 
 function setupReplayExchangeModal() {
@@ -1067,10 +1089,51 @@ function setupReplayExchangeModal() {
   }
 }
 
+function setupInGameWalkthrough() {
+  if (hintSolutionActionBtn) {
+    hintSolutionActionBtn.addEventListener("click", () => {
+      handleSolutionGuideAction();
+    });
+  }
+  const closeWalkthrough = () => closeInGameWalkthroughModal();
+  if (closeInGameWalkthroughModalBtn) {
+    closeInGameWalkthroughModalBtn.addEventListener("click", closeWalkthrough);
+  }
+  if (inGameWalkthroughCloseBtn) {
+    inGameWalkthroughCloseBtn.addEventListener("click", closeWalkthrough);
+  }
+  if (inGameWalkthroughModal) {
+    inGameWalkthroughModal.addEventListener("click", (e) => {
+      if (e.target === inGameWalkthroughModal) closeWalkthrough();
+    });
+  }
+}
+
+function setupHintModal() {
+  if (blockTipToggle && blockTipModal) {
+    blockTipToggle.addEventListener("click", () => {
+      openHintModal();
+    });
+  }
+  const closeBtn = document.getElementById("closeBlockTip");
+  if (blockTipModal && closeBtn) {
+    closeBtn.addEventListener("click", closeHintModal);
+    blockTipModal.addEventListener("click", (e) => {
+      if (e.target === blockTipModal) closeHintModal();
+    });
+  }
+}
+
 setupAntigravityExchangeModal();
 setupReplayExchangeModal();
+setupInGameWalkthrough();
+setupReplayStepNav();
+setupHintModal();
 window.openAntigravityExchangeModal = openAntigravityExchangeModal;
 window.openReplayExchangeModal = openReplayExchangeModal;
+window.handleSolutionGuideAction = handleSolutionGuideAction;
+window.openInGameWalkthroughModal = openInGameWalkthroughModal;
+window.openHintModal = openHintModal;
 
 function isAudioMuted() {
   return !!window.cmAudioMuted;
@@ -1111,25 +1174,6 @@ document.addEventListener('DOMContentLoaded', () => {
       if (legacyContainer && legacyContainer.children.length === 0) {
         legacyContainer.remove();
       }
-    }
-
-    const tipToggle = document.getElementById('blockTipToggle');
-    const tipModal = document.getElementById('blockTipModal');
-    const closeBlockTip = document.getElementById('closeBlockTip');
-    if (tipModal && tipToggle && typeof tipToggle.addEventListener === 'function') {
-      tipToggle.addEventListener('click', () => {
-        tipModal.classList.add('active');
-      });
-    }
-    if (tipModal && closeBlockTip) {
-      closeBlockTip.addEventListener('click', () => {
-        tipModal.classList.remove('active');
-      });
-      tipModal.addEventListener('click', (e) => {
-        if (e.target === tipModal) {
-          tipModal.classList.remove('active');
-        }
-      });
     }
 
     if (levelCompleteRetryBtn) {
@@ -1312,8 +1356,8 @@ function updateLevelCompleteStatsDisplay() {
   }
   if (levelCompleteFewestOtherMovesDisplay) {
     levelCompleteFewestOtherMovesDisplay.textContent = Number.isFinite(fewestOtherMovesForLevel)
-      ? `Fewest move by other user: ${fewestOtherMovesForLevel}`
-      : "Fewest move by other user: --";
+      ? `Others' best: ${fewestOtherMovesForLevel}`
+      : "Others' best: --";
   }
   updateLevelCompleteAchievementDisplay();
 }
@@ -1982,9 +2026,9 @@ function drawCastleRookMarker(renderCtx, x, y, size) {
   renderCtx.restore();
 }
 
-function drawLevelCompleteReplaySnapshot(index) {
-  if (!levelCompleteReplayCanvas || !fewestOtherMovesReplayPath || !fewestOtherMovesReplayPath.length) return;
-  const replayCtx = levelCompleteReplayCanvas.getContext("2d");
+function drawReplaySnapshotOnCanvas(index, canvasEl, stepEl, eventEl) {
+  if (!canvasEl || !fewestOtherMovesReplayPath || !fewestOtherMovesReplayPath.length) return;
+  const replayCtx = canvasEl.getContext("2d");
   if (!replayCtx) return;
 
   const safeIndex = Math.max(0, Math.min(index, fewestOtherMovesReplayPath.length - 1));
@@ -1996,8 +2040,8 @@ function drawLevelCompleteReplaySnapshot(index) {
   const playersData = Array.isArray(snapshot.players) ? snapshot.players : [];
   const targetPiecesData = Array.isArray(snapshot.targetPieces) ? snapshot.targetPieces : [];
 
-  const cw = levelCompleteReplayCanvas.width;
-  const ch = levelCompleteReplayCanvas.height;
+  const cw = canvasEl.width;
+  const ch = canvasEl.height;
   replayCtx.clearRect(0, 0, cw, ch);
   replayCtx.fillStyle = "#0d1118";
   replayCtx.fillRect(0, 0, cw, ch);
@@ -2027,21 +2071,206 @@ function drawLevelCompleteReplaySnapshot(index) {
     drawReplayPlayerPiece(replayCtx, p.pieceType, p.row, p.col, ox, oy, tile);
   }
 
-  if (levelCompleteReplayStep) {
+  if (stepEl) {
     const logicalStep = fewestOtherMovesReplayStepNumbers[safeIndex] || 0;
     const totalLogicalSteps = Number.isFinite(fewestOtherMovesForLevel)
       ? fewestOtherMovesForLevel
       : (fewestOtherMovesReplayStepNumbers.length ? Math.max(...fewestOtherMovesReplayStepNumbers) : 0);
-    levelCompleteReplayStep.textContent = `Step: ${logicalStep}/${totalLogicalSteps}`;
+    stepEl.textContent = `Step: ${logicalStep}/${totalLogicalSteps}`;
   }
-  if (levelCompleteReplayEvent) {
+  if (eventEl) {
     const moveMeta = snapshot && snapshot.move ? snapshot.move : null;
     if (moveMeta && moveMeta.antigravityApplied) {
-      levelCompleteReplayEvent.textContent = "Antigravity used on this step.";
+      eventEl.textContent = "Antigravity used on this step.";
     } else {
-      levelCompleteReplayEvent.textContent = "";
+      eventEl.textContent = "";
     }
   }
+}
+
+function drawLevelCompleteReplaySnapshot(index) {
+  drawReplaySnapshotOnCanvas(
+    index,
+    levelCompleteReplayCanvas,
+    levelCompleteReplayStep,
+    levelCompleteReplayEvent
+  );
+}
+
+function drawInGameWalkthroughSnapshot(index) {
+  drawReplaySnapshotOnCanvas(
+    index,
+    inGameWalkthroughCanvas,
+    inGameWalkthroughStep,
+    inGameWalkthroughEvent
+  );
+}
+
+function stepReplayNavigation(action) {
+  const walkthroughModalActive =
+    inGameWalkthroughModal && inGameWalkthroughModal.classList.contains("active");
+  const levelCompleteModalActive =
+    levelCompleteModal && levelCompleteModal.classList.contains("active");
+  if (!fewestOtherMovesReplayPath || !fewestOtherMovesReplayPath.length) return;
+  if (levelCompleteModalActive && !replayUnlockedForLevel) return;
+
+  const maxIndex = fewestOtherMovesReplayPath.length - 1;
+  let nextIndex = levelCompleteReplayIndex;
+  if (action === "prev") nextIndex = levelCompleteReplayIndex - 1;
+  else if (action === "next") nextIndex = levelCompleteReplayIndex + 1;
+  else if (action === "first") nextIndex = 0;
+  else if (action === "last") nextIndex = maxIndex;
+  else return;
+
+  if (walkthroughModalActive) {
+    drawInGameWalkthroughSnapshot(nextIndex);
+  } else if (levelCompleteModalActive) {
+    drawLevelCompleteReplaySnapshot(nextIndex);
+  }
+}
+
+function setReplayStepNavVisible(navEl, visible) {
+  if (!navEl) return;
+  navEl.style.display = visible ? "grid" : "none";
+}
+
+function setupReplayStepNav() {
+  document.querySelectorAll("[data-replay-step]").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      stepReplayNavigation(btn.getAttribute("data-replay-step"));
+    });
+  });
+}
+
+function updateHintSolutionSection() {
+  const hasBenchmark = Number.isFinite(fewestOtherMovesForLevel);
+  const hasReplay = !!(fewestOtherMovesReplayPath && fewestOtherMovesReplayPath.length >= 2);
+  const shopAvailable = portalUndoShopAvailable();
+
+  if (fewestOtherMovesDisplay) {
+    fewestOtherMovesDisplay.textContent = hasBenchmark
+      ? `Others' best: ${fewestOtherMovesForLevel}`
+      : "Others' best: --";
+  }
+
+  if (blockTipToggle) {
+    blockTipToggle.classList.toggle(
+      "hint-toggle--notify",
+      hasBenchmark && !replayUnlockedForLevel
+    );
+    blockTipToggle.title = hasBenchmark && !replayUnlockedForLevel
+      ? "Hint — solution guide available to unlock"
+      : "Level tips and solution guide";
+  }
+
+  if (!hintSolutionSummary || !hintSolutionActionBtn) return;
+
+  if (!hasBenchmark) {
+    hintSolutionSummary.textContent = "No other player has cleared this level yet.";
+    hintSolutionActionBtn.style.display = "none";
+    hintSolutionActionBtn.disabled = true;
+    if (hintSolutionNote) hintSolutionNote.textContent = "Check back after someone else completes this level.";
+    return;
+  }
+
+  const shownName =
+    fewestOtherMovesUserName && String(fewestOtherMovesUserName).trim()
+      ? String(fewestOtherMovesUserName).trim()
+      : "another player";
+  hintSolutionSummary.textContent = `Best route by ${shownName}: ${fewestOtherMovesForLevel} moves`;
+
+  if (!replayUnlockedForLevel) {
+    hintSolutionActionBtn.style.display = "inline-block";
+    hintSolutionActionBtn.textContent = "Unlock guide";
+    hintSolutionActionBtn.disabled = !shopAvailable;
+    if (hintSolutionNote) {
+      hintSolutionNote.textContent = shopAvailable
+        ? "Watch their route step by step after unlocking."
+        : "Unlock is not available in this environment (Portal shop required).";
+    }
+    return;
+  }
+
+  hintSolutionActionBtn.style.display = "inline-block";
+  hintSolutionActionBtn.textContent = "View guide";
+  hintSolutionActionBtn.disabled = !hasReplay;
+  if (hintSolutionNote) {
+    hintSolutionNote.textContent = hasReplay
+      ? "Opens an interactive walkthrough you can step through."
+      : "Route data is not available yet for this level.";
+  }
+}
+
+function refreshFewestOtherMovesAffordance() {
+  if (CM_EDITOR_PAGE) return;
+  updateHintSolutionSection();
+}
+
+function closeHintModal() {
+  if (!blockTipModal) return;
+  blockTipModal.classList.remove("active");
+  blockTipModal.setAttribute("aria-hidden", "true");
+}
+
+function openHintModal() {
+  if (!blockTipModal) return;
+  updateHintSolutionSection();
+  blockTipModal.classList.add("active");
+  blockTipModal.setAttribute("aria-hidden", "false");
+}
+
+function handleSolutionGuideAction() {
+  if (CM_EDITOR_PAGE) return;
+
+  if (!Number.isFinite(fewestOtherMovesForLevel)) {
+    return;
+  }
+  if (!replayUnlockedForLevel) {
+    closeHintModal();
+    openReplayExchangeModal();
+    return;
+  }
+  if (!fewestOtherMovesReplayPath || fewestOtherMovesReplayPath.length < 2) {
+    return;
+  }
+  closeHintModal();
+  openInGameWalkthroughModal();
+}
+
+function updateInGameWalkthroughPanel() {
+  const hasName = !!(fewestOtherMovesUserName && String(fewestOtherMovesUserName).trim());
+  const shownName = hasName ? String(fewestOtherMovesUserName).trim() : "Unknown";
+  if (inGameWalkthroughTitle) {
+    inGameWalkthroughTitle.textContent = `Best Route by ${shownName}`;
+  }
+  if (inGameWalkthroughSubtitle && Number.isFinite(fewestOtherMovesForLevel)) {
+    inGameWalkthroughSubtitle.textContent = `Fewest moves: ${fewestOtherMovesForLevel}`;
+  }
+  if (inGameWalkthroughCanvas) inGameWalkthroughCanvas.style.display = "block";
+  if (inGameWalkthroughHint) inGameWalkthroughHint.style.display = "block";
+  if (inGameWalkthroughStep) inGameWalkthroughStep.style.display = "block";
+  if (inGameWalkthroughEvent) inGameWalkthroughEvent.style.display = "block";
+  setReplayStepNavVisible(inGameReplayStepNav, true);
+}
+
+function openInGameWalkthroughModal() {
+  if (!inGameWalkthroughModal) return;
+  if (!fewestOtherMovesReplayPath || fewestOtherMovesReplayPath.length < 2) {
+    updateStatus("Walkthrough path is not available yet for this level.");
+    return;
+  }
+  levelCompleteReplayIndex = 0;
+  updateInGameWalkthroughPanel();
+  drawInGameWalkthroughSnapshot(0);
+  inGameWalkthroughModal.classList.add("active");
+  inGameWalkthroughModal.setAttribute("aria-hidden", "false");
+}
+
+function closeInGameWalkthroughModal() {
+  if (!inGameWalkthroughModal) return;
+  inGameWalkthroughModal.classList.remove("active");
+  inGameWalkthroughModal.setAttribute("aria-hidden", "true");
 }
 
 function updateLevelCompleteReplayDisplay() {
@@ -2065,6 +2294,7 @@ function updateLevelCompleteReplayDisplay() {
     if (levelCompleteReplayCanvas) levelCompleteReplayCanvas.style.display = "none";
     if (levelCompleteReplayHint) levelCompleteReplayHint.style.display = "none";
     if (levelCompleteReplayStep) levelCompleteReplayStep.style.display = "none";
+    setReplayStepNavVisible(levelCompleteReplayStepNav, false);
     if (levelCompleteReplayEvent) {
       levelCompleteReplayEvent.style.display = "none";
       levelCompleteReplayEvent.textContent = "";
@@ -2085,6 +2315,7 @@ function updateLevelCompleteReplayDisplay() {
     if (levelCompleteReplayCanvas) levelCompleteReplayCanvas.style.display = "block";
     if (levelCompleteReplayHint) levelCompleteReplayHint.style.display = "block";
     if (levelCompleteReplayStep) levelCompleteReplayStep.style.display = "block";
+    setReplayStepNavVisible(levelCompleteReplayStepNav, false);
     if (levelCompleteReplayEvent) levelCompleteReplayEvent.style.display = "block";
     if (levelCompleteReplayLock) levelCompleteReplayLock.style.display = "flex";
     refreshLevelCompleteReplayLockCostEl();
@@ -2105,6 +2336,7 @@ function updateLevelCompleteReplayDisplay() {
     if (levelCompleteReplayCanvas) levelCompleteReplayCanvas.style.display = "none";
     if (levelCompleteReplayHint) levelCompleteReplayHint.style.display = "none";
     if (levelCompleteReplayStep) levelCompleteReplayStep.style.display = "none";
+    setReplayStepNavVisible(levelCompleteReplayStepNav, false);
     if (levelCompleteReplayEvent) {
       levelCompleteReplayEvent.style.display = "none";
       levelCompleteReplayEvent.textContent = "";
@@ -2125,6 +2357,7 @@ function updateLevelCompleteReplayDisplay() {
   if (levelCompleteReplayCanvas) levelCompleteReplayCanvas.style.display = "block";
   if (levelCompleteReplayHint) levelCompleteReplayHint.style.display = "block";
   if (levelCompleteReplayStep) levelCompleteReplayStep.style.display = "block";
+  setReplayStepNavVisible(levelCompleteReplayStepNav, true);
   if (levelCompleteReplayEvent) levelCompleteReplayEvent.style.display = "block";
   drawLevelCompleteReplaySnapshot(levelCompleteReplayIndex);
 }
@@ -2138,11 +2371,7 @@ function updateFewestOtherMovesDisplay(bestMoves, replayPath, userName, replayUn
   if (fewestOtherMovesReplayPath) {
     levelCompleteReplayIndex = 0;
   }
-  if (fewestOtherMovesDisplay) {
-    fewestOtherMovesDisplay.textContent = Number.isFinite(fewestOtherMovesForLevel)
-      ? `Fewest move by other user: ${fewestOtherMovesForLevel}`
-      : "Fewest move by other user: --";
-  }
+  refreshFewestOtherMovesAffordance();
   updateLevelCompleteStatsDisplay();
   updateLevelCompleteReplayDisplay();
 }
@@ -5665,32 +5894,49 @@ canvas.addEventListener("touchstart", (e) => {
 
 // --- Keyboard controls ---
 document.addEventListener("keydown", (e) => {
-  if (
-    levelCompleteModal &&
-    levelCompleteModal.classList.contains("active") &&
+  const walkthroughModalActive =
+    inGameWalkthroughModal && inGameWalkthroughModal.classList.contains("active");
+  const levelCompleteModalActive =
+    levelCompleteModal && levelCompleteModal.classList.contains("active");
+  const replayViewerActive =
     replayUnlockedForLevel &&
     fewestOtherMovesReplayPath &&
-    fewestOtherMovesReplayPath.length
-  ) {
-    const maxIndex = fewestOtherMovesReplayPath.length - 1;
+    fewestOtherMovesReplayPath.length &&
+    (walkthroughModalActive || levelCompleteModalActive);
+
+  if (replayViewerActive) {
     if (e.key === "ArrowLeft") {
       e.preventDefault();
-      drawLevelCompleteReplaySnapshot(levelCompleteReplayIndex - 1);
+      stepReplayNavigation("prev");
       return;
     }
     if (e.key === "ArrowRight") {
       e.preventDefault();
-      drawLevelCompleteReplaySnapshot(levelCompleteReplayIndex + 1);
+      stepReplayNavigation("next");
       return;
     }
     if (e.key === "ArrowUp") {
       e.preventDefault();
-      drawLevelCompleteReplaySnapshot(0);
+      stepReplayNavigation("first");
       return;
     }
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      drawLevelCompleteReplaySnapshot(maxIndex);
+      stepReplayNavigation("last");
+      return;
+    }
+  }
+
+  if (e.key === "Escape") {
+    const hintModalActive = blockTipModal && blockTipModal.classList.contains("active");
+    if (walkthroughModalActive) {
+      e.preventDefault();
+      closeInGameWalkthroughModal();
+      return;
+    }
+    if (hintModalActive) {
+      e.preventDefault();
+      closeHintModal();
       return;
     }
   }
@@ -5778,6 +6024,78 @@ window.addEventListener("resize", resizeCanvas);
 if (window.visualViewport) {
   window.visualViewport.addEventListener("resize", resizeCanvas);
 }
+
+let pageScrollLockY = 0;
+
+const MODAL_SCROLL_LOCK_SELECTOR =
+  ".leaderboard-modal.active, .block-tip-modal.active, .undo-exchange-modal.active";
+const MODAL_SCROLLABLE_SELECTOR =
+  ".leaderboard-content, .guide-content, .level-complete-content, .block-tip-content, .undo-exchange-panel";
+
+function isAnyGameModalOpen() {
+  return !!document.querySelector(MODAL_SCROLL_LOCK_SELECTOR);
+}
+
+function measureScrollbarWidth() {
+  return Math.max(0, window.innerWidth - document.documentElement.clientWidth);
+}
+
+function syncPageScrollLock() {
+  const open = isAnyGameModalOpen();
+  const root = document.documentElement;
+  const body = document.body;
+  if (open) {
+    if (!body.classList.contains("modal-scroll-lock")) {
+      pageScrollLockY = window.scrollY || root.scrollTop || 0;
+      const scrollbarWidth = measureScrollbarWidth();
+      root.style.setProperty("--modal-scrollbar-width", `${scrollbarWidth}px`);
+      body.classList.add("modal-scroll-lock");
+      body.style.top = `-${pageScrollLockY}px`;
+      root.classList.add("modal-scroll-lock");
+    }
+    return;
+  }
+  if (body.classList.contains("modal-scroll-lock")) {
+    root.classList.remove("modal-scroll-lock");
+    body.classList.remove("modal-scroll-lock");
+    body.style.top = "";
+    root.style.removeProperty("--modal-scrollbar-width");
+    window.scrollTo(0, pageScrollLockY);
+  }
+}
+
+function initModalScrollLock() {
+  document
+    .querySelectorAll(".leaderboard-modal, .block-tip-modal, .undo-exchange-modal")
+    .forEach((modal) => {
+      const observer = new MutationObserver(() => syncPageScrollLock());
+      observer.observe(modal, { attributes: true, attributeFilter: ["class"] });
+    });
+
+  document.addEventListener(
+    "touchmove",
+    (e) => {
+      if (!document.body.classList.contains("modal-scroll-lock")) return;
+      if (!e.target.closest(MODAL_SCROLLABLE_SELECTOR)) {
+        e.preventDefault();
+      }
+    },
+    { passive: false }
+  );
+
+  document.addEventListener(
+    "wheel",
+    (e) => {
+      if (!document.body.classList.contains("modal-scroll-lock")) return;
+      if (!e.target.closest(MODAL_SCROLLABLE_SELECTOR)) {
+        e.preventDefault();
+      }
+    },
+    { passive: false }
+  );
+}
+
+initModalScrollLock();
 
 // Initialize the game
 initializeCanvas();

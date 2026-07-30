@@ -9,9 +9,15 @@
       padding: 0;
     }
 
+    html {
+      min-height: 100%;
+      background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d);
+      background-attachment: fixed;
+    }
+
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d);
+      background: transparent;
       box-sizing: border-box;
       padding: 20px;
       color: #333;
@@ -227,6 +233,9 @@
       overflow-y: auto;
       overflow-x: hidden;
       padding-right: 4px;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
+      touch-action: pan-y;
     }
     
     .level-button {
@@ -380,6 +389,21 @@
       text-align: left;
       white-space: nowrap;
     }
+    #blockTipToggle {
+      background: #9b59b6;
+      position: relative;
+    }
+    #blockTipToggle.hint-toggle--notify::after {
+      content: "";
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #f1c40f;
+      box-shadow: 0 0 0 2px #9b59b6;
+    }
     #blockTipStats {
       margin-top: 8px;
       color: #000;
@@ -510,6 +534,26 @@
       color: #f39c12;
     }
 
+    html.modal-scroll-lock,
+    body.modal-scroll-lock {
+      overflow: hidden !important;
+      overscroll-behavior: none;
+    }
+    html.modal-scroll-lock {
+      height: 100%;
+    }
+    body.modal-scroll-lock {
+      position: fixed;
+      width: 100%;
+      left: 0;
+      right: 0;
+      min-height: 100dvh;
+      box-sizing: border-box;
+      padding-right: calc(20px + var(--modal-scrollbar-width, 0px));
+      background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d);
+      background-attachment: fixed;
+    }
+
     .leaderboard-modal {
       display: none;
       position: fixed;
@@ -518,10 +562,21 @@
       z-index: 10001;
       justify-content: center;
       align-items: center;
+      overflow: hidden;
+      overscroll-behavior: none;
+      touch-action: none;
     }
 
     .leaderboard-modal.active {
       display: flex;
+    }
+
+    .leaderboard-modal.active .leaderboard-content,
+    .leaderboard-modal.active .guide-content,
+    .leaderboard-modal.active .level-complete-content {
+      touch-action: pan-y;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
     }
     .guide-content h2 {
       margin: 16px 0 8px;
@@ -648,6 +703,48 @@
       font-weight: 700;
       color: rgba(255, 255, 255, 0.96);
     }
+    .replay-step-nav {
+      display: grid;
+      grid-template-columns: repeat(3, 48px);
+      grid-template-rows: repeat(3, 44px);
+      gap: 6px;
+      justify-content: center;
+      margin: 12px auto 4px;
+      max-width: 180px;
+    }
+    .replay-step-nav-btn {
+      border: none;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.92);
+      color: #1a2a6c;
+      font-size: 1.25rem;
+      font-weight: 700;
+      line-height: 1;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .replay-step-nav-btn:active {
+      transform: scale(0.96);
+      background: rgba(255, 255, 255, 0.78);
+    }
+    .replay-step-nav-btn--up {
+      grid-column: 2;
+      grid-row: 1;
+    }
+    .replay-step-nav-btn--left {
+      grid-column: 1;
+      grid-row: 2;
+    }
+    .replay-step-nav-btn--right {
+      grid-column: 3;
+      grid-row: 2;
+    }
+    .replay-step-nav-btn--down {
+      grid-column: 2;
+      grid-row: 3;
+    }
     .level-complete-replay-event {
       color: #ffe58a;
       font-weight: 700;
@@ -679,9 +776,19 @@
       align-items: center;
       padding: 16px;
       box-sizing: border-box;
+      overflow: hidden;
+      overscroll-behavior: none;
+      touch-action: none;
     }
     .undo-exchange-modal.active {
       display: flex;
+    }
+    .undo-exchange-modal.active .undo-exchange-panel {
+      touch-action: pan-y;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
+      max-height: min(85vh, 100%);
+      overflow-y: auto;
     }
     .undo-exchange-panel {
       background: linear-gradient(165deg, #1e2d45 0%, #141c2e 55%, #121a2c 100%);
@@ -841,10 +948,19 @@
       z-index: 10001;
       justify-content: center;
       align-items: center;
+      overflow: hidden;
+      overscroll-behavior: none;
+      touch-action: none;
     }
 
     .block-tip-modal.active {
       display: flex;
+    }
+
+    .block-tip-modal.active .block-tip-content {
+      touch-action: pan-y;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
     }
 
     .block-tip-content {
@@ -880,6 +996,62 @@
       font-size: 20px;
       line-height: 1;
       cursor: pointer;
+    }
+
+    .hint-section {
+      margin-top: 16px;
+    }
+    .hint-section:first-of-type {
+      margin-top: 0;
+    }
+    .hint-section-title {
+      margin: 0 0 8px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: #6c7a89;
+    }
+    #blockDescription {
+      margin: 0;
+      line-height: 1.5;
+      font-size: 0.95rem;
+    }
+    .hint-solution-divider {
+      border: none;
+      border-top: 1px solid #e2e8f0;
+      margin: 18px 0;
+    }
+    .hint-solution-summary {
+      margin: 0 0 10px;
+      font-size: 0.95rem;
+      line-height: 1.45;
+    }
+    .hint-solution-note {
+      margin: 8px 0 0;
+      font-size: 0.84rem;
+      color: #6c7a89;
+      line-height: 1.4;
+    }
+    .hint-solution-action {
+      display: inline-block;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 16px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #fff;
+      background: linear-gradient(180deg, #b07cc6 0%, #9b59b6 100%);
+      cursor: pointer;
+      box-shadow: 0 2px 10px rgba(155, 89, 182, 0.35);
+    }
+    .hint-solution-action:hover:not(:disabled) {
+      filter: brightness(1.05);
+    }
+    .hint-solution-action:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      box-shadow: none;
     }
 
     .leaderboard-content {
@@ -1024,11 +1196,13 @@
       flex: 1 1 0;
       width: auto;
       min-width: 0;
+      min-height: 0;
       background: transparent;
       border-radius: 0;
       padding: 0;
       box-sizing: border-box;
       overflow: hidden;
+      overscroll-behavior: contain;
     }
 
     .canvas-container {
@@ -1573,6 +1747,34 @@
     </div>
   </div>
 
+  <div id="inGameWalkthroughModal" class="leaderboard-modal" aria-hidden="true">
+    <div class="leaderboard-content level-complete-content">
+      <div class="leaderboard-header">
+        <h2>Walkthrough</h2>
+        <button type="button" class="close-leaderboard" id="closeInGameWalkthroughModal" aria-label="Close walkthrough">&times;</button>
+      </div>
+      <div class="level-complete-replay" id="inGameWalkthroughPanel">
+        <p class="level-complete-replay-title" id="inGameWalkthroughTitle">Best route</p>
+        <p class="level-complete-replay-subtitle" id="inGameWalkthroughSubtitle"></p>
+        <div class="level-complete-replay-canvas-wrap">
+          <canvas id="inGameWalkthroughCanvas" width="320" height="220" aria-label="Walkthrough mini board"></canvas>
+        </div>
+        <p class="level-complete-replay-hint" id="inGameWalkthroughHint">←/→ step · ↑ first · ↓ last (keys or buttons below)</p>
+        <p class="level-complete-replay-step" id="inGameWalkthroughStep">Step: --/--</p>
+        <div class="replay-step-nav" id="inGameReplayStepNav" role="group" aria-label="Walkthrough step controls">
+          <button type="button" class="replay-step-nav-btn replay-step-nav-btn--up" data-replay-step="first" aria-label="First step">↑</button>
+          <button type="button" class="replay-step-nav-btn replay-step-nav-btn--left" data-replay-step="prev" aria-label="Previous step">←</button>
+          <button type="button" class="replay-step-nav-btn replay-step-nav-btn--right" data-replay-step="next" aria-label="Next step">→</button>
+          <button type="button" class="replay-step-nav-btn replay-step-nav-btn--down" data-replay-step="last" aria-label="Last step">↓</button>
+        </div>
+        <p class="level-complete-replay-event" id="inGameWalkthroughEvent"></p>
+      </div>
+      <div class="level-complete-actions">
+        <button type="button" id="inGameWalkthroughCloseBtn">Close</button>
+      </div>
+    </div>
+  </div>
+
   <div id="levelCompleteModal" class="leaderboard-modal">
     <div class="leaderboard-content level-complete-content">
       <div class="leaderboard-header">
@@ -1582,7 +1784,7 @@
       <p id="levelCompleteText">Great job!</p>
       <div class="level-complete-stats">
         <div id="levelCompleteMoveCount">Your move: 0</div>
-        <div id="levelCompleteFewestOtherMoves">Fewest move by other user: --</div>
+        <div id="levelCompleteFewestOtherMoves">Others' best: --</div>
       </div>
       <p id="levelCompleteAchievement" class="level-complete-achievement"></p>
       <div class="level-complete-replay" id="levelCompleteReplayPanel">
@@ -1595,8 +1797,14 @@
             <div class="level-complete-replay-lock-text">Unlock replay for this level<br/><span id="levelCompleteReplayLockCost" class="level-complete-replay-lock-cost">…</span></div>
           </div>
         </div>
-        <p class="level-complete-replay-hint" id="levelCompleteReplayHint">Use Arrow Keys: ←/→ step, ↑ first, ↓ last</p>
+        <p class="level-complete-replay-hint" id="levelCompleteReplayHint">←/→ step · ↑ first · ↓ last (keys or buttons below)</p>
         <p class="level-complete-replay-step" id="levelCompleteReplayStep">Step: --/--</p>
+        <div class="replay-step-nav" id="levelCompleteReplayStepNav" role="group" aria-label="Replay step controls">
+          <button type="button" class="replay-step-nav-btn replay-step-nav-btn--up" data-replay-step="first" aria-label="First step">↑</button>
+          <button type="button" class="replay-step-nav-btn replay-step-nav-btn--left" data-replay-step="prev" aria-label="Previous step">←</button>
+          <button type="button" class="replay-step-nav-btn replay-step-nav-btn--right" data-replay-step="next" aria-label="Next step">→</button>
+          <button type="button" class="replay-step-nav-btn replay-step-nav-btn--down" data-replay-step="last" aria-label="Last step">↓</button>
+        </div>
         <p class="level-complete-replay-event" id="levelCompleteReplayEvent"></p>
       </div>
       <div class="level-complete-actions">
@@ -1606,13 +1814,23 @@
     </div>
   </div>
 
-  <div id="blockTipModal" class="block-tip-modal">
-    <div class="block-tip-content">
+  <div id="blockTipModal" class="block-tip-modal" aria-hidden="true">
+    <div class="block-tip-content" role="dialog" aria-labelledby="hintModalTitle">
       <div class="block-tip-header">
-        <h3>Block Tip</h3>
-        <button class="close-block-tip" id="closeBlockTip" aria-label="Close block tip">&times;</button>
+        <h3 id="hintModalTitle">Hint</h3>
+        <button type="button" class="close-block-tip" id="closeBlockTip" aria-label="Close hint">&times;</button>
       </div>
-      <p id="blockDescription">Welcome! Start the first level to learn about blocks.</p>
+      <section class="hint-section" aria-labelledby="hintLevelTipsHeading">
+        <h4 class="hint-section-title" id="hintLevelTipsHeading">Level tips</h4>
+        <p id="blockDescription">Welcome! Start the first level to learn about blocks.</p>
+      </section>
+      <hr class="hint-solution-divider" />
+      <section class="hint-section" id="hintSolutionSection" aria-labelledby="hintSolutionHeading">
+        <h4 class="hint-section-title" id="hintSolutionHeading">Solution guide</h4>
+        <p class="hint-solution-summary" id="hintSolutionSummary">Others' best: --</p>
+        <button type="button" class="hint-solution-action" id="hintSolutionActionBtn" style="display: none;">Unlock guide</button>
+        <p class="hint-solution-note" id="hintSolutionNote"></p>
+      </section>
     </div>
   </div>
 
@@ -1725,14 +1943,14 @@
       <div class="controls-left">
         <div class="top-stats">
           <div class="move-count" id="moveCount">Your move: 0</div>
-          <div class="fewest-other-moves" id="fewestOtherMoves">Fewest move by other user: --</div>
+          <div class="fewest-other-moves" id="fewestOtherMoves">Others' best: --</div>
         </div>
         <button id="undoMoveBtn">Undo(0)</button>
         <button id="restartLevelBtn">Restart Level</button>
         <button id="antigravityToggle" onclick="toggleAntigravity()">Antigravity(0)</button>
       </div>
       <div class="controls-right">
-        <button type="button" id="blockTipToggle">Block Tip</button>
+        <button type="button" id="blockTipToggle">Hint</button>
         <button id="musicToggle">Music</button>
       </div>
     </div>
@@ -1780,9 +1998,27 @@
     document.addEventListener("DOMContentLoaded", () => {
       const bgMusic = document.getElementById("bgMusic");
       const musicToggle = document.getElementById("musicToggle");
-      const startButton = document.getElementById("startButton");
-      let musicPlaying = false;
       window.cmAudioMuted = false;
+      window.cmMusicPlaying = false;
+
+      function isHomepageVisible() {
+        const startScreen = document.getElementById("startScreen");
+        if (!startScreen) return true;
+        return window.getComputedStyle(startScreen).display !== "none";
+      }
+
+      function syncBgMusic() {
+        if (!bgMusic) return;
+        const shouldPlay =
+          window.cmMusicPlaying && !window.cmAudioMuted && !isHomepageVisible();
+        if (!shouldPlay) {
+          bgMusic.pause();
+          return;
+        }
+        bgMusic.volume = 0.5;
+        bgMusic.play().catch(() => {});
+      }
+      window.syncBgMusic = syncBgMusic;
 
       function applyGlobalMute(muted) {
         window.cmAudioMuted = !!muted;
@@ -1791,42 +2027,20 @@
           audioEl.muted = window.cmAudioMuted;
         });
 
-        if (bgMusic) {
-          if (window.cmAudioMuted) {
-            bgMusic.pause();
-          } else if (musicPlaying) {
-            bgMusic.play().catch(() => {});
-          }
-        }
+        syncBgMusic();
 
         if (musicToggle) {
           musicToggle.textContent = window.cmAudioMuted ? "🔇 Muted" : "🔊 Music";
         }
       }
 
-      // Start the music when the Start button is clicked
-      if (startButton) {
-        startButton.addEventListener("click", async () => {
-          await (window.authReady || Promise.resolve());
-          const canStart = !!(window.cmUser && (window.cmToken || window.cmSessionReady));
-          if (!canStart) return;
-          if (!musicPlaying) {
-            bgMusic.volume = 0.5;
-            musicPlaying = true;
-            if (!window.cmAudioMuted) {
-              bgMusic.play().catch(() => {});
-            }
-          }
-        });
-      }
-
-      // Toggle global audio on/off
       if (musicToggle) {
         musicToggle.addEventListener("click", () => {
           applyGlobalMute(!window.cmAudioMuted);
         });
       }
 
+      if (bgMusic) bgMusic.pause();
       applyGlobalMute(false);
     });
 
@@ -2248,6 +2462,10 @@
         startScreen.style.display = inGame ? "none" : "flex";
       }
       document.body.classList.toggle("in-game", !!inGame);
+      window.cmMusicPlaying = !!inGame;
+      if (typeof window.syncBgMusic === "function") {
+        window.syncBgMusic();
+      }
       if (typeof window.updatePortalButton === "function") {
         window.updatePortalButton();
       }
@@ -2355,10 +2573,10 @@
   </script>
   
   <!-- Link to external JS -->
-  <script src="js/game.js?v=20260213"></script>
+  <script src="js/game.js?v=20260609"></script>
   <script src="js/levels.js"></script>
 
-  <audio id="bgMusic" loop preload="auto">
+  <audio id="bgMusic" loop preload="none">
     <source src="assets/audio/background1.mp3" type="audio/mpeg">
   </audio>
 
