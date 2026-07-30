@@ -1,0 +1,54 @@
+/* portal.css */
+.portal-button {
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  background: #f5f5f5;
+  color: #333;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 25px;
+  cursor: pointer;
+  font-weight: bold;
+  font-size: 14px;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  z-index: 10000;
+  display: inline-block;
+  transition: all 0.3s ease;
+}
+
+.portal-button:hover {
+  background: #e8e8e8;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  transform: translateY(-1px);
+}
+
+.portal-button:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+.developer-only {
+  display: none;
+}
+
+.consumer-mode .developer-only {
+  display: none !important;
+}
+
+.developer-mode .developer-only {
+  display: block;
+}
+
+.consumer-mode #controls {
+  display: none;
+}
+
+.consumer-mode .level-selector {
+  display: block;
+}
+
+.developer-mode .level-selector {
+  display: none;
+}

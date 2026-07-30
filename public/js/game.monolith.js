@@ -1,61 +1,3 @@
-/** GENERATED FILE — edit public/js/game/*.js then run: node scripts/concat-game.mjs */
-
-/**
- * Central asset URLs for ChessMater.
- *
- * Put design files under public/assets/ (see folders below), then point paths here.
- * Prefer local files under /assets/... so the game does not depend on Wikimedia CDN.
- *
- * Folder map:
- *   public/assets/images/pieces/  → chess piece + goal/bomb sprites (svg/png/webp)
- *   public/assets/images/blocks/  → solid / phase / teleporter / objective tiles
- *   public/assets/images/ui/      → HUD icons (coin, diamond, flower, buttons)
- *   public/assets/images/fx/      → particles, confetti overlays, VFX sheets
- *   public/assets/audio/music/    → background loops
- *   public/assets/audio/sfx/      → move / explode / win sounds
- *   public/assets/fonts/          → custom UI fonts
- *
- * After changing this file, React loads it via GAME_SCRIPT_PARTS.
- * If you still use public/js/game.js for the editor, run: node scripts/concat-game.mjs
- */
-window.CM_ASSETS = {
-  pieces: {
-    // Drop files as rook.svg, bishop.svg, ... then switch these to local paths, e.g.:
-    // rook: "/assets/images/pieces/rook.svg",
-    rook: "https://upload.wikimedia.org/wikipedia/commons/7/72/Chess_rlt45.svg",
-    bishop: "https://upload.wikimedia.org/wikipedia/commons/b/b1/Chess_blt45.svg",
-    queen: "https://upload.wikimedia.org/wikipedia/commons/1/15/Chess_qlt45.svg",
-    knight: "https://upload.wikimedia.org/wikipedia/commons/7/70/Chess_nlt45.svg",
-    king: "https://upload.wikimedia.org/wikipedia/commons/4/42/Chess_klt45.svg",
-    pawn: "https://upload.wikimedia.org/wikipedia/commons/4/45/Chess_plt45.svg",
-    target: "https://upload.wikimedia.org/wikipedia/commons/f/f0/Chess_kdt45.svg",
-    bomb:
-      "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='40' fill='black'/%3E%3Ccircle cx='35' cy='40' r='5' fill='white'/%3E%3Ccircle cx='45' cy='35' r='3' fill='white'/%3E%3Cpath d='M60,30 L75,25 L70,40 Z' fill='red'/%3E%3C/svg%3E",
-  },
-  ui: {
-    coin: "/assets/images/coin.svg",
-    diamond: "/assets/images/diamond.svg",
-    flower: "/assets/images/flower.svg",
-  },
-  audio: {
-    // Prefer moving files into music/ and sfx/ over time; paths below match current files.
-    music: "/assets/audio/background1.mp3",
-    move: "/assets/audio/thump.mp3",
-    explode: "/assets/audio/explosion.mp3",
-    win: "/assets/audio/completion.mp3",
-  },
-  blocks: {
-    // Optional future tile textures (engine still draws with canvas colors today).
-    // solid: "/assets/images/blocks/solid.png",
-    // phase: "/assets/images/blocks/phase.png",
-  },
-};
-
-/**
- * game/01-state.js
- * DOM refs, constants, images, mutable game state
- * Split from game.js lines 1-161 — logic unchanged.
- */
 /**
  * Multi-Player Chess Puzzle with Gravity
  * Copyright (c) 2024 [DeepBrainTech]
@@ -160,7 +102,7 @@ const TELEPORT_COLORS = {
 // Piece types
 const PIECE_TYPES = ["rook", "bishop", "queen", "knight", "king", "pawn"];
 
-// --- Load images (URLs from 00-assets-config.js → window.CM_ASSETS) ---
+// --- Load images ---
 const pieceImages = {
   rook: new Image(),
   bishop: new Image(),
@@ -171,17 +113,14 @@ const pieceImages = {
   target: new Image(),
   bomb: new Image()
 };
-(function loadPieceImagesFromAssets() {
-  const pieces = (window.CM_ASSETS && window.CM_ASSETS.pieces) || {};
-  pieceImages.rook.src = pieces.rook || "";
-  pieceImages.bishop.src = pieces.bishop || "";
-  pieceImages.queen.src = pieces.queen || "";
-  pieceImages.knight.src = pieces.knight || "";
-  pieceImages.king.src = pieces.king || "";
-  pieceImages.pawn.src = pieces.pawn || "";
-  pieceImages.target.src = pieces.target || "";
-  pieceImages.bomb.src = pieces.bomb || "";
-})();
+pieceImages.rook.src   = "https://upload.wikimedia.org/wikipedia/commons/7/72/Chess_rlt45.svg";
+pieceImages.bishop.src = "https://upload.wikimedia.org/wikipedia/commons/b/b1/Chess_blt45.svg";
+pieceImages.queen.src  = "https://upload.wikimedia.org/wikipedia/commons/1/15/Chess_qlt45.svg";
+pieceImages.knight.src = "https://upload.wikimedia.org/wikipedia/commons/7/70/Chess_nlt45.svg";
+pieceImages.king.src   = "https://upload.wikimedia.org/wikipedia/commons/4/42/Chess_klt45.svg";
+pieceImages.pawn.src   = "https://upload.wikimedia.org/wikipedia/commons/4/45/Chess_plt45.svg";
+pieceImages.target.src = "https://upload.wikimedia.org/wikipedia/commons/f/f0/Chess_kdt45.svg";
+pieceImages.bomb.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='40' fill='black'/%3E%3Ccircle cx='35' cy='40' r='5' fill='white'/%3E%3Ccircle cx='45' cy='35' r='3' fill='white'/%3E%3Cpath d='M60,30 L75,25 L70,40 Z' fill='red'/%3E%3C/svg%3E";
 
 // tracker for players, goals, and objectives
 let board = Array.from({ length: ROWS }, () => Array(COLS).fill(CELL_TYPES.EMPTY));
@@ -220,17 +159,9 @@ let replayUnlockedForLevel = false;
 let antigravityUnlockedThisRun = false;
 let autoRestartScheduled = false;
 
-/**
- * game/02-api-shop-exchange.js
- * API auth, credits, portal shop, exchange modal defs (setup*() calls deferred — no cross-file hoist)
- * Split from game.js lines 162-1027 — logic unchanged.
- */
 function updateUndoButtonLabel() {
   if (!undoMoveButton) return;
   undoMoveButton.textContent = `Undo(${undoCredits})`;
-  if (typeof window.cmEmitGameUi === "function") {
-    window.cmEmitGameUi({ type: "undoCredits", undoCredits });
-  }
 }
 
 function updateAntigravityButtonLabel() {
@@ -240,14 +171,6 @@ function updateAntigravityButtonLabel() {
     antigravityToggleButton.textContent = `Antigravity ${state}`;
   } else {
     antigravityToggleButton.textContent = `Antigravity(${antigravityCredits})`;
-  }
-  if (typeof window.cmEmitGameUi === "function") {
-    window.cmEmitGameUi({
-      type: "antigravity",
-      antigravityCredits,
-      antigravityEnabled,
-      antigravityUnlockedThisRun,
-    });
   }
 }
 
@@ -537,9 +460,9 @@ function getFallbackShopCost(itemId) {
 }
 
 const CM_CURRENCY_ICON_SRC = {
-  coin: (window.CM_ASSETS && window.CM_ASSETS.ui && window.CM_ASSETS.ui.coin) || "/assets/images/coin.svg",
-  diamond: (window.CM_ASSETS && window.CM_ASSETS.ui && window.CM_ASSETS.ui.diamond) || "/assets/images/diamond.svg",
-  flower: (window.CM_ASSETS && window.CM_ASSETS.ui && window.CM_ASSETS.ui.flower) || "/assets/images/flower.svg",
+  coin: "assets/images/coin.svg",
+  diamond: "assets/images/diamond.svg",
+  flower: "assets/images/flower.svg"
 };
 
 function currencyIconImgHtml(kind) {
@@ -1103,11 +1026,16 @@ function setupHintModal() {
   }
 }
 
-/**
- * game/03-audio-canvas-hud-replay.js
- * Audio, canvas, HUD, replay, objectives + deferred setup*() from former lines 1029-1038
- * Split from game.js lines 1039-1950 — logic unchanged.
- */
+setupAntigravityExchangeModal();
+setupReplayExchangeModal();
+setupInGameWalkthrough();
+setupReplayStepNav();
+setupHintModal();
+window.openAntigravityExchangeModal = openAntigravityExchangeModal;
+window.openReplayExchangeModal = openReplayExchangeModal;
+window.handleSolutionGuideAction = handleSolutionGuideAction;
+window.openInGameWalkthroughModal = openInGameWalkthroughModal;
+window.openHintModal = openHintModal;
 
 function isAudioMuted() {
   return !!window.cmAudioMuted;
@@ -1139,7 +1067,7 @@ if (fogToggle) {
 //   applyGravity();
 // });
 
-function bindLevelCompleteUi() {
+document.addEventListener('DOMContentLoaded', () => {
   try {
     const legacyNextBtn = document.getElementById('nextLevelBtn');
     if (legacyNextBtn) {
@@ -1178,13 +1106,7 @@ function bindLevelCompleteUi() {
       });
     }
   } catch (e) {}
-}
-// React mounts scripts after DOMContentLoaded; run now if document is already ready.
-if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", bindLevelCompleteUi);
-} else {
-  bindLevelCompleteUi();
-}
+});
 
 // Function to resize the board
 function resizeBoard(newRows, newCols) {
@@ -1297,17 +1219,11 @@ function updateStatus(message) {
 function updatePlayerCount() {
   if (!playerCount) return;
   playerCount.textContent = `Players: ${players.length}`;
-  if (typeof window.cmEmitGameUi === "function") {
-    window.cmEmitGameUi({ type: "playerCount", count: players.length });
-  }
 }
 
 function updateMoveCountDisplay() {
   if (moveCountDisplay) {
     moveCountDisplay.textContent = `Your move: ${levelMoveCount}`;
-  }
-  if (typeof window.cmEmitGameUi === "function") {
-    window.cmEmitGameUi({ type: "moveCount", levelMoveCount });
   }
   updateLevelCompleteStatsDisplay();
 }
@@ -1723,14 +1639,6 @@ function updateHintSolutionSection() {
       ? `Others' best: ${fewestOtherMovesForLevel}`
       : "Others' best: --";
   }
-  if (typeof window.cmEmitGameUi === "function") {
-    window.cmEmitGameUi({
-      type: "fewestOtherMoves",
-      bestMoves: hasBenchmark ? fewestOtherMovesForLevel : null,
-      userName: fewestOtherMovesUserName,
-      replayUnlocked: replayUnlockedForLevel,
-    });
-  }
 
   if (blockTipToggle) {
     blockTipToggle.classList.toggle(
@@ -1952,14 +1860,6 @@ function updateFewestOtherMovesDisplay(bestMoves, replayPath, userName, replayUn
   refreshFewestOtherMovesAffordance();
   updateLevelCompleteStatsDisplay();
   updateLevelCompleteReplayDisplay();
-  if (typeof window.cmEmitGameUi === "function") {
-    window.cmEmitGameUi({
-      type: "fewestOtherMoves",
-      bestMoves: fewestOtherMovesForLevel,
-      userName: fewestOtherMovesUserName,
-      replayUnlocked: replayUnlockedForLevel,
-    });
-  }
 }
 
 async function fetchFewestOtherMovesForCurrentLevel() {
@@ -2003,13 +1903,6 @@ function updateObjectiveCount() {
   if (!objectiveCount) return;
   const completed = objectives.filter(obj => obj.completed).length;
   objectiveCount.textContent = `Objectives: ${completed}/${totalObjectives}`;
-  if (typeof window.cmEmitGameUi === "function") {
-    window.cmEmitGameUi({
-      type: "objectiveCount",
-      completed,
-      totalObjectives,
-    });
-  }
 }
 
 // Check if all objectives are completed
@@ -2054,25 +1947,7 @@ function resetPhaseBlocks() {
   }
 }
 
-// Deferred from former game.js ~1029-1038 (must run after openHintModal / setupReplayStepNav exist).
-setupAntigravityExchangeModal();
-setupReplayExchangeModal();
-setupInGameWalkthrough();
-setupReplayStepNav();
-setupHintModal();
-window.openAntigravityExchangeModal = openAntigravityExchangeModal;
-window.openReplayExchangeModal = openReplayExchangeModal;
-window.handleSolutionGuideAction = handleSolutionGuideAction;
-window.openInGameWalkthroughModal = openInGameWalkthroughModal;
-window.openHintModal = openHintModal;
-
 // --- Load puzzle from JSON file ---
-
-/**
- * game/04-level-rules.js
- * loadPuzzle, gravity, moves, win, undo, teleport, transformer
- * Split from game.js lines 1951-3060 — logic unchanged.
- */
 function loadPuzzle(puzzleData) {
   currentPuzzleData = JSON.parse(JSON.stringify(puzzleData)); // Deep copy
   moveHistorySnapshots = [];
@@ -3183,12 +3058,6 @@ function handleTransformerMenuClick(e) {
 }
 
 // --- Draw possible moves for selected player ---
-
-/**
- * game/05-vision-render.js
- * Valid moves, vision/fog, drawCellContent, drawBoard
- * Split from game.js lines 3061-3757 — logic unchanged.
- */
 function drawPossibleMoves() {
   if (mode !== "play" || selectedPlayerIndex === -1 || gameWon) return;
   
@@ -3886,12 +3755,6 @@ function drawBoard() {
 }
 
 // --- Confetti Celebration ---
-
-/**
- * game/06-effects-bombs.js
- * Confetti, explosions, bombs
- * Split from game.js lines 3758-4203 — logic unchanged.
- */
 function triggerConfetti() {
   //const Winsound = new Audio("assets/audio/woo-hoo-82843.mp3");
   const Winsound = new Audio("assets/audio/completion.mp3");
@@ -4338,12 +4201,6 @@ function createInitialBurst(container, canvasRect, centerX, startY) {
 }
 
 // --- Click handler ---
-
-/**
- * game/07-input-loop.js
- * Input, antigravity, restart, game loop, modal scroll lock, boot
- * Split from game.js lines 4204-4657 — logic unchanged.
- */
 function handleMove(e) {
   if (showTransformerMenu && transformerPosition) {
     handleTransformerMenuClick(e);
@@ -4795,16 +4652,5 @@ if (window.authReady && typeof window.authReady.finally === "function") {
 updatePlayerCount();
 updateObjectiveCount();
 
-window.cmGetCurrentLevelIndex = function () {
-  return currentLevelIndex;
-};
-window.cmSetCurrentLevelIndex = function (index) {
-  currentLevelIndex = index;
-};
-window.toggleAntigravity = toggleAntigravity;
-window.restartLevel = restartLevel;
-window.undoMove = undoMove;
-window.loadPuzzle = loadPuzzle;
-window.updateStatus = updateStatus;
-
 gameLoop();
+

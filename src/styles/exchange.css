@@ -1,0 +1,174 @@
+/* exchange.css */
+.undo-exchange-modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 10002;
+  justify-content: center;
+  align-items: center;
+  padding: 16px;
+  box-sizing: border-box;
+  overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: none;
+}
+.undo-exchange-modal.active {
+  display: flex;
+}
+.undo-exchange-modal.active .undo-exchange-panel {
+  touch-action: pan-y;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  max-height: min(85vh, 100%);
+  overflow-y: auto;
+}
+.undo-exchange-panel {
+  background: linear-gradient(165deg, #1e2d45 0%, #141c2e 55%, #121a2c 100%);
+  color: #f4f6fb;
+  border-radius: 16px;
+  padding: 22px 24px 18px;
+  width: min(92vw, 400px);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+  font-family: 'Segoe UI', system-ui, sans-serif;
+}
+.undo-exchange-title {
+  margin: 0 0 16px;
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.undo-exchange-section {
+  margin-bottom: 0;
+}
+.undo-exchange-section--cost {
+  margin-bottom: 14px;
+}
+.undo-exchange-section--assets {
+  padding-top: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+.undo-exchange-section-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(168, 185, 212, 0.95);
+  margin: 0 0 8px;
+}
+.undo-exchange-section-body.undo-exchange-cost-line {
+  margin: 0;
+  font-size: 1.05rem;
+  opacity: 0.98;
+}
+.undo-exchange-cost-line strong {
+  font-weight: 700;
+  color: #fff;
+}
+.undo-exchange-balances {
+  margin: 0;
+  font-size: 0.98rem;
+  line-height: 1.5;
+}
+.undo-exchange-balances p {
+  margin: 4px 0;
+}
+.undo-exchange-balances span {
+  font-weight: 600;
+  color: #fff;
+}
+.undo-exchange-balance-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+  margin: 5px 0;
+}
+.undo-exchange-currency-icon {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  object-fit: contain;
+  vertical-align: middle;
+}
+.undo-exchange-balance-value {
+  font-weight: 600;
+  color: #fff;
+}
+.undo-exchange-cost-part {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  vertical-align: middle;
+}
+.undo-exchange-cost-part .undo-exchange-currency-icon {
+  width: 18px;
+  height: 18px;
+}
+.undo-exchange-cost-num {
+  font-weight: 700;
+}
+.level-complete-replay-lock-cost {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+  margin-top: 4px;
+  font-weight: 700;
+}
+.level-complete-replay-lock-cost .undo-exchange-cost-part {
+  gap: 3px;
+}
+.undo-exchange-message {
+  min-height: 1.2em;
+  font-size: 0.9rem;
+  margin: 10px 0 0;
+  opacity: 0.92;
+}
+.undo-exchange-message.error {
+  color: #ff8a8a;
+}
+.undo-exchange-message.success {
+  color: #6ee7b7;
+}
+.undo-exchange-message.hint {
+  color: #a8b9d4;
+}
+.undo-exchange-footer {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+  margin-top: 22px;
+  flex-wrap: wrap;
+}
+.undo-exchange-footer button {
+  border: none;
+  border-radius: 12px;
+  padding: 11px 22px;
+  font-size: 0.98rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.12s ease, filter 0.12s ease;
+}
+.undo-exchange-footer button:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+.undo-exchange-footer button:active:not(:disabled) {
+  transform: scale(0.98);
+}
+.undo-exchange-btn-cancel {
+  background: #3d4d63;
+  color: #fff;
+}
+.undo-exchange-btn-confirm {
+  background: linear-gradient(180deg, #f39c3d 0%, #e67e22 100%);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(230, 126, 34, 0.45);
+}
+.undo-exchange-btn-confirm:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: none;
+}
