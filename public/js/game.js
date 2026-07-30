@@ -3,34 +3,41 @@
 /**
  * Central asset URLs for ChessMater.
  *
- * Put design files under public/assets/ (see folders below), then point paths here.
- * Prefer local files under /assets/... so the game does not depend on Wikimedia CDN.
+ * Put design files under public/assets/, then point paths here.
  *
  * Folder map:
- *   public/assets/images/pieces/  → chess piece + goal/bomb sprites (svg/png/webp)
+ *   public/assets/images/pieces/  → chess piece + goal/bomb sprites
  *   public/assets/images/blocks/  → solid / phase / teleporter / objective tiles
- *   public/assets/images/ui/      → HUD icons (coin, diamond, flower, buttons)
- *   public/assets/images/fx/      → particles, confetti overlays, VFX sheets
+ *   public/assets/images/ui/      → HUD icons
+ *   public/assets/images/fx/      → particles / VFX
  *   public/assets/audio/music/    → background loops
  *   public/assets/audio/sfx/      → move / explode / win sounds
  *   public/assets/fonts/          → custom UI fonts
- *
- * After changing this file, React loads it via GAME_SCRIPT_PARTS.
- * If you still use public/js/game.js for the editor, run: node scripts/concat-game.mjs
  */
 window.CM_ASSETS = {
   pieces: {
-    // Drop files as rook.svg, bishop.svg, ... then switch these to local paths, e.g.:
-    // rook: "/assets/images/pieces/rook.svg",
     rook: "https://upload.wikimedia.org/wikipedia/commons/7/72/Chess_rlt45.svg",
+    castle_rook: "https://upload.wikimedia.org/wikipedia/commons/7/72/Chess_rlt45.svg",
     bishop: "https://upload.wikimedia.org/wikipedia/commons/b/b1/Chess_blt45.svg",
     queen: "https://upload.wikimedia.org/wikipedia/commons/1/15/Chess_qlt45.svg",
     knight: "https://upload.wikimedia.org/wikipedia/commons/7/70/Chess_nlt45.svg",
     king: "https://upload.wikimedia.org/wikipedia/commons/4/42/Chess_klt45.svg",
     pawn: "https://upload.wikimedia.org/wikipedia/commons/4/45/Chess_plt45.svg",
+    boom_right:
+      "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='40' fill='black'/%3E%3Ccircle cx='35' cy='40' r='5' fill='white'/%3E%3Ccircle cx='45' cy='35' r='3' fill='white'/%3E%3Cpath d='M60,30 L75,25 L70,40 Z' fill='red'/%3E%3C/svg%3E",
+    boom_left:
+      "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='40' fill='black'/%3E%3Ccircle cx='35' cy='40' r='5' fill='white'/%3E%3Ccircle cx='45' cy='35' r='3' fill='white'/%3E%3Cpath d='M60,30 L75,25 L70,40 Z' fill='red'/%3E%3C/svg%3E",
     target: "https://upload.wikimedia.org/wikipedia/commons/f/f0/Chess_kdt45.svg",
     bomb:
       "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='40' fill='black'/%3E%3Ccircle cx='35' cy='40' r='5' fill='white'/%3E%3Ccircle cx='45' cy='35' r='3' fill='white'/%3E%3Cpath d='M60,30 L75,25 L70,40 Z' fill='red'/%3E%3C/svg%3E",
+  },
+  targetPieces: {
+    rook: "https://upload.wikimedia.org/wikipedia/commons/f/ff/Chess_rdt45.svg",
+    bishop: "https://upload.wikimedia.org/wikipedia/commons/9/98/Chess_bdt45.svg",
+    queen: "https://upload.wikimedia.org/wikipedia/commons/4/47/Chess_qdt45.svg",
+    knight: "https://upload.wikimedia.org/wikipedia/commons/e/ef/Chess_ndt45.svg",
+    king: "https://upload.wikimedia.org/wikipedia/commons/f/f0/Chess_kdt45.svg",
+    pawn: "https://upload.wikimedia.org/wikipedia/commons/c/c7/Chess_pdt45.svg",
   },
   ui: {
     coin: "/assets/images/coin.svg",
@@ -38,23 +45,18 @@ window.CM_ASSETS = {
     flower: "/assets/images/flower.svg",
   },
   audio: {
-    // Prefer moving files into music/ and sfx/ over time; paths below match current files.
     music: "/assets/audio/background1.mp3",
     move: "/assets/audio/thump.mp3",
     explode: "/assets/audio/explosion.mp3",
     win: "/assets/audio/completion.mp3",
   },
-  blocks: {
-    // Optional future tile textures (engine still draws with canvas colors today).
-    // solid: "/assets/images/blocks/solid.png",
-    // phase: "/assets/images/blocks/phase.png",
-  },
+  blocks: {},
 };
 
 /**
  * game/01-state.js
  * DOM refs, constants, images, mutable game state
- * Split from game.js lines 1-161 — logic unchanged.
+ * Split from game.monolith.js lines 1-259.
  */
 /**
  * Multi-Player Chess Puzzle with Gravity
@@ -74,6 +76,7 @@ const ctx = canvas.getContext("2d");
 const statusMessage = document.getElementById("statusMessage");
 const playerCount = document.getElementById("playerCount");
 const objectiveCount = document.getElementById("objectiveCount");
+const targetPieceCount = document.getElementById("targetPieceCount");
 const moveCountDisplay = document.getElementById("moveCount");
 const fewestOtherMovesDisplay = document.getElementById("fewestOtherMoves");
 const blockTipToggle = document.getElementById("blockTipToggle");
@@ -130,6 +133,37 @@ let shakeX = 0;
 let shakeY = 0;
 const visitedSquares = Array.from({ length: ROWS }, () => Array(COLS).fill(false));
 
+function syncVisitedSquaresSize() {
+  while (visitedSquares.length < ROWS) {
+    visitedSquares.push(Array(COLS).fill(false));
+  }
+  visitedSquares.length = ROWS;
+
+  for (const row of visitedSquares) {
+    const previousLength = row.length;
+    row.length = COLS;
+    if (previousLength < COLS) {
+      row.fill(false, previousLength);
+    }
+  }
+}
+
+function isInsideBoard(row, col) {
+  return row >= 0 && row < ROWS && col >= 0 && col < COLS;
+}
+
+function revealAdjacentSquares(visible, row, col) {
+  for (let dr = -1; dr <= 1; dr++) {
+    for (let dc = -1; dc <= 1; dc++) {
+      const visibleRow = row + dr;
+      const visibleCol = col + dc;
+      if (isInsideBoard(visibleRow, visibleCol)) {
+        visible[visibleRow][visibleCol] = true;
+      }
+    }
+  }
+}
+
 
 // Board block types
 const CELL_TYPES = {
@@ -147,7 +181,9 @@ const CELL_TYPES = {
   TELEPORT_GREEN: 11,  // Green teleporter (pair 2)
   TELEPORT_BLUE: 12,   // Blue teleporter (pair 3)
   TELEPORT_ORANGE: 13,  // Orange teleporter (pair 4)
-  BOMB: 14    // bomb block
+  BOMB: 14,    // bomb block
+  MOVING_PLATFORM: 15, // vertically moving platform
+  BLACK_TARGET_PIECE: 16 // Capturable black piece required to unlock the goal
 };
 
 const TELEPORT_COLORS = {
@@ -157,30 +193,81 @@ const TELEPORT_COLORS = {
   [CELL_TYPES.TELEPORT_ORANGE]: { fill: "rgba(243, 156, 18, 0.8)", stroke: "rgba(255, 255, 255, 0.6)" }
 };
 
+const TELEPORT_DOOR_COLORS = {
+  [CELL_TYPES.TELEPORT_PURPLE]: {
+    door: "#7e3fa0",
+    dark: "#4b2364",
+    edge: "#c084fc",
+    glow: "rgba(192, 132, 252, 0.55)"
+  },
+  [CELL_TYPES.TELEPORT_GREEN]: {
+    door: "#27965c",
+    dark: "#17613c",
+    edge: "#86efac",
+    glow: "rgba(134, 239, 172, 0.55)"
+  },
+  [CELL_TYPES.TELEPORT_BLUE]: {
+    door: "#2577b8",
+    dark: "#174c75",
+    edge: "#93c5fd",
+    glow: "rgba(147, 197, 253, 0.55)"
+  },
+  [CELL_TYPES.TELEPORT_ORANGE]: {
+    door: "#c97819",
+    dark: "#7c4510",
+    edge: "#fdba74",
+    glow: "rgba(253, 186, 116, 0.55)"
+  }
+};
+
 // Piece types
-const PIECE_TYPES = ["rook", "bishop", "queen", "knight", "king", "pawn"];
+const PIECE_TYPES = ["rook", "bishop", "queen", "knight", "king", "pawn", "castle_rook"];
 
 // --- Load images (URLs from 00-assets-config.js → window.CM_ASSETS) ---
+const bombImageSrc =
+  (window.CM_ASSETS && window.CM_ASSETS.pieces && window.CM_ASSETS.pieces.bomb) ||
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='40' fill='black'/%3E%3Ccircle cx='35' cy='40' r='5' fill='white'/%3E%3Ccircle cx='45' cy='35' r='3' fill='white'/%3E%3Cpath d='M60,30 L75,25 L70,40 Z' fill='red'/%3E%3C/svg%3E";
 const pieceImages = {
   rook: new Image(),
+  castle_rook: new Image(),
   bishop: new Image(),
   queen: new Image(),
   knight: new Image(),
   king: new Image(),
   pawn: new Image(),
+  boom_right: new Image(),
+  boom_left: new Image(),
   target: new Image(),
   bomb: new Image()
 };
+const targetPieceImages = {
+  rook: new Image(),
+  bishop: new Image(),
+  queen: new Image(),
+  knight: new Image(),
+  king: new Image(),
+  pawn: new Image()
+};
 (function loadPieceImagesFromAssets() {
   const pieces = (window.CM_ASSETS && window.CM_ASSETS.pieces) || {};
+  const targets = (window.CM_ASSETS && window.CM_ASSETS.targetPieces) || {};
   pieceImages.rook.src = pieces.rook || "";
+  pieceImages.castle_rook.src = pieces.castle_rook || pieces.rook || "";
   pieceImages.bishop.src = pieces.bishop || "";
   pieceImages.queen.src = pieces.queen || "";
   pieceImages.knight.src = pieces.knight || "";
   pieceImages.king.src = pieces.king || "";
   pieceImages.pawn.src = pieces.pawn || "";
+  pieceImages.boom_right.src = pieces.boom_right || bombImageSrc;
+  pieceImages.boom_left.src = pieces.boom_left || bombImageSrc;
   pieceImages.target.src = pieces.target || "";
-  pieceImages.bomb.src = pieces.bomb || "";
+  pieceImages.bomb.src = pieces.bomb || bombImageSrc;
+  targetPieceImages.rook.src = targets.rook || "";
+  targetPieceImages.bishop.src = targets.bishop || "";
+  targetPieceImages.queen.src = targets.queen || "";
+  targetPieceImages.knight.src = targets.knight || "";
+  targetPieceImages.king.src = targets.king || pieces.target || "";
+  targetPieceImages.pawn.src = targets.pawn || "";
 })();
 
 // tracker for players, goals, and objectives
@@ -190,8 +277,24 @@ let goal   = null;
 let objectives = []; // Array of { row, col, completed }
 let objectivesCompleted = 0;
 let totalObjectives = 0;
+let targetPieces = []; // Array of { row, col, pieceType, captured }
+let targetPiecesCaptured = 0;
+let totalTargetPieces = 0;
 let phaseBlockStates = {}; // Track which phase blocks have been activated
-let bombs = []; // {row, col, direction}
+let bombs = []; // Horizontal bombs use {row, col, direction}; boom bombs use diagonal row/col directions.
+let laserBlocks = []; // Solid blocks that emit selected edge-mounted lasers.
+let ducks = []; // Horizontal hazards: {row, col, direction}; pieces can safely stand one row above.
+const DUCK_EMPTY_GAP = 3;
+const DUCK_COLUMN_STEP = DUCK_EMPTY_GAP + 1;
+const LASER_DIRECTIONS = [
+  { dr: -1, dc: 0, name: "up" },
+  { dr: 1, dc: 0, name: "down" },
+  { dr: 0, dc: -1, name: "left" },
+  { dr: 0, dc: 1, name: "right" }
+];
+const DEFAULT_LASER_DIRECTIONS = LASER_DIRECTIONS.map(direction => direction.name);
+const DEFAULT_LASER_FIRE_EVERY_STEPS = 2;
+let movingPlatforms = []; // vertical: {row, col, minLevel, maxLevel, currentLevel}; horizontal: {axis, row, col, minCol, maxCol, currentCol}
 let explodingPlayers = []; // { x, y, rotation, velocityY, img }
 let mode = CM_EDITOR_PAGE ? "edit" : "play";
 let editMode = "player_rook"; // tool in edit mode (editor page only)
@@ -222,8 +325,8 @@ let autoRestartScheduled = false;
 
 /**
  * game/02-api-shop-exchange.js
- * API auth, credits, portal shop, exchange modal defs (setup*() calls deferred — no cross-file hoist)
- * Split from game.js lines 162-1027 — logic unchanged.
+ * API/credits/shop/exchange modal defs (setup calls deferred)
+ * Split from game.monolith.js lines 260-1125.
  */
 function updateUndoButtonLabel() {
   if (!undoMoveButton) return;
@@ -1105,10 +1208,9 @@ function setupHintModal() {
 
 /**
  * game/03-audio-canvas-hud-replay.js
- * Audio, canvas, HUD, replay, objectives + deferred setup*() from former lines 1029-1038
- * Split from game.js lines 1039-1950 — logic unchanged.
+ * Audio, HUD, replay, objectives, lasers/platforms helpers
+ * Split from game.monolith.js lines 1138-2757.
  */
-
 function isAudioMuted() {
   return !!window.cmAudioMuted;
 }
@@ -1207,6 +1309,7 @@ function resizeBoard(newRows, newCols) {
   board = newBoard;
   ROWS = newRows;
   COLS = newCols;
+  syncVisitedSquaresSize();
   
   // Resize canvas
   resizeCanvas();
@@ -1219,6 +1322,28 @@ function resizeBoard(newRows, newCols) {
   objectives = objectives.filter(obj => 
     obj.row < newRows && obj.col < newCols
   );
+
+  targetPieces = targetPieces.filter(piece =>
+    piece.row < newRows && piece.col < newCols
+  );
+  totalTargetPieces = targetPieces.length;
+  targetPiecesCaptured = targetPieces.filter(piece => piece.captured).length;
+
+  bombs = bombs.filter(bomb =>
+    bomb.row < newRows && bomb.col < newCols
+  );
+
+  laserBlocks = laserBlocks.filter(laser =>
+    laser.row < newRows && laser.col < newCols
+  );
+
+  ducks = ducks.filter(duck =>
+    duck.row < newRows && duck.col < newCols
+  );
+
+  movingPlatforms = movingPlatforms
+    .filter(platform => platform.row < newRows && platform.col < newCols)
+    .map(normalizeMovingPlatformData);
   
   // Update goal if it's out of bounds
   if (goal && (goal.row >= newRows || goal.col >= newCols)) {
@@ -1228,6 +1353,7 @@ function resizeBoard(newRows, newCols) {
   // Update counts and redraw
   updatePlayerCount();
   updateObjectiveCount();
+  updateTargetPieceCount();
   updateStatus(`Board resized to ${newRows}x${newCols}`);
 }
 
@@ -1358,6 +1484,7 @@ function buildCurrentReplaySnapshot(moveMeta = null) {
     players: cloneGameData(players),
     goal: cloneGameData(goal),
     objectives: cloneGameData(objectives),
+    targetPieces: cloneGameData(targetPieces),
     move: moveMeta ? cloneGameData(moveMeta) : null
   };
 }
@@ -1463,7 +1590,349 @@ function buildReplayStepNumbers(path) {
   return numbers;
 }
 
-function drawReplayCellDecoration(replayCtx, cellType, x, y, tile) {
+function drawInactivePhaseBlock(renderCtx, x, y, tile, inset = 3) {
+  const innerSize = tile - inset * 2;
+  const arrowY = y + tile * 0.48;
+  const stemWidth = Math.max(2, tile * 0.06);
+  const stemHeight = Math.max(6, tile * 0.18);
+  const headWidth = Math.max(8, tile * 0.22);
+  const headHeight = Math.max(6, tile * 0.16);
+  const arrowGap = Math.max(1, (innerSize - headWidth * 3) / 4);
+  const firstArrowCenterX = x + inset + arrowGap + headWidth / 2;
+
+  renderCtx.save();
+  renderCtx.fillStyle = "rgba(52, 152, 219, 0.3)";
+  renderCtx.fillRect(x + inset, y + inset, innerSize, innerSize);
+
+  renderCtx.fillStyle = "rgba(25, 118, 210, 0.65)";
+  for (let i = 0; i < 3; i++) {
+    const centerX = firstArrowCenterX + i * (headWidth + arrowGap);
+    const stemTop = arrowY;
+    renderCtx.fillRect(centerX - stemWidth / 2, stemTop, stemWidth, stemHeight);
+    renderCtx.beginPath();
+    renderCtx.moveTo(centerX, stemTop - headHeight);
+    renderCtx.lineTo(centerX - headWidth / 2, stemTop);
+    renderCtx.lineTo(centerX + headWidth / 2, stemTop);
+    renderCtx.closePath();
+    renderCtx.fill();
+  }
+
+  renderCtx.strokeStyle = "rgba(25, 118, 210, 0.8)";
+  renderCtx.lineWidth = Math.max(2, tile * 0.04);
+  renderCtx.setLineDash([Math.max(4, tile * 0.1), Math.max(3, tile * 0.07)]);
+  renderCtx.beginPath();
+  renderCtx.moveTo(x + inset, y + tile - inset);
+  renderCtx.lineTo(x + tile - inset, y + tile - inset);
+  renderCtx.stroke();
+  renderCtx.restore();
+}
+
+function getMovingPlatformAt(row, col) {
+  return movingPlatforms.find(platform => platform.row === row && platform.col === col) || null;
+}
+
+function getMovingPlatformAxisAt(row, col) {
+  const platform = getMovingPlatformAt(row, col);
+  return platform && platform.axis === "horizontal" ? "horizontal" : "vertical";
+}
+
+function drawSomersaultCloudPlatform(renderCtx, x, y, tile) {
+  const centerX = x + tile / 2;
+  const centerY = y + tile * 0.54;
+
+  function drawCloudSpiral(cx, cy, radius, turns = 1.8) {
+    renderCtx.beginPath();
+    const steps = 44;
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      const angle = t * turns * Math.PI * 2;
+      const r = radius * (1 - t);
+      const px = cx + Math.cos(angle) * r;
+      const py = cy + Math.sin(angle) * r;
+      if (i === 0) {
+        renderCtx.moveTo(px, py);
+      } else {
+        renderCtx.lineTo(px, py);
+      }
+    }
+    renderCtx.stroke();
+  }
+
+  renderCtx.save();
+  renderCtx.shadowColor = "rgba(250, 204, 21, 0.48)";
+  renderCtx.shadowBlur = Math.max(5, tile * 0.14);
+  renderCtx.fillStyle = "#f7d45a";
+  renderCtx.strokeStyle = "#9f7a2d";
+  renderCtx.lineWidth = Math.max(2, tile * 0.04);
+  renderCtx.beginPath();
+  renderCtx.moveTo(x + tile * 0.07, y + tile * 0.68);
+  renderCtx.bezierCurveTo(x + tile * 0.22, y + tile * 0.82, x + tile * 0.42, y + tile * 0.72, x + tile * 0.34, y + tile * 0.57);
+  renderCtx.bezierCurveTo(x + tile * 0.12, y + tile * 0.62, x + tile * 0.07, y + tile * 0.38, x + tile * 0.23, y + tile * 0.25);
+  renderCtx.bezierCurveTo(x + tile * 0.25, y + tile * 0.05, x + tile * 0.5, y + tile * 0.03, x + tile * 0.56, y + tile * 0.2);
+  renderCtx.bezierCurveTo(x + tile * 0.72, y + tile * 0.11, x + tile * 0.91, y + tile * 0.27, x + tile * 0.82, y + tile * 0.49);
+  renderCtx.bezierCurveTo(x + tile * 0.96, y + tile * 0.57, x + tile * 0.88, y + tile * 0.82, x + tile * 0.67, y + tile * 0.78);
+  renderCtx.bezierCurveTo(x + tile * 0.57, y + tile * 0.95, x + tile * 0.34, y + tile * 0.86, x + tile * 0.43, y + tile * 0.73);
+  renderCtx.bezierCurveTo(x + tile * 0.3, y + tile * 0.81, x + tile * 0.15, y + tile * 0.79, x + tile * 0.02, y + tile * 0.68);
+  renderCtx.bezierCurveTo(x - tile * 0.12, y + tile * 0.57, x + tile * 0.05, y + tile * 0.62, x + tile * 0.07, y + tile * 0.68);
+  renderCtx.closePath();
+  renderCtx.fill();
+  renderCtx.shadowBlur = 0;
+  renderCtx.stroke();
+
+  renderCtx.strokeStyle = "rgba(159, 122, 45, 0.82)";
+  renderCtx.lineWidth = Math.max(1.5, tile * 0.035);
+  renderCtx.lineCap = "round";
+  renderCtx.lineJoin = "round";
+  drawCloudSpiral(centerX - tile * 0.19, centerY + tile * 0.06, tile * 0.13, 1.75);
+  drawCloudSpiral(centerX + tile * 0.04, centerY - tile * 0.16, tile * 0.15, 1.7);
+  drawCloudSpiral(centerX + tile * 0.23, centerY + tile * 0.1, tile * 0.16, 1.8);
+
+  renderCtx.strokeStyle = "rgba(159, 122, 45, 0.42)";
+  renderCtx.lineWidth = Math.max(1, tile * 0.025);
+  renderCtx.beginPath();
+  renderCtx.moveTo(x + tile * 0.18, y + tile * 0.72);
+  renderCtx.bezierCurveTo(x + tile * 0.31, y + tile * 0.76, x + tile * 0.43, y + tile * 0.74, x + tile * 0.53, y + tile * 0.67);
+  renderCtx.stroke();
+
+  renderCtx.restore();
+}
+
+function drawMovingPlatform(renderCtx, x, y, tile, axis = "vertical") {
+  if (axis === "horizontal") {
+    drawSomersaultCloudPlatform(renderCtx, x, y, tile);
+    return;
+  }
+
+  const inset = Math.max(2, tile * 0.08);
+  const width = tile - inset * 2;
+  const height = Math.max(8, tile * 0.28);
+  const platformY = y + tile * 0.52;
+
+  renderCtx.save();
+  renderCtx.fillStyle = "rgba(20, 184, 166, 0.78)";
+  renderCtx.fillRect(x + inset, platformY, width, height);
+  renderCtx.strokeStyle = "rgba(15, 118, 110, 0.95)";
+  renderCtx.lineWidth = Math.max(2, tile * 0.04);
+  renderCtx.strokeRect(x + inset, platformY, width, height);
+
+  renderCtx.fillStyle = "rgba(250, 204, 21, 0.9)";
+  renderCtx.beginPath();
+  renderCtx.moveTo(x + tile * 0.5, y + tile * 0.2);
+  renderCtx.lineTo(x + tile * 0.35, y + tile * 0.38);
+  renderCtx.lineTo(x + tile * 0.65, y + tile * 0.38);
+  renderCtx.closePath();
+  renderCtx.fill();
+
+  renderCtx.restore();
+}
+
+function drawDuck(renderCtx, duck, tile = TILE_SIZE) {
+  const x = duck.col * tile;
+  const y = duck.row * tile;
+  const direction = duck.direction === -1 ? -1 : 1;
+
+  renderCtx.save();
+  renderCtx.translate(x + tile / 2, y + tile / 2);
+  renderCtx.scale(direction, 1);
+  renderCtx.fillStyle = "#facc15";
+  renderCtx.strokeStyle = "#a16207";
+  renderCtx.lineWidth = Math.max(1.5, tile * 0.035);
+
+  renderCtx.beginPath();
+  renderCtx.ellipse(-tile * 0.05, tile * 0.12, tile * 0.3, tile * 0.22, 0, 0, Math.PI * 2);
+  renderCtx.fill();
+  renderCtx.stroke();
+
+  renderCtx.beginPath();
+  renderCtx.arc(tile * 0.18, -tile * 0.1, tile * 0.17, 0, Math.PI * 2);
+  renderCtx.fill();
+  renderCtx.stroke();
+
+  renderCtx.fillStyle = "#f97316";
+  renderCtx.beginPath();
+  renderCtx.moveTo(tile * 0.32, -tile * 0.1);
+  renderCtx.lineTo(tile * 0.48, -tile * 0.02);
+  renderCtx.lineTo(tile * 0.32, tile * 0.03);
+  renderCtx.closePath();
+  renderCtx.fill();
+
+  renderCtx.fillStyle = "#111827";
+  renderCtx.beginPath();
+  renderCtx.arc(tile * 0.22, -tile * 0.14, Math.max(1.5, tile * 0.025), 0, Math.PI * 2);
+  renderCtx.fill();
+
+  renderCtx.fillStyle = "rgba(234, 179, 8, 0.9)";
+  renderCtx.beginPath();
+  renderCtx.ellipse(-tile * 0.12, tile * 0.09, tile * 0.14, tile * 0.09, -0.35, 0, Math.PI * 2);
+  renderCtx.fill();
+  renderCtx.restore();
+}
+
+function getTeleporterDoorRole(row, col, teleportType) {
+  const sameColorTeleports = teleportBlocks
+    .filter(tp => tp.type === teleportType)
+    .slice()
+    .sort((a, b) => (a.row - b.row) || (a.col - b.col));
+
+  if (sameColorTeleports.length !== 2) return "in";
+  const isFirst =
+    sameColorTeleports[0].row === row &&
+    sameColorTeleports[0].col === col;
+  return isFirst ? "in" : "out";
+}
+
+function drawTeleporterDoor(renderCtx, x, y, tile, teleportType, role = "in") {
+  const color = TELEPORT_COLORS[teleportType];
+  const doorColor = TELEPORT_DOOR_COLORS[teleportType];
+  if (!color || !doorColor) return;
+
+  const frameX = x + tile * 0.22;
+  const frameY = y + tile * 0.1;
+  const frameW = tile * 0.56;
+  const frameH = tile * 0.8;
+  const gapLeft = frameX + frameW * 0.08;
+  const gapRight = frameX + frameW * 0.42;
+  const slabLeft = frameX + frameW * 0.5;
+  const slabTop = frameY + frameH * 0.04;
+  const slabBottom = frameY + frameH * 0.96;
+  const slabRightTop = frameX + frameW * 1.02;
+  const slabRightBottom = frameX + frameW * 0.82;
+
+  renderCtx.save();
+
+  renderCtx.fillStyle = "rgba(15, 23, 42, 0.35)";
+  renderCtx.beginPath();
+  renderCtx.ellipse(x + tile / 2, y + tile * 0.9, tile * 0.31, tile * 0.06, 0, 0, Math.PI * 2);
+  renderCtx.fill();
+
+  // Teleporter color stays as light leaking from the opening, so the
+  // object can look like a real wooden door while still showing its pair.
+  renderCtx.fillStyle = doorColor.glow;
+  renderCtx.globalAlpha = 1;
+  renderCtx.fillRect(gapLeft, frameY + frameH * 0.08, gapRight - gapLeft, frameH * 0.82);
+
+  // Doorway darkness visible through the half-open gap.
+  renderCtx.fillStyle = "rgba(12, 8, 7, 0.86)";
+  renderCtx.fillRect(gapLeft, frameY + frameH * 0.06, gapRight - gapLeft, frameH * 0.88);
+
+  // Colored wooden frame matching the teleporter type.
+  renderCtx.strokeStyle = doorColor.dark;
+  renderCtx.lineWidth = Math.max(3, tile * 0.07);
+  renderCtx.strokeRect(frameX, frameY, frameW, frameH);
+  renderCtx.strokeStyle = doorColor.edge;
+  renderCtx.lineWidth = Math.max(1, tile * 0.02);
+  renderCtx.strokeRect(frameX + tile * 0.02, frameY + tile * 0.02, frameW - tile * 0.04, frameH - tile * 0.04);
+
+  // Half-open colored wood slab, perspective skewed like the reference photo.
+  renderCtx.fillStyle = doorColor.door;
+  renderCtx.beginPath();
+  renderCtx.moveTo(slabLeft, slabTop);
+  renderCtx.lineTo(slabRightTop, frameY + frameH * 0.12);
+  renderCtx.lineTo(slabRightBottom, slabBottom);
+  renderCtx.lineTo(slabLeft, frameY + frameH * 0.9);
+  renderCtx.closePath();
+  renderCtx.fill();
+  renderCtx.strokeStyle = doorColor.dark;
+  renderCtx.lineWidth = Math.max(1.5, tile * 0.035);
+  renderCtx.stroke();
+
+  // Wood panels.
+  renderCtx.strokeStyle = "rgba(255, 255, 255, 0.28)";
+  renderCtx.lineWidth = Math.max(1, tile * 0.018);
+  const panelLeft = slabLeft + frameW * 0.08;
+  const panelRightTop = slabRightTop - frameW * 0.1;
+  const panelRightBottom = slabRightBottom - frameW * 0.1;
+  renderCtx.beginPath();
+  renderCtx.moveTo(panelLeft, frameY + frameH * 0.2);
+  renderCtx.lineTo(panelRightTop, frameY + frameH * 0.25);
+  renderCtx.moveTo(panelLeft, frameY + frameH * 0.45);
+  renderCtx.lineTo(panelRightTop - frameW * 0.03, frameY + frameH * 0.48);
+  renderCtx.moveTo(panelLeft, frameY + frameH * 0.7);
+  renderCtx.lineTo(panelRightBottom, frameY + frameH * 0.7);
+  renderCtx.stroke();
+
+  // Teleporter-colored rim light along the opening.
+  renderCtx.strokeStyle = doorColor.edge;
+  renderCtx.lineWidth = Math.max(1.5, tile * 0.035);
+  renderCtx.beginPath();
+  renderCtx.moveTo(gapRight, frameY + frameH * 0.1);
+  renderCtx.lineTo(gapRight, frameY + frameH * 0.88);
+  renderCtx.stroke();
+
+  // Handle and lock plate.
+  renderCtx.fillStyle = "#1f2937";
+  renderCtx.fillRect(slabLeft + frameW * 0.12, frameY + frameH * 0.48, frameW * 0.08, frameH * 0.18);
+  renderCtx.fillStyle = "#d1d5db";
+  renderCtx.beginPath();
+  renderCtx.arc(slabLeft + frameW * 0.2, frameY + frameH * 0.57, Math.max(1.5, tile * 0.028), 0, Math.PI * 2);
+  renderCtx.fill();
+
+  // White arrow inside the door gap:
+  // "in" points into the doorway; "out" points out of the doorway.
+  const arrowY = frameY + frameH * 0.58;
+  const arrowStartX = role === "out" ? gapRight - frameW * 0.01 : gapLeft + frameW * 0.01;
+  const arrowEndX = role === "out" ? gapLeft + frameW * 0.01 : gapRight - frameW * 0.01;
+  const arrowDir = arrowEndX > arrowStartX ? 1 : -1;
+  const headSize = Math.max(5, tile * 0.12);
+
+  renderCtx.strokeStyle = "rgba(0, 0, 0, 0.55)";
+  renderCtx.fillStyle = "rgba(0, 0, 0, 0.55)";
+  renderCtx.lineWidth = Math.max(4, tile * 0.08);
+  renderCtx.lineCap = "round";
+  renderCtx.beginPath();
+  renderCtx.moveTo(arrowStartX, arrowY);
+  renderCtx.lineTo(arrowEndX - arrowDir * headSize * 0.55, arrowY);
+  renderCtx.stroke();
+  renderCtx.beginPath();
+  renderCtx.moveTo(arrowEndX, arrowY);
+  renderCtx.lineTo(arrowEndX - arrowDir * headSize, arrowY - headSize * 0.6);
+  renderCtx.lineTo(arrowEndX - arrowDir * headSize, arrowY + headSize * 0.6);
+  renderCtx.closePath();
+  renderCtx.fill();
+
+  renderCtx.strokeStyle = "#ffffff";
+  renderCtx.fillStyle = "#ffffff";
+  renderCtx.lineWidth = Math.max(2.5, tile * 0.055);
+  renderCtx.lineCap = "round";
+  renderCtx.beginPath();
+  renderCtx.moveTo(arrowStartX, arrowY);
+  renderCtx.lineTo(arrowEndX - arrowDir * headSize * 0.55, arrowY);
+  renderCtx.stroke();
+  renderCtx.beginPath();
+  renderCtx.moveTo(arrowEndX, arrowY);
+  renderCtx.lineTo(arrowEndX - arrowDir * headSize, arrowY - headSize * 0.6);
+  renderCtx.lineTo(arrowEndX - arrowDir * headSize, arrowY + headSize * 0.6);
+  renderCtx.closePath();
+  renderCtx.fill();
+
+  renderCtx.restore();
+}
+
+function drawPlatformLevelGuide() {
+  if (!CM_EDITOR_PAGE || mode !== "edit") return;
+
+  ctx.save();
+  ctx.fillStyle = "rgba(15, 23, 42, 0.72)";
+  ctx.font = "bold 18px Arial";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+
+  for (let r = 0; r < ROWS; r++) {
+    const level = rowToPlatformLevel(r);
+    const y = r * TILE_SIZE + TILE_SIZE / 2;
+    ctx.fillText(String(level), TILE_SIZE * 0.24, y);
+  }
+
+  ctx.font = "bold 14px Arial";
+  for (let c = 0; c < COLS; c++) {
+    const x = c * TILE_SIZE + TILE_SIZE / 2;
+    ctx.fillText(String(c), x, TILE_SIZE * 0.22);
+  }
+
+  ctx.restore();
+}
+
+function drawReplayCellDecoration(replayCtx, cellType, x, y, tile, row = null, col = null, targetPiecesData = []) {
   const inset = Math.max(1, Math.floor(tile * 0.08));
   const innerSize = Math.max(1, tile - inset * 2);
   const centerX = x + tile / 2;
@@ -1476,23 +1945,18 @@ function drawReplayCellDecoration(replayCtx, cellType, x, y, tile) {
   }
 
   if (cellType === CELL_TYPES.PHASE_BLOCK) {
-    replayCtx.fillStyle = "rgba(52, 152, 219, 0.3)";
-    replayCtx.fillRect(x + inset, y + inset, innerSize, innerSize);
-    replayCtx.fillStyle = "rgba(25, 118, 210, 0.6)";
-    const arrow = Math.max(2, Math.floor(tile * 0.16));
-    const bottom = y + tile - inset - 1;
-    replayCtx.beginPath();
-    replayCtx.moveTo(centerX, bottom);
-    replayCtx.lineTo(centerX - arrow, bottom - arrow);
-    replayCtx.lineTo(centerX + arrow, bottom - arrow);
-    replayCtx.closePath();
-    replayCtx.fill();
+    drawInactivePhaseBlock(replayCtx, x, y, tile, inset);
     return;
   }
 
   if (cellType === CELL_TYPES.PHASE_BLOCK_ACTIVE) {
     replayCtx.fillStyle = "rgba(41, 128, 185, 0.8)";
     replayCtx.fillRect(x + inset, y + inset, innerSize, innerSize);
+    return;
+  }
+
+  if (cellType === CELL_TYPES.MOVING_PLATFORM) {
+    drawMovingPlatform(replayCtx, x, y, tile);
     return;
   }
 
@@ -1536,16 +2000,7 @@ function drawReplayCellDecoration(replayCtx, cellType, x, y, tile) {
     CELL_TYPES.TELEPORT_BLUE,
     CELL_TYPES.TELEPORT_ORANGE
   ].includes(cellType)) {
-    const color = TELEPORT_COLORS[cellType];
-    if (color) {
-      replayCtx.fillStyle = color.fill;
-      replayCtx.beginPath();
-      replayCtx.arc(centerX, centerY, tile / 3, 0, Math.PI * 2);
-      replayCtx.fill();
-      replayCtx.strokeStyle = color.stroke;
-      replayCtx.lineWidth = Math.max(1, tile * 0.07);
-      replayCtx.stroke();
-    }
+    drawTeleporterDoor(replayCtx, x, y, tile, cellType, "in");
     return;
   }
 
@@ -1584,6 +2039,17 @@ function drawReplayPlayerPiece(replayCtx, pieceType, row, col, ox, oy, tile) {
   const img = pieceImages[pieceType];
   if (img && img.complete) {
     replayCtx.drawImage(img, x + pad, y + pad, tile - pad * 2, tile - pad * 2);
+    if (pieceType === "castle_rook") {
+      drawCastleRookMarker(replayCtx, x, y, tile);
+    }
+    return;
+  }
+
+  if (cellType === CELL_TYPES.BLACK_TARGET_PIECE) {
+    const targetPiece = Array.isArray(targetPiecesData)
+      ? targetPiecesData.find(piece => !piece.captured && piece.row === row && piece.col === col)
+      : null;
+    drawBlackTargetPiece(replayCtx, x, y, tile, targetPiece ? targetPiece.pieceType : "pawn");
     return;
   }
   replayCtx.fillStyle = "#ffffff";
@@ -1595,6 +2061,57 @@ function drawReplayPlayerPiece(replayCtx, pieceType, row, col, ox, oy, tile) {
   replayCtx.textBaseline = "middle";
   replayCtx.font = `600 ${Math.max(7, Math.floor(tile * 0.35))}px Segoe UI`;
   replayCtx.fillText(String(pieceType || "P").charAt(0).toUpperCase(), x + tile / 2, y + tile / 2 + 0.5);
+  if (pieceType === "castle_rook") {
+    drawCastleRookMarker(replayCtx, x, y, tile);
+  }
+}
+
+function drawBlackTargetPiece(renderCtx, x, y, tile, pieceType) {
+  const pad = Math.max(1, Math.floor(tile * 0.13));
+  const img = targetPieceImages[pieceType] || targetPieceImages.pawn;
+
+  renderCtx.save();
+  renderCtx.fillStyle = "rgba(17, 24, 39, 0.18)";
+  renderCtx.beginPath();
+  renderCtx.arc(x + tile / 2, y + tile / 2, tile * 0.42, 0, Math.PI * 2);
+  renderCtx.fill();
+
+  if (img && img.complete) {
+    renderCtx.drawImage(img, x + pad, y + pad, tile - pad * 2, tile - pad * 2);
+  } else {
+    renderCtx.fillStyle = "#111827";
+    renderCtx.textAlign = "center";
+    renderCtx.textBaseline = "middle";
+    renderCtx.font = `700 ${Math.max(10, Math.floor(tile * 0.44))}px Arial`;
+    renderCtx.fillText(String(pieceType || "P").charAt(0).toUpperCase(), x + tile / 2, y + tile / 2);
+  }
+
+  renderCtx.strokeStyle = "rgba(255, 255, 255, 0.75)";
+  renderCtx.lineWidth = Math.max(1, tile * 0.035);
+  renderCtx.beginPath();
+  renderCtx.arc(x + tile / 2, y + tile / 2, tile * 0.42, 0, Math.PI * 2);
+  renderCtx.stroke();
+  renderCtx.restore();
+}
+
+function drawCastleRookMarker(renderCtx, x, y, size) {
+  const radius = Math.max(4, size * 0.14);
+  const centerX = x + size * 0.76;
+  const centerY = y + size * 0.24;
+
+  renderCtx.save();
+  renderCtx.fillStyle = "rgba(245, 158, 11, 0.95)";
+  renderCtx.beginPath();
+  renderCtx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+  renderCtx.fill();
+  renderCtx.strokeStyle = "rgba(255, 255, 255, 0.95)";
+  renderCtx.lineWidth = Math.max(1, size * 0.035);
+  renderCtx.beginPath();
+  renderCtx.moveTo(centerX - radius * 0.45, centerY);
+  renderCtx.lineTo(centerX - radius * 0.08, centerY + radius * 0.38);
+  renderCtx.lineTo(centerX + radius * 0.55, centerY - radius * 0.45);
+  renderCtx.stroke();
+  renderCtx.restore();
 }
 
 function drawReplaySnapshotOnCanvas(index, canvasEl, stepEl, eventEl) {
@@ -1609,6 +2126,7 @@ function drawReplaySnapshotOnCanvas(index, canvasEl, stepEl, eventEl) {
   const cols = Number(snapshot.cols) || 1;
   const boardData = Array.isArray(snapshot.board) ? snapshot.board : [];
   const playersData = Array.isArray(snapshot.players) ? snapshot.players : [];
+  const targetPiecesData = Array.isArray(snapshot.targetPieces) ? snapshot.targetPieces : [];
 
   const cw = canvasEl.width;
   const ch = canvasEl.height;
@@ -1632,7 +2150,7 @@ function drawReplaySnapshotOnCanvas(index, canvasEl, stepEl, eventEl) {
       replayCtx.fillRect(x, y, tile, tile);
       replayCtx.strokeStyle = "rgba(0,0,0,0.12)";
       replayCtx.strokeRect(x + 0.5, y + 0.5, tile, tile);
-      drawReplayCellDecoration(replayCtx, cellType, x, y, tile);
+      drawReplayCellDecoration(replayCtx, cellType, x, y, tile, r, c, targetPiecesData);
     }
   }
 
@@ -1722,14 +2240,6 @@ function updateHintSolutionSection() {
     fewestOtherMovesDisplay.textContent = hasBenchmark
       ? `Others' best: ${fewestOtherMovesForLevel}`
       : "Others' best: --";
-  }
-  if (typeof window.cmEmitGameUi === "function") {
-    window.cmEmitGameUi({
-      type: "fewestOtherMoves",
-      bestMoves: hasBenchmark ? fewestOtherMovesForLevel : null,
-      userName: fewestOtherMovesUserName,
-      replayUnlocked: replayUnlockedForLevel,
-    });
   }
 
   if (blockTipToggle) {
@@ -2012,9 +2522,26 @@ function updateObjectiveCount() {
   }
 }
 
+function updateTargetPieceCount() {
+  if (!targetPieceCount) return;
+  const captured = targetPieces.filter(piece => piece.captured).length;
+  targetPieceCount.textContent = `Target Pieces: ${captured}/${totalTargetPieces}`;
+  if (typeof window.cmEmitGameUi === "function") {
+    window.cmEmitGameUi({
+      type: "targetPieceCount",
+      captured,
+      totalTargetPieces,
+    });
+  }
+}
+
+function getUnlockProgressText() {
+  return `Objectives ${objectivesCompleted}/${totalObjectives}, Target Pieces ${targetPiecesCaptured}/${totalTargetPieces}`;
+}
+
 // Check if all objectives are completed
 function areAllObjectivesCompleted() {
-  return objectivesCompleted >= totalObjectives;
+  return objectivesCompleted >= totalObjectives && targetPiecesCaptured >= totalTargetPieces;
 }
 
 // Complete an objective
@@ -2031,6 +2558,12 @@ function completeObjective(row, col) {
   return false;
 }
 
+function getObjectiveCellTypeAt(row, col) {
+  const objective = objectives.find(obj => obj.row === row && obj.col === col);
+  if (!objective) return CELL_TYPES.EMPTY;
+  return objective.completed ? CELL_TYPES.OBJECTIVE_COMPLETED : CELL_TYPES.OBJECTIVE;
+}
+
 // Check for objective completion when players move
 function checkObjectiveCompletion() {
   for (const player of players) {
@@ -2040,6 +2573,36 @@ function checkObjectiveCompletion() {
       }
     }
   }
+}
+
+function getTargetPieceAt(row, col) {
+  return targetPieces.findIndex(piece =>
+    !piece.captured &&
+    piece.row === row &&
+    piece.col === col
+  );
+}
+
+function removeTargetPieceAt(row, col) {
+  const index = targetPieces.findIndex(piece => piece.row === row && piece.col === col);
+  if (index !== -1) {
+    targetPieces.splice(index, 1);
+    totalTargetPieces = targetPieces.length;
+    targetPiecesCaptured = targetPieces.filter(piece => piece.captured).length;
+    updateTargetPieceCount();
+  }
+}
+
+function completeTargetPiece(row, col) {
+  const targetIndex = getTargetPieceAt(row, col);
+  if (targetIndex === -1) return false;
+
+  targetPieces[targetIndex].captured = true;
+  targetPiecesCaptured++;
+  board[row][col] = CELL_TYPES.EMPTY;
+  updateTargetPieceCount();
+  updateStatus(`Target piece captured! ${targetPiecesCaptured}/${totalTargetPieces}`);
+  return true;
 }
 
 // Reset all phase blocks to inactive state
@@ -2054,7 +2617,255 @@ function resetPhaseBlocks() {
   }
 }
 
-// Deferred from former game.js ~1029-1038 (must run after openHintModal / setupReplayStepNav exist).
+function createBoomBomb(row, col, type) {
+  const isLeftDiagonal = type === "boom_left";
+  return {
+    row,
+    col,
+    type,
+    rowDirection: 1,
+    colDirection: isLeftDiagonal ? -1 : 1
+  };
+}
+
+function normalizeBombData(bomb) {
+  if (bomb.type === "boom_right" || bomb.type === "boom_left") {
+    const defaultBoom = createBoomBomb(bomb.row, bomb.col, bomb.type);
+    return {
+      row: bomb.row,
+      col: bomb.col,
+      type: bomb.type,
+      rowDirection: bomb.rowDirection || defaultBoom.rowDirection,
+      colDirection: bomb.colDirection || defaultBoom.colDirection
+    };
+  }
+
+  return {
+    row: bomb.row,
+    col: bomb.col,
+    direction: bomb.direction || 1
+  };
+}
+
+function normalizeDuckData(duck) {
+  return {
+    row: Number.parseInt(duck.row, 10),
+    col: Number.parseInt(duck.col, 10),
+    direction: duck.direction === -1 ? -1 : 1
+  };
+}
+
+function normalizeTargetPieceData(piece) {
+  const allowedTypes = ["rook", "bishop", "queen", "knight", "king", "pawn"];
+  const pieceType = allowedTypes.includes(piece.pieceType) ? piece.pieceType : "pawn";
+  return {
+    row: Number.parseInt(piece.row, 10),
+    col: Number.parseInt(piece.col, 10),
+    pieceType,
+    captured: !!piece.captured
+  };
+}
+
+function normalizeLaserDirections(directions) {
+  if (!Array.isArray(directions)) return DEFAULT_LASER_DIRECTIONS.slice();
+  const validDirections = directions.filter(direction => DEFAULT_LASER_DIRECTIONS.includes(direction));
+  return [...new Set(validDirections)];
+}
+
+function normalizeLaserFireEverySteps(value) {
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed)) return DEFAULT_LASER_FIRE_EVERY_STEPS;
+  return Math.max(2, Math.min(99, parsed));
+}
+
+function getLaserFireEverySteps(laser) {
+  return normalizeLaserFireEverySteps(laser && laser.fireEverySteps);
+}
+
+function normalizeLaserBlockData(laser) {
+  return {
+    row: Number.parseInt(laser.row, 10),
+    col: Number.parseInt(laser.col, 10),
+    directions: normalizeLaserDirections(laser.directions),
+    fireEverySteps: normalizeLaserFireEverySteps(laser.fireEverySteps)
+  };
+}
+
+function getDuckAt(row, col) {
+  return ducks.findIndex(duck => duck.row === row && duck.col === col);
+}
+
+function isBoomPieceType(pieceType) {
+  return pieceType === "boom_right" || pieceType === "boom_left";
+}
+
+function isBoomBomb(bomb) {
+  return isBoomPieceType(bomb.type);
+}
+
+function isLaserBlockAt(row, col) {
+  return laserBlocks.some(laser => laser.row === row && laser.col === col);
+}
+
+function removeLaserBlockAt(row, col) {
+  const index = laserBlocks.findIndex(laser => laser.row === row && laser.col === col);
+  if (index !== -1) {
+    laserBlocks.splice(index, 1);
+  }
+}
+
+function addLaserBlock(row, col, directions = DEFAULT_LASER_DIRECTIONS, fireEverySteps = DEFAULT_LASER_FIRE_EVERY_STEPS) {
+  const normalizedDirections = normalizeLaserDirections(directions);
+  const normalizedFireEverySteps = normalizeLaserFireEverySteps(fireEverySteps);
+  const existing = laserBlocks.find(laser => laser.row === row && laser.col === col);
+  if (existing) {
+    existing.directions = normalizedDirections;
+    existing.fireEverySteps = normalizedFireEverySteps;
+    return;
+  }
+
+  if (!isLaserBlockAt(row, col)) {
+    laserBlocks.push({ row, col, directions: normalizedDirections, fireEverySteps: normalizedFireEverySteps });
+  }
+}
+
+function isLaserBlockingCell(row, col) {
+  return board[row][col] === CELL_TYPES.SOLID_BLOCK ||
+    board[row][col] === CELL_TYPES.PHASE_BLOCK_ACTIVE ||
+    board[row][col] === CELL_TYPES.MOVING_PLATFORM;
+}
+
+function isLaserActive(laser, moveNumber = levelMoveCount) {
+  const fireEverySteps = getLaserFireEverySteps(laser);
+  return moveNumber > 0 && moveNumber % fireEverySteps === 0;
+}
+
+function getLaserCountdown(laser, moveNumber = levelMoveCount) {
+  const fireEverySteps = getLaserFireEverySteps(laser);
+  if (moveNumber > 0 && moveNumber % fireEverySteps === 0) {
+    return 0;
+  }
+  return fireEverySteps - (moveNumber % fireEverySteps);
+}
+
+function getLaserDirections(laser) {
+  const enabledDirections = normalizeLaserDirections(laser.directions);
+  return LASER_DIRECTIONS.filter(direction => enabledDirections.includes(direction.name));
+}
+
+function getLaserCellsFromBlock(laser) {
+  const cells = [];
+  for (const direction of getLaserDirections(laser)) {
+    let row = laser.row + direction.dr;
+    let col = laser.col + direction.dc;
+    while (row >= 0 && row < ROWS && col >= 0 && col < COLS) {
+      if (isLaserBlockingCell(row, col)) break;
+      cells.push({ row, col, direction: direction.name });
+      row += direction.dr;
+      col += direction.dc;
+    }
+  }
+  return cells;
+}
+
+function isCellInActiveLaser(row, col) {
+  return laserBlocks.some(laser =>
+    isLaserActive(laser) &&
+    getLaserCellsFromBlock(laser).some(cell => cell.row === row && cell.col === col)
+  );
+}
+
+function getMoveTraversalCells(fromRow, fromCol, toRow, toCol) {
+  const rowDelta = toRow - fromRow;
+  const colDelta = toCol - fromCol;
+  const rowStep = Math.sign(rowDelta);
+  const colStep = Math.sign(colDelta);
+  const straightOrDiagonal =
+    fromRow === toRow ||
+    fromCol === toCol ||
+    Math.abs(rowDelta) === Math.abs(colDelta);
+
+  if (!straightOrDiagonal) {
+    return [{ row: toRow, col: toCol }];
+  }
+
+  const steps = Math.max(Math.abs(rowDelta), Math.abs(colDelta));
+  const cells = [];
+  for (let i = 1; i <= steps; i++) {
+    cells.push({
+      row: fromRow + rowStep * i,
+      col: fromCol + colStep * i
+    });
+  }
+  return cells;
+}
+
+function getActiveLaserHitOnMove(player, toRow, toCol) {
+  return getMoveTraversalCells(player.row, player.col, toRow, toCol)
+    .find(cell => isCellInActiveLaser(cell.row, cell.col)) || null;
+}
+
+function clampPlatformLevel(level) {
+  const parsed = Number.parseInt(level, 10);
+  if (!Number.isFinite(parsed)) return 0;
+  return Math.max(0, Math.min(ROWS - 1, parsed));
+}
+
+function rowToPlatformLevel(row) {
+  return clampPlatformLevel(ROWS - 1 - row);
+}
+
+function platformLevelToRow(level) {
+  return ROWS - 1 - clampPlatformLevel(level);
+}
+
+function clampPlatformCol(col) {
+  const parsed = Number.parseInt(col, 10);
+  if (!Number.isFinite(parsed)) return 0;
+  return Math.max(0, Math.min(COLS - 1, parsed));
+}
+
+function normalizeMovingPlatformData(platform) {
+  const axis = platform.axis === "horizontal" ? "horizontal" : "vertical";
+  if (axis === "horizontal") {
+    const currentCol = platform.currentCol !== undefined
+      ? clampPlatformCol(platform.currentCol)
+      : clampPlatformCol(platform.col);
+    const minCol = clampPlatformCol(platform.minCol !== undefined ? platform.minCol : 0);
+    const maxCol = clampPlatformCol(platform.maxCol !== undefined ? platform.maxCol : COLS - 1);
+    const low = Math.min(minCol, maxCol);
+    const high = Math.max(minCol, maxCol);
+
+    return {
+      axis: "horizontal",
+      row: platform.row,
+      col: platform.col !== undefined ? platform.col : currentCol,
+      minCol: low,
+      maxCol: high,
+      currentCol: Math.max(low, Math.min(high, currentCol)),
+      direction: platform.direction === -1 ? -1 : 1
+    };
+  }
+
+  const currentLevel = platform.currentLevel !== undefined
+    ? clampPlatformLevel(platform.currentLevel)
+    : rowToPlatformLevel(platform.row);
+  const minLevel = clampPlatformLevel(platform.minLevel !== undefined ? platform.minLevel : 0);
+  const maxLevel = clampPlatformLevel(platform.maxLevel !== undefined ? platform.maxLevel : ROWS - 1);
+  const low = Math.min(minLevel, maxLevel);
+  const high = Math.max(minLevel, maxLevel);
+
+  return {
+    row: platform.row !== undefined ? platform.row : platformLevelToRow(currentLevel),
+    col: platform.col,
+    minLevel: low,
+    maxLevel: high,
+    currentLevel: Math.max(low, Math.min(high, currentLevel)),
+    direction: platform.direction === -1 ? -1 : 1
+  };
+}
+
+// Deferred from monolith ~1127-1135 (must run after openHintModal / setupReplayStepNav exist).
 setupAntigravityExchangeModal();
 setupReplayExchangeModal();
 setupInGameWalkthrough();
@@ -2066,13 +2877,13 @@ window.handleSolutionGuideAction = handleSolutionGuideAction;
 window.openInGameWalkthroughModal = openInGameWalkthroughModal;
 window.openHintModal = openHintModal;
 
-// --- Load puzzle from JSON file ---
 
 /**
  * game/04-level-rules.js
  * loadPuzzle, gravity, moves, win, undo, teleport, transformer
- * Split from game.js lines 1951-3060 — logic unchanged.
+ * Split from game.monolith.js lines 2758-4121.
  */
+// --- Load puzzle from JSON file ---
 function loadPuzzle(puzzleData) {
   currentPuzzleData = JSON.parse(JSON.stringify(puzzleData)); // Deep copy
   moveHistorySnapshots = [];
@@ -2109,15 +2920,82 @@ function loadPuzzle(puzzleData) {
       }
     }
     
+    bombs = [];
+    if (Array.isArray(puzzleData.bombs)) {
+      bombs = puzzleData.bombs
+        .filter(b => b.row < loadedRows && b.col < loadedCols)
+        .map(normalizeBombData);
+    }
+
+    laserBlocks = [];
+    if (Array.isArray(puzzleData.laserBlocks)) {
+      laserBlocks = puzzleData.laserBlocks
+        .map(normalizeLaserBlockData)
+        .filter(laser =>
+          Number.isFinite(laser.row) &&
+          Number.isFinite(laser.col) &&
+          laser.row >= 0 &&
+          laser.row < loadedRows &&
+          laser.col >= 0 &&
+          laser.col < loadedCols
+        );
+    }
+
+    ducks = [];
+    if (Array.isArray(puzzleData.ducks)) {
+      ducks = puzzleData.ducks
+        .map(normalizeDuckData)
+        .filter(duck =>
+          Number.isFinite(duck.row) &&
+          Number.isFinite(duck.col) &&
+          duck.row >= 0 &&
+          duck.row < loadedRows &&
+          duck.col >= 0 &&
+          duck.col < loadedCols
+        );
+    }
+
+    movingPlatforms = [];
+    if (Array.isArray(puzzleData.movingPlatforms)) {
+      movingPlatforms = puzzleData.movingPlatforms
+        .filter(platform => platform.row < loadedRows && platform.col < loadedCols)
+        .map(normalizeMovingPlatformData);
+    }
+
     // Recreate players (filter out ones that don't fit)
+    players = [];
     if (puzzleData.players && Array.isArray(puzzleData.players)) {
-      players = puzzleData.players
+      puzzleData.players
         .filter(player => player.row < loadedRows && player.col < loadedCols)
-        .map(player => ({ 
-          row: player.row, 
-          col: player.col, 
-          pieceType: player.pieceType || "rook"
-        }));
+        .forEach(player => {
+          const pieceType = player.pieceType || "rook";
+          if (isBoomPieceType(pieceType)) {
+            bombs.push(createBoomBomb(player.row, player.col, pieceType));
+            board[player.row][player.col] = CELL_TYPES.BOMB;
+            return;
+          }
+
+          players.push({
+            row: player.row,
+            col: player.col,
+            pieceType,
+            hasMoved: !!player.hasMoved
+          });
+        });
+    }
+    for (const b of bombs) {
+      board[b.row][b.col] = CELL_TYPES.BOMB;
+    }
+    for (const laser of laserBlocks) {
+      board[laser.row][laser.col] = CELL_TYPES.SOLID_BLOCK;
+    }
+    for (const platform of movingPlatforms) {
+      if (platform.axis === "horizontal") {
+        platform.col = clampPlatformCol(platform.currentCol);
+      } else {
+        platform.row = platformLevelToRow(platform.currentLevel);
+      }
+      board[platform.row][platform.col] = CELL_TYPES.MOVING_PLATFORM;
     }
     for (const p of players) {
       visitedSquares[p.row][p.col] = true;
@@ -2152,24 +3030,37 @@ function loadPuzzle(puzzleData) {
         }));
 
       // 💣 Recreate bombs from saved data
-      bombs = [];
-      if (Array.isArray(puzzleData.bombs)) {
-        bombs = puzzleData.bombs
-          .filter(b => b.row < loadedRows && b.col < loadedCols)
-          .map(b => ({
-            row: b.row,
-            col: b.col,
-            direction: b.direction || 1 // Default to moving right if direction not specified
-          }));
-        
-        // Update board with bomb positions
-        for (const b of bombs) {
-          board[b.row][b.col] = CELL_TYPES.BOMB;
-        }
-      }
-
       totalObjectives = objectives.length;
       objectivesCompleted = objectives.filter(obj => obj.completed).length;
+    } else {
+      objectives = [];
+      totalObjectives = 0;
+      objectivesCompleted = 0;
+    }
+
+    targetPieces = [];
+    if (Array.isArray(puzzleData.targetPieces)) {
+      targetPieces = puzzleData.targetPieces
+        .map(normalizeTargetPieceData)
+        .filter(piece =>
+          Number.isFinite(piece.row) &&
+          Number.isFinite(piece.col) &&
+          piece.row >= 0 &&
+          piece.row < loadedRows &&
+          piece.col >= 0 &&
+          piece.col < loadedCols
+        );
+      totalTargetPieces = targetPieces.length;
+      targetPiecesCaptured = targetPieces.filter(piece => piece.captured).length;
+      for (const piece of targetPieces) {
+        if (!piece.captured) {
+          board[piece.row][piece.col] = CELL_TYPES.BLACK_TARGET_PIECE;
+        }
+      }
+    } else {
+      targetPieces = [];
+      totalTargetPieces = 0;
+      targetPiecesCaptured = 0;
     }
 
     teleportBlocks = [];
@@ -2188,12 +3079,14 @@ function loadPuzzle(puzzleData) {
 
     updatePlayerCount();
     updateObjectiveCount();
+    updateTargetPieceCount();
     updateStatus(`Puzzle "${puzzleData.name}" loaded successfully! Size: ${loadedRows}x${loadedCols}`);
     // ✅ Reset state so pieces can move again
     mode = "play";
     gameWon = false;
     antigravityEnabled = false;
     antigravityUnlockedThisRun = false;
+    frameCount = 0;
     levelMoveCount = 0;
     updateMoveCountDisplay();
     updateAntigravityButtonLabel();
@@ -2245,6 +3138,18 @@ function decrementCounterAfterMove() {
 function isCellBlocked(row, col, ignorePlayer = null, fromDirection = null) {
   // Check if cell has a solid block (but allow transformer blocks)
   if (board[row][col] === CELL_TYPES.SOLID_BLOCK) {
+    return true;
+  }
+
+  if (board[row][col] === CELL_TYPES.MOVING_PLATFORM) {
+    return true;
+  }
+
+  if (getDuckAt(row, col) !== -1) {
+    return true;
+  }
+
+  if (board[row][col] === CELL_TYPES.BLACK_TARGET_PIECE) {
     return true;
   }
 
@@ -2347,7 +3252,7 @@ function updateFallingPieces() {
 
   for (let i = fallingPieces.length - 1; i >= 0; i--) {
     const piece = fallingPieces[i];
-    const targetY = piece.targetRow * TILE_SIZE;
+    let targetY = piece.targetRow * TILE_SIZE;
     const prevY = piece.y;
 
     // Move piece down
@@ -2358,7 +3263,18 @@ function updateFallingPieces() {
     const currentRow = Math.floor(piece.y / TILE_SIZE);
 
     if (currentRow !== prevRow) {
-      for (let r = prevRow + 1; r <= currentRow; r++) {
+      for (let r = prevRow + 1; r <= Math.min(currentRow, ROWS - 1); r++) {
+        // A falling piece can land on a duck that moves into the same column.
+        // The duck itself occupies row r, so the piece lands one cell above it.
+        if (getDuckAt(r, piece.col) !== -1 && r > 0) {
+          piece.targetRow = r - 1;
+          targetY = piece.targetRow * TILE_SIZE;
+          if (piece.y >= targetY) {
+            piece.y = targetY;
+          }
+          break;
+        }
+
         // Check if landing on a bomb during fall
         if (board[r][piece.col] === CELL_TYPES.BOMB) {
           // Handle bomb collision for falling piece
@@ -2678,7 +3594,7 @@ function checkWinCondition() {
     for (const player of players) {
       if (player.row === goal.row && player.col === goal.col) {
         gameWon = true;
-        updateStatus("Puzzle solved! All objectives completed and goal reached!");
+        updateStatus("Puzzle solved! All requirements completed and goal reached!");
         triggerConfetti();
         showLevelCompleteModal();
         syncProgressAfterWin();
@@ -2723,6 +3639,30 @@ function isPathClear(r1, c1, r2, c2, movingPlayer = null) {
   return true;
 }
 
+function isPawnForwardDestinationCell(row, col, movingPlayer) {
+  return board[row][col] !== CELL_TYPES.PHASE_BLOCK &&
+    !isCellBlocked(row, col, movingPlayer, "below");
+}
+
+function isPawnForwardPathCell(row, col, movingPlayer) {
+  if (board[row][col] === CELL_TYPES.MOVING_PLATFORM) {
+    return true;
+  }
+  return !isCellBlocked(row, col, movingPlayer, "below");
+}
+
+function isPawnDiagonalCaptureCell(row, col) {
+  const cellType = board[row][col];
+  return [
+    CELL_TYPES.OBJECTIVE,
+    CELL_TYPES.OBJECTIVE_COMPLETED,
+    CELL_TYPES.TRANSFORMER,
+    CELL_TYPES.GOAL,
+    CELL_TYPES.COUNTER_GOAL,
+    CELL_TYPES.BLACK_TARGET_PIECE
+  ].includes(cellType);
+}
+
 // --- Movement rules ---
 function isValidMove(playerIndex, newRow, newCol) {
   if (playerIndex < 0 || playerIndex >= players.length) return false;
@@ -2745,6 +3685,8 @@ function isValidMove(playerIndex, newRow, newCol) {
   // Block if the cell is otherwise invalid (except transformer and bomb)
   if (board[newRow][newCol] !== CELL_TYPES.TRANSFORMER && 
       board[newRow][newCol] !== CELL_TYPES.BOMB &&
+      board[newRow][newCol] !== CELL_TYPES.BLACK_TARGET_PIECE &&
+      getDuckAt(newRow, newCol) === -1 &&
       isCellBlocked(newRow, newCol, player, fromDirection)) {
     return false;
   }
@@ -2753,6 +3695,7 @@ function isValidMove(playerIndex, newRow, newCol) {
   // Use the player's specific piece type
   switch (player.pieceType) {
     case "rook":
+    case "castle_rook":
       if (r === newRow || c === newCol) return isPathClear(r, c, newRow, newCol, player);
       return false;
     case "bishop":
@@ -2772,18 +3715,107 @@ function isValidMove(playerIndex, newRow, newCol) {
     case "king":
       return Math.abs(newRow - r) <= 1 && Math.abs(newCol - c) <= 1;
     case "pawn":
-      // Pawns can only move forward one square
-      // In this puzzle, we'll assume all pawns move downward (increasing row)
-      if (newCol === c && newRow === r + 1) {
-        // Moving straight forward - can only move to empty square
-        return !isCellBlocked(newRow, newCol, player, "above");
-      } else if (Math.abs(newCol - c) === 1 && newRow === r + 1) {
-        // Capturing diagonally - can only move to occupied square (not blocks, but can capture other players)
-        return isCellBlocked(newRow, newCol, player, "above") && board[newRow][newCol] !== CELL_TYPES.SOLID_BLOCK && board[newRow][newCol] !== CELL_TYPES.PHASE_BLOCK && board[newRow][newCol] !== CELL_TYPES.PHASE_BLOCK_ACTIVE;
+      // Pawns move upward. First move can advance two squares; later moves advance one.
+      if (newCol === c && newRow === r - 1) {
+        return isPawnForwardDestinationCell(newRow, newCol, player);
+      } else if (newCol === c && newRow === r - 2 && !player.hasMoved) {
+        const middleRow = r - 1;
+        return middleRow >= 0 &&
+          isPawnForwardPathCell(middleRow, c, player) &&
+          isPawnForwardDestinationCell(newRow, newCol, player);
+      } else if (Math.abs(newCol - c) === 1 && newRow === r - 1) {
+        // Diagonal "captures" can take puzzle targets/blocks, like chess captures a piece.
+        return isPawnDiagonalCaptureCell(newRow, newCol);
       }
       return false;
   }
   return false;
+}
+
+function canCastle(kingIndex, rookIndex) {
+  if (kingIndex < 0 || rookIndex < 0 || kingIndex === rookIndex) return false;
+  const king = players[kingIndex];
+  const rook = players[rookIndex];
+  if (!king || !rook) return false;
+  if (king.pieceType !== "king" || rook.pieceType !== "castle_rook") return false;
+  if (king.hasMoved || rook.hasMoved) return false;
+  if (king.row !== rook.row) return false;
+
+  const direction = rook.col > king.col ? 1 : -1;
+  const kingTargetCol = king.col + direction * 2;
+  const rookTargetCol = kingTargetCol - direction;
+  if (kingTargetCol < 0 || kingTargetCol >= COLS || rookTargetCol < 0 || rookTargetCol >= COLS) return false;
+
+  const start = Math.min(king.col, rook.col) + 1;
+  const end = Math.max(king.col, rook.col);
+  for (let col = start; col < end; col++) {
+    if (board[king.row][col] !== CELL_TYPES.EMPTY || getPlayerAt(king.row, col) !== -1) {
+      return false;
+    }
+  }
+
+  const isOriginalKingOrRookCell = (col) =>
+    col === king.col || col === rook.col;
+  const isCastleTargetAvailable = (col) =>
+    board[king.row][col] === CELL_TYPES.EMPTY || isOriginalKingOrRookCell(col);
+
+  return (
+    isCastleTargetAvailable(kingTargetCol) &&
+    isCastleTargetAvailable(rookTargetCol)
+  );
+}
+
+function castleKingWithRook(kingIndex, rookIndex) {
+  if (!canCastle(kingIndex, rookIndex)) {
+    updateStatus("Castling is not available here");
+    return false;
+  }
+
+  const king = players[kingIndex];
+  const rook = players[rookIndex];
+  const oldKingRow = king.row;
+  const oldKingCol = king.col;
+  const oldRookRow = rook.row;
+  const oldRookCol = rook.col;
+  const direction = rook.col > king.col ? 1 : -1;
+  const kingTargetCol = king.col + direction * 2;
+  const rookTargetCol = kingTargetCol - direction;
+
+  saveUndoSnapshot();
+  queueMoveTraceCapture({
+    from: { row: oldKingRow, col: oldKingCol },
+    to: { row: oldKingRow, col: kingTargetCol },
+    pieceType: "king",
+    castling: direction > 0 ? "kingside" : "queenside",
+    rookFrom: { row: oldRookRow, col: oldRookCol },
+    rookTo: { row: oldRookRow, col: rookTargetCol }
+  });
+
+  board[oldKingRow][oldKingCol] = CELL_TYPES.EMPTY;
+  board[oldRookRow][oldRookCol] = CELL_TYPES.EMPTY;
+  king.col = kingTargetCol;
+  rook.col = rookTargetCol;
+  king.hasMoved = true;
+  rook.hasMoved = true;
+  board[king.row][king.col] = CELL_TYPES.PLAYER;
+  board[rook.row][rook.col] = CELL_TYPES.PLAYER;
+  visitedSquares[king.row][king.col] = true;
+  visitedSquares[rook.row][rook.col] = true;
+
+  levelMoveCount += 1;
+  updateMoveCountDisplay();
+  updateStatus(direction > 0 ? "Kingside castling!" : "Queenside castling!");
+  checkWinCondition();
+
+  if (gravityEnabled) {
+    applyGravity();
+  } else if (antigravityEnabled) {
+    applyAntigravity();
+  } else {
+    tryCapturePendingMoveTrace(true);
+  }
+
+  return true;
 }
 
 function movePlayer(playerIndex, newRow, newCol) {
@@ -2797,7 +3829,7 @@ function movePlayer(playerIndex, newRow, newCol) {
   if (!isValidMove(playerIndex, newRow, newCol)) {
     // Check if the move was invalid because goal is locked
     if (board[newRow][newCol] === CELL_TYPES.GOAL && !areAllObjectivesCompleted()) {
-      updateStatus("Complete all objectives first! " + objectivesCompleted + "/" + totalObjectives);
+      updateStatus("Complete all requirements first! " + getUnlockProgressText());
     } else {
       updateStatus("Invalid move for selected piece");
     }
@@ -2814,8 +3846,16 @@ function movePlayer(playerIndex, newRow, newCol) {
   levelMoveCount += 1;
   updateMoveCountDisplay();
 
-  // ✅ NEW: Check if moving into a bomb BEFORE moving
+  // Check the full movement path against active lasers before moving.
+  const laserHit = getActiveLaserHitOnMove(player, newRow, newCol);
+  if (laserHit) {
+    handleLaserCollision(playerIndex, laserHit.row, laserHit.col);
+    return;
+  }
+
   const isBombBlock = board[newRow][newCol] === CELL_TYPES.BOMB;
+  const isDuckHazard = getDuckAt(newRow, newCol) !== -1;
+  const isTargetPiece = board[newRow][newCol] === CELL_TYPES.BLACK_TARGET_PIECE;
 
   // Check if destination is ANY teleport block type BEFORE moving
   const isTeleportBlock = [
@@ -2834,10 +3874,20 @@ function movePlayer(playerIndex, newRow, newCol) {
     return; // Stop further processing
   }
 
+  if (isDuckHazard) {
+    handleDuckCollision(playerIndex);
+    return;
+  }
+
   board[player.row][player.col] = CELL_TYPES.EMPTY;
   player.row = newRow;
   player.col = newCol;
+  player.hasMoved = true;
   visitedSquares[newRow][newCol] = true;
+
+  if (isTargetPiece) {
+    completeTargetPiece(newRow, newCol);
+  }
 
   if (isTeleportBlock) {
     handleTeleport(player);
@@ -2859,8 +3909,8 @@ function movePlayer(playerIndex, newRow, newCol) {
   checkObjectiveCompletion();
 
   // Check if player moved through a phase block from below and activate it
-  if (newRow < player.row) { // Moving upward
-    for (let r = newRow + 1; r < player.row; r++) {
+  if (newRow < fromRow) { // Moving upward
+    for (let r = newRow + 1; r < fromRow; r++) {
       if (board[r][newCol] === CELL_TYPES.PHASE_BLOCK) {
         activatePhaseBlock(r, newCol);
       }
@@ -2923,8 +3973,14 @@ function saveUndoSnapshot() {
     objectives: cloneGameData(objectives),
     objectivesCompleted,
     totalObjectives,
+    targetPieces: cloneGameData(targetPieces),
+    targetPiecesCaptured,
+    totalTargetPieces,
     phaseBlockStates: cloneGameData(phaseBlockStates),
     bombs: cloneGameData(bombs),
+    laserBlocks: cloneGameData(laserBlocks),
+    ducks: cloneGameData(ducks),
+    movingPlatforms: cloneGameData(movingPlatforms),
     teleportBlocks: cloneGameData(teleportBlocks),
     playerTeleportCooldowns: Array.from(playerTeleportCooldowns.entries()),
     gameWon,
@@ -2961,8 +4017,14 @@ async function undoMove() {
   objectives = cloneGameData(snapshot.objectives);
   objectivesCompleted = snapshot.objectivesCompleted;
   totalObjectives = snapshot.totalObjectives;
+  targetPieces = cloneGameData(snapshot.targetPieces || []);
+  targetPiecesCaptured = snapshot.targetPiecesCaptured || targetPieces.filter(piece => piece.captured).length;
+  totalTargetPieces = snapshot.totalTargetPieces || targetPieces.length;
   phaseBlockStates = cloneGameData(snapshot.phaseBlockStates);
   bombs = cloneGameData(snapshot.bombs);
+  laserBlocks = cloneGameData(snapshot.laserBlocks || []);
+  ducks = cloneGameData(snapshot.ducks || []);
+  movingPlatforms = cloneGameData(snapshot.movingPlatforms || []);
   teleportBlocks = cloneGameData(snapshot.teleportBlocks);
   playerTeleportCooldowns = new Map(snapshot.playerTeleportCooldowns || []);
   gameWon = snapshot.gameWon;
@@ -2984,6 +4046,7 @@ async function undoMove() {
 
   updatePlayerCount();
   updateObjectiveCount();
+  updateTargetPieceCount();
   updateMoveCountDisplay();
   drawBoard();
 }
@@ -3132,16 +4195,17 @@ function handleTransformerMenuClick(e) {
   const buttonSize = 35;
   const spacing = 15;
   const menuWidth = 3 * buttonSize + 2 * spacing;
-  const menuHeight = 2 * buttonSize + spacing;
+  const menuHeight = 3 * buttonSize + 2 * spacing;
   const outerMargin = 20;
   
   const startX = centerX - menuWidth / 2;
   const startY = centerY - menuHeight / 2 - 10;
   
-  // Define the 2x3 grid layout
+  // Define the piece grid layout
   const pieceLayout = [
     ["rook", "bishop", "queen"],
-    ["knight", "king", "pawn"]
+    ["knight", "king", "pawn"],
+    ["castle_rook"]
   ];
   
   // Check if click is on any piece button
@@ -3186,8 +4250,8 @@ function handleTransformerMenuClick(e) {
 
 /**
  * game/05-vision-render.js
- * Valid moves, vision/fog, drawCellContent, drawBoard
- * Split from game.js lines 3061-3757 — logic unchanged.
+ * Valid moves, vision/fog, drawBoard
+ * Split from game.monolith.js lines 4122-4830.
  */
 function drawPossibleMoves() {
   if (mode !== "play" || selectedPlayerIndex === -1 || gameWon) return;
@@ -3241,7 +4305,7 @@ function drawPieceSelectionMenu() {
   const buttonSize = 35;
   const spacing = 15;
   const menuWidth = 3 * buttonSize + 2 * spacing;
-  const menuHeight = 2 * buttonSize + spacing;
+  const menuHeight = 3 * buttonSize + 2 * spacing;
   
   // Center the menu on the board
   const outerMargin = 20;
@@ -3283,10 +4347,11 @@ function drawPieceSelectionMenu() {
   ctx.textAlign = "center";
   ctx.fillText("Choose Piece Type", centerX, startY - outerMargin + 12);
   
-  // Define the 2x3 grid layout
+  // Define the piece grid layout
   const pieceLayout = [
     ["rook", "bishop", "queen"],
-    ["knight", "king", "pawn"]
+    ["knight", "king", "pawn"],
+    ["castle_rook"]
   ];
   
   // Draw piece options
@@ -3315,7 +4380,10 @@ function drawPieceSelectionMenu() {
       ctx.textAlign = "center";
       ctx.textBaseline = "top";
       
-      const displayName = pieceType.charAt(0).toUpperCase() + pieceType.slice(1);
+      const displayName = pieceType
+        .split("_")
+        .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+        .join(" ");
       ctx.fillText(displayName, btnX + buttonSize/2, btnY + buttonSize + 3);
     });
   });
@@ -3330,8 +4398,9 @@ function drawPieceSelectionMenu() {
   ctx.textBaseline = "alphabetic";
 }
 
-//visible for only piece can move to
+// Fog reveals each player piece plus the eight surrounding squares.
 function getVisibleSquares() {
+  syncVisitedSquaresSize();
   const visible = Array.from({ length: ROWS }, () => Array(COLS).fill(false));
 
   if (!fogEnabled || (CM_EDITOR_PAGE && mode === "edit")) {
@@ -3341,22 +4410,15 @@ function getVisibleSquares() {
     return visible;
   }
 
-  if (selectedPlayerIndex >= 0) {
-    const p = players[selectedPlayerIndex];
-    visible[p.row][p.col] = true;
+  players.forEach(player => {
+    revealAdjacentSquares(visible, player.row, player.col);
+  });
 
-    // Show all valid move targets in fog
-    for (let r = 0; r < ROWS; r++) {
-      for (let c = 0; c < COLS; c++) {
-        if (isValidMove(selectedPlayerIndex, r, c) || visitedSquares[r][c]) {
-          visible[r][c] = true;
-        }
-      }
-    }
-  }
   for (let r = 0; r < ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
-      if (visitedSquares[r][c]) {
+      if (visible[r][c]) {
+        visitedSquares[r][c] = true;
+      } else if (visitedSquares[r][c]) {
         visible[r][c] = true;
       }
     }
@@ -3379,97 +4441,18 @@ function getValidMovesFor(playerIndex) {
 
 function getVisionForPiece(row, col, pieceType, playerIndex) {
   const visionSquares = [];
-  
-  // Always include current position
-  visionSquares.push([row, col]);
-  
-  switch (pieceType) {
-    case "rook":
-      // Rooks see in straight lines until blocked
-      addLineOfSight(visionSquares, row, col, 1, 0, playerIndex);  // Down
-      addLineOfSight(visionSquares, row, col, -1, 0, playerIndex); // Up
-      addLineOfSight(visionSquares, row, col, 0, 1, playerIndex);  // Right
-      addLineOfSight(visionSquares, row, col, 0, -1, playerIndex); // Left
-      break;
-      
-    case "bishop":
-      // Bishops see in diagonals until blocked
-      addLineOfSight(visionSquares, row, col, 1, 1, playerIndex);   // Down-right
-      addLineOfSight(visionSquares, row, col, 1, -1, playerIndex);  // Down-left
-      addLineOfSight(visionSquares, row, col, -1, 1, playerIndex);  // Up-right
-      addLineOfSight(visionSquares, row, col, -1, -1, playerIndex); // Up-left
-      break;
-      
-    case "queen":
-      // Queens see in all directions until blocked
-      for (let dr = -1; dr <= 1; dr++) {
-        for (let dc = -1; dc <= 1; dc++) {
-          if (dr === 0 && dc === 0) continue;
-          addLineOfSight(visionSquares, row, col, dr, dc, playerIndex);
-        }
-      }
-      break;
-      
-    case "knight":
-      // Knights see all knight moves (2+1 pattern)
-      const knightMoves = [
-        [2, 1], [2, -1], [-2, 1], [-2, -1],
-        [1, 2], [1, -2], [-1, 2], [-1, -2]
-      ];
-      knightMoves.forEach(([dr, dc]) => {
-        const newRow = row + dr;
-        const newCol = col + dc;
-        if (newRow >= 0 && newRow < ROWS && newCol >= 0 && newCol < COLS) {
-          visionSquares.push([newRow, newCol]);
-        }
-      });
-      break;
-      
-    case "king":
-      // Kings see all adjacent squares
-      for (let dr = -1; dr <= 1; dr++) {
-        for (let dc = -1; dc <= 1; dc++) {
-          if (dr === 0 && dc === 0) continue;
-          const newRow = row + dr;
-          const newCol = col + dc;
-          if (newRow >= 0 && newRow < ROWS && newCol >= 0 && newCol < COLS) {
-            visionSquares.push([newRow, newCol]);
-          }
-        }
-      }
-      break;
-      
-    case "pawn":
-      // Pawns see forward and diagonal for capturing
-      const newRow = row + 1; // Assuming pawns move downward
-      if (newRow < ROWS) {
-        visionSquares.push([newRow, col]); // Forward
-        if (col > 0) visionSquares.push([newRow, col - 1]); // Diagonal left
-        if (col < COLS - 1) visionSquares.push([newRow, col + 1]); // Diagonal right
-      }
-      break;
-  }
-  
-  return visionSquares;
-}
 
-// Helper function to add line-of-sight squares until blocked
-function addLineOfSight(visionSquares, startRow, startCol, dr, dc, playerIndex) {
-  let r = startRow + dr;
-  let c = startCol + dc;
-  
-  while (r >= 0 && r < ROWS && c >= 0 && c < COLS) {
-    visionSquares.push([r, c]);
-    
-    // Stop if we hit a blocking cell (but allow seeing through players)
-    if (board[r][c] === CELL_TYPES.SOLID_BLOCK || 
-        board[r][c] === CELL_TYPES.PHASE_BLOCK_ACTIVE) {
-      break;
+  for (let dr = -1; dr <= 1; dr++) {
+    for (let dc = -1; dc <= 1; dc++) {
+      const visibleRow = row + dr;
+      const visibleCol = col + dc;
+      if (isInsideBoard(visibleRow, visibleCol)) {
+        visionSquares.push([visibleRow, visibleCol]);
+      }
     }
-    
-    r += dr;
-    c += dc;
   }
+
+  return visionSquares;
 }
 
 // Add this function to draw the content of a cell
@@ -3482,23 +4465,17 @@ function drawCellContent(cellType, x, y, row, col) {
   
   // Draw inactive phase block (blue semi-transparent)
   if (cellType === CELL_TYPES.PHASE_BLOCK) {
-    ctx.fillStyle = "rgba(52, 152, 219, 0.3)";
-    ctx.fillRect(x+3, y+3, TILE_SIZE-6, TILE_SIZE-6);
-    
-    // Draw upward arrow to indicate you can pass through from below
-    ctx.fillStyle = "rgba(25, 118, 210, 0.6)";
-    ctx.beginPath();
-    ctx.moveTo(x + TILE_SIZE/2, y + TILE_SIZE - 10);
-    ctx.lineTo(x + TILE_SIZE/2 - 8, y + TILE_SIZE - 18);
-    ctx.lineTo(x + TILE_SIZE/2 + 8, y + TILE_SIZE - 18);
-    ctx.closePath();
-    ctx.fill();
+    drawInactivePhaseBlock(ctx, x, y, TILE_SIZE);
   }
   
   // Draw active phase block (solid blue)
   if (cellType === CELL_TYPES.PHASE_BLOCK_ACTIVE) {
     ctx.fillStyle = "rgba(41, 128, 185, 0.8)";
     ctx.fillRect(x+3, y+3, TILE_SIZE-6, TILE_SIZE-6);
+  }
+
+  if (cellType === CELL_TYPES.MOVING_PLATFORM) {
+    drawMovingPlatform(ctx, x, y, TILE_SIZE, getMovingPlatformAxisAt(row, col));
   }
   
   // Draw transformer block (purple with question mark)
@@ -3558,9 +4535,128 @@ function drawCellContent(cellType, x, y, row, col) {
   if (cellType === CELL_TYPES.COUNTER_GOAL && goal && goal.row === row && goal.col === col) {
     ctx.drawImage(pieceImages.target, x+8, y+8, TILE_SIZE-16, TILE_SIZE-16);
   }
+
+  if (cellType === CELL_TYPES.BLACK_TARGET_PIECE) {
+    const targetIndex = getTargetPieceAt(row, col);
+    const targetPiece = targetIndex !== -1 ? targetPieces[targetIndex] : null;
+    drawBlackTargetPiece(ctx, x, y, TILE_SIZE, targetPiece ? targetPiece.pieceType : "pawn");
+  }
 }
 
 // --- Drawing ---
+function drawCounterGoalBadge(x, y, counter, centerY = y + TILE_SIZE / 2) {
+  ctx.save();
+  ctx.fillStyle = "rgba(0,0,0,0.7)";
+  ctx.beginPath();
+  ctx.arc(x + TILE_SIZE / 2, centerY, 14, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = (counter <= 3) ? "red" : "white";
+  ctx.font = "bold 16px Arial";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(counter, x + TILE_SIZE / 2, centerY);
+  ctx.restore();
+}
+
+function drawLaserEmitter(renderCtx, x, y, tile, laser) {
+  const plate = Math.max(5, tile * 0.12);
+  const inset = Math.max(9, tile * 0.18);
+  const active = isLaserActive(laser);
+  const enabledDirections = normalizeLaserDirections(laser && laser.directions);
+  const countdown = getLaserCountdown(laser);
+
+  renderCtx.save();
+  renderCtx.lineWidth = 1.5;
+
+  const barsByDirection = {
+    up: [x + inset, y + 2, tile - inset * 2, plate],
+    down: [x + inset, y + tile - plate - 2, tile - inset * 2, plate],
+    left: [x + 2, y + inset, plate, tile - inset * 2],
+    right: [x + tile - plate - 2, y + inset, plate, tile - inset * 2]
+  };
+
+  for (const direction of DEFAULT_LASER_DIRECTIONS) {
+    const [barX, barY, width, height] = barsByDirection[direction];
+    const enabled = enabledDirections.includes(direction);
+    renderCtx.fillStyle = enabled
+      ? (active ? "#ff3b30" : "#6c1f1a")
+      : "rgba(30, 30, 30, 0.72)";
+    renderCtx.strokeStyle = enabled
+      ? (active ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.35)")
+      : "rgba(255,255,255,0.18)";
+    renderCtx.fillRect(barX, barY, width, height);
+    renderCtx.strokeRect(barX, barY, width, height);
+  }
+
+  const badgeRadius = Math.max(9, tile * 0.24);
+  const centerX = x + tile / 2;
+  const centerY = y + tile / 2;
+  renderCtx.fillStyle = active ? "rgba(255, 59, 48, 0.92)" : "rgba(20, 24, 31, 0.78)";
+  renderCtx.strokeStyle = active ? "rgba(255, 255, 255, 0.95)" : "rgba(255, 255, 255, 0.78)";
+  renderCtx.lineWidth = Math.max(1.5, tile * 0.035);
+  renderCtx.beginPath();
+  renderCtx.arc(centerX, centerY, badgeRadius, 0, Math.PI * 2);
+  renderCtx.fill();
+  renderCtx.stroke();
+
+  renderCtx.fillStyle = "#ffffff";
+  renderCtx.font = `bold ${Math.max(11, Math.floor(tile * 0.34))}px Arial`;
+  renderCtx.textAlign = "center";
+  renderCtx.textBaseline = "middle";
+  renderCtx.fillText(String(countdown), centerX, centerY + 0.5);
+
+  renderCtx.restore();
+}
+
+function drawLaserCell(renderCtx, x, y, direction) {
+  const beamWidth = Math.max(8, TILE_SIZE * 0.16);
+  const glowWidth = Math.max(18, TILE_SIZE * 0.34);
+  const isVertical = direction === "up" || direction === "down";
+  const centerX = x + TILE_SIZE / 2;
+  const centerY = y + TILE_SIZE / 2;
+
+  renderCtx.save();
+  renderCtx.fillStyle = "rgba(255, 64, 64, 0.16)";
+  if (isVertical) {
+    renderCtx.fillRect(centerX - glowWidth / 2, y, glowWidth, TILE_SIZE);
+  } else {
+    renderCtx.fillRect(x, centerY - glowWidth / 2, TILE_SIZE, glowWidth);
+  }
+
+  renderCtx.fillStyle = "rgba(255, 0, 0, 0.75)";
+  if (isVertical) {
+    renderCtx.fillRect(centerX - beamWidth / 2, y, beamWidth, TILE_SIZE);
+  } else {
+    renderCtx.fillRect(x, centerY - beamWidth / 2, TILE_SIZE, beamWidth);
+  }
+
+  renderCtx.fillStyle = "rgba(255, 255, 255, 0.9)";
+  const coreWidth = Math.max(2, beamWidth * 0.28);
+  if (isVertical) {
+    renderCtx.fillRect(centerX - coreWidth / 2, y, coreWidth, TILE_SIZE);
+  } else {
+    renderCtx.fillRect(x, centerY - coreWidth / 2, TILE_SIZE, coreWidth);
+  }
+  renderCtx.restore();
+}
+
+function drawLaserEffects(visible) {
+  for (const laser of laserBlocks) {
+    if (laser.row < 0 || laser.row >= ROWS || laser.col < 0 || laser.col >= COLS) continue;
+    if (fogEnabled && !visible[laser.row][laser.col]) continue;
+    drawLaserEmitter(ctx, laser.col * TILE_SIZE, laser.row * TILE_SIZE, TILE_SIZE, laser);
+  }
+
+  for (const laser of laserBlocks) {
+    if (!isLaserActive(laser)) continue;
+    for (const cell of getLaserCellsFromBlock(laser)) {
+      if (fogEnabled && !visible[cell.row][cell.col]) continue;
+      drawLaserCell(ctx, cell.col * TILE_SIZE, cell.row * TILE_SIZE, cell.direction);
+    }
+  }
+}
+
 function drawBoard() {
   const visible = fogEnabled ? getVisibleSquares() : null;
   for (let r = 0; r < ROWS; r++) {
@@ -3604,17 +4700,7 @@ function drawBoard() {
       // Draw inactive phase block (blue semi-transparent) - adjust size
       if (board[r][c] === CELL_TYPES.PHASE_BLOCK) {
         if (!fogEnabled || visible[r][c]) {
-          ctx.fillStyle = "rgba(52, 152, 219, 0.3)";
-          ctx.fillRect(x+3, y+3, TILE_SIZE-6, TILE_SIZE-6);
-          
-          // Draw upward arrow to indicate you can pass through from below
-          ctx.fillStyle = "rgba(25, 118, 210, 0.6)";
-          ctx.beginPath();
-          ctx.moveTo(x + TILE_SIZE/2, y + TILE_SIZE - 10);
-          ctx.lineTo(x + TILE_SIZE/2 - 8, y + TILE_SIZE - 18);
-          ctx.lineTo(x + TILE_SIZE/2 + 8, y + TILE_SIZE - 18);
-          ctx.closePath();
-          ctx.fill();
+          drawInactivePhaseBlock(ctx, x, y, TILE_SIZE);
         }
       }
       
@@ -3623,6 +4709,12 @@ function drawBoard() {
         if (!fogEnabled || visible[r][c]) {
           ctx.fillStyle = "rgba(41, 128, 185, 0.8)";
           ctx.fillRect(x+3, y+3, TILE_SIZE-6, TILE_SIZE-6);
+        }
+      }
+
+      if (board[r][c] === CELL_TYPES.MOVING_PLATFORM) {
+        if (!fogEnabled || visible[r][c]) {
+          drawMovingPlatform(ctx, x, y, TILE_SIZE, getMovingPlatformAxisAt(r, c));
         }
       }
       
@@ -3665,16 +4757,7 @@ function drawBoard() {
           CELL_TYPES.TELEPORT_ORANGE
       ].includes(board[r][c])) {
           if (!fogEnabled || visible[r][c]) {
-              const color = TELEPORT_COLORS[board[r][c]];
-              if (color) {
-                  ctx.fillStyle = color.fill;
-                  ctx.beginPath();
-                  ctx.arc(x + TILE_SIZE / 2, y + TILE_SIZE / 2, TILE_SIZE / 3, 0, Math.PI * 2);
-                  ctx.fill();
-                  ctx.strokeStyle = color.stroke;
-                  ctx.lineWidth = 2;
-                  ctx.stroke();
-              }
+              drawTeleporterDoor(ctx, x, y, TILE_SIZE, board[r][c], getTeleporterDoorRole(r, c, board[r][c]));
           }
       }
       
@@ -3710,34 +4793,24 @@ function drawBoard() {
             // Check if there's a teleport block at this position
             const teleportBlock = teleportBlocks.find(tp => tp.row === r && tp.col === c);
             if (teleportBlock) {
-                const color = TELEPORT_COLORS[teleportBlock.type];
-                if (color) {
-                    // Draw teleport block underneath
-                    ctx.fillStyle = color.fill;
-                    ctx.beginPath();
-                    ctx.arc(x + TILE_SIZE / 2, y + TILE_SIZE / 2, TILE_SIZE / 3, 0, Math.PI * 2);
-                    ctx.fill();
-                    ctx.strokeStyle = color.stroke;
-                    ctx.lineWidth = 2;
-                    ctx.stroke();
-                }
+                drawTeleporterDoor(ctx, x, y, TILE_SIZE, teleportBlock.type, getTeleporterDoorRole(r, c, teleportBlock.type));
             }
             
-            // Draw the player piece on top
-            ctx.drawImage(pieceImages[player.pieceType], x+8, y+8, TILE_SIZE-16, TILE_SIZE-16);
+          // Draw the player piece on top
+          ctx.drawImage(pieceImages[player.pieceType], x+8, y+8, TILE_SIZE-16, TILE_SIZE-16);
+          if (player.pieceType === "castle_rook") {
+            drawCastleRookMarker(ctx, x, y, TILE_SIZE);
           }
         }
+      }
       }
 
       if (teleportBlocks.some(tp => tp.row === r && tp.col === c) && board[r][c] !== CELL_TYPES.PLAYER) {
         if (!fogEnabled || visible[r][c]) {
-            ctx.fillStyle = "rgba(155, 89, 182, 0.8)";
-            ctx.beginPath();
-            ctx.arc(x + TILE_SIZE / 2, y + TILE_SIZE / 2, TILE_SIZE / 3, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.strokeStyle = "rgba(255, 255, 255, 0.6)";
-            ctx.lineWidth = 2;
-            ctx.stroke();
+            const teleportBlock = teleportBlocks.find(tp => tp.row === r && tp.col === c);
+            if (teleportBlock) {
+              drawTeleporterDoor(ctx, x, y, TILE_SIZE, teleportBlock.type, getTeleporterDoorRole(r, c, teleportBlock.type));
+            }
         }
       }
 
@@ -3820,21 +4893,14 @@ function drawBoard() {
       // Check if there's a teleport block at this position
       const teleportBlock = teleportBlocks.find(tp => tp.row === player.row && tp.col === player.col);
       if (teleportBlock) {
-        const color = TELEPORT_COLORS[teleportBlock.type];
-        if (color) {
-          // Draw teleport block underneath
-          ctx.fillStyle = color.fill;
-          ctx.beginPath();
-          ctx.arc(x + TILE_SIZE / 2, y + TILE_SIZE / 2, TILE_SIZE / 3, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.strokeStyle = color.stroke;
-          ctx.lineWidth = 2;
-          ctx.stroke();
-        }
+        drawTeleporterDoor(ctx, x, y, TILE_SIZE, teleportBlock.type, getTeleporterDoorRole(player.row, player.col, teleportBlock.type));
       }
       
       // Draw the player piece on top
       ctx.drawImage(pieceImages[player.pieceType], x+8, y+8, TILE_SIZE-16, TILE_SIZE-16);
+      if (player.pieceType === "castle_rook") {
+        drawCastleRookMarker(ctx, x, y, TILE_SIZE);
+      }
     }
   });
 
@@ -3852,24 +4918,16 @@ function drawBoard() {
     if (!fogEnabled || visible[goal.row][goal.col]) {
       // Draw base king image
       ctx.drawImage(pieceImages.target, x+8, y+8, TILE_SIZE-16, TILE_SIZE-16);
+      const goalLocked = !areAllObjectivesCompleted() ||
+        (goal.type === "counter" && goal.counter <= 0);
 
       // If it's a counter goal, draw counter
-      if (goal.type === "counter") {
-        ctx.fillStyle = "rgba(0,0,0,0.7)";
-        ctx.beginPath();
-        ctx.arc(x + TILE_SIZE/2, y + TILE_SIZE/2, 14, 0, Math.PI*2);
-        ctx.fill();
-
-        ctx.fillStyle = (goal.counter <= 3) ? "red" : "white";
-        ctx.font = "bold 16px Arial";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(goal.counter, x + TILE_SIZE/2, y + TILE_SIZE/2);
+      if (goal.type === "counter" && !goalLocked) {
+        drawCounterGoalBadge(x, y, goal.counter);
       }
 
       // Lock overlay
-      if (!areAllObjectivesCompleted() ||
-        (goal.type === "counter" && goal.counter <= 0)) {
+      if (goalLocked) {
         ctx.fillStyle = "rgba(0,0,0,0.7)";
         ctx.beginPath();
         ctx.arc(x + TILE_SIZE/2, y + TILE_SIZE/2, 12, 0, Math.PI*2);
@@ -3881,16 +4939,34 @@ function drawBoard() {
         ctx.textBaseline = "middle";
         ctx.fillText("🔒", x + TILE_SIZE/2, y + TILE_SIZE/2);
       }
+
+      if (goal.type === "counter" && goalLocked) {
+        drawCounterGoalBadge(x, y, goal.counter, y + 10);
+      }
     }
   }
+
+  for (const duck of ducks) {
+    const isOnBoard =
+      duck.row >= 0 &&
+      duck.row < ROWS &&
+      duck.col >= 0 &&
+      duck.col < COLS;
+    if (isOnBoard && (!fogEnabled || visible[duck.row][duck.col])) {
+      drawDuck(ctx, duck);
+    }
+  }
+
+  drawLaserEffects(visible);
+  drawPlatformLevelGuide();
 }
 
 // --- Confetti Celebration ---
 
 /**
  * game/06-effects-bombs.js
- * Confetti, explosions, bombs
- * Split from game.js lines 3758-4203 — logic unchanged.
+ * Confetti, bombs, ducks, platforms, lasers collisions
+ * Split from game.monolith.js lines 4831-5646.
  */
 function triggerConfetti() {
   //const Winsound = new Audio("assets/audio/woo-hoo-82843.mp3");
@@ -4151,16 +5227,22 @@ function moveBombs() {
 function updateBombs() {
   for (let i = bombs.length - 1; i >= 0; i--) {
     const bomb = bombs[i];
-    const nextCol = bomb.col + bomb.direction;
+    const nextRow = isBoomBomb(bomb) ? bomb.row + bomb.rowDirection : bomb.row;
+    const nextCol = isBoomBomb(bomb) ? bomb.col + bomb.colDirection : bomb.col + bomb.direction;
 
     // Check bounds - bounce if hitting the edge
-    if (nextCol < 0 || nextCol >= COLS) {
-      bomb.direction *= -1; // Reverse direction
+    if (nextRow < 0 || nextRow >= ROWS || nextCol < 0 || nextCol >= COLS) {
+      if (isBoomBomb(bomb)) {
+        bomb.rowDirection *= -1;
+        bomb.colDirection *= -1;
+      } else {
+        bomb.direction *= -1; // Reverse direction
+      }
       continue;
     }
 
     // Check for collision with ANY player (regardless of selection state)
-    const hitPlayerIndex = players.findIndex(p => p.row === bomb.row && p.col === nextCol);
+    const hitPlayerIndex = players.findIndex(p => p.row === nextRow && p.col === nextCol);
     if (hitPlayerIndex !== -1) {
       const player = players[hitPlayerIndex];
 
@@ -4202,22 +5284,312 @@ function updateBombs() {
       
       // Move the bomb to the player's position and continue
       board[bomb.row][bomb.col] = CELL_TYPES.EMPTY;
+      bomb.row = nextRow;
       bomb.col = nextCol;
       board[bomb.row][bomb.col] = CELL_TYPES.BOMB;
       continue; // Skip the rest of the logic for this bomb this frame
     }
 
     // Only move if the next position is empty
-    if (board[bomb.row][nextCol] === CELL_TYPES.EMPTY) {
+    if (board[nextRow][nextCol] === CELL_TYPES.EMPTY) {
       // Clear current position
       board[bomb.row][bomb.col] = CELL_TYPES.EMPTY;
       
       // Move bomb
+      bomb.row = nextRow;
       bomb.col = nextCol;
       board[bomb.row][bomb.col] = CELL_TYPES.BOMB;
     } else {
       // If the next position is blocked by something else, bounce
-      bomb.direction *= -1;
+      if (isBoomBomb(bomb)) {
+        bomb.rowDirection *= -1;
+        bomb.colDirection *= -1;
+      } else {
+        bomb.direction *= -1;
+      }
+    }
+  }
+}
+
+function handleDuckCollision(playerIndex) {
+  const player = players[playerIndex];
+  if (!player) return;
+
+  explodingPlayers.push({
+    x: player.col * TILE_SIZE,
+    y: player.row * TILE_SIZE,
+    velocityY: -7,
+    velocityX: 0,
+    rotation: 0,
+    rotationSpeed: (Math.random() < 0.5 ? -1 : 1) * 0.22,
+    pieceType: player.pieceType
+  });
+
+  if (board[player.row][player.col] === CELL_TYPES.PLAYER) {
+    board[player.row][player.col] = CELL_TYPES.EMPTY;
+  }
+
+  players.splice(playerIndex, 1);
+  updatePlayerCount();
+  selectedPlayerIndex = -1;
+  shakeAmount = 18;
+  updateStatus("🦆 You ran into a duck!");
+  scheduleAutoRestartAfterDeath("🦆 The duck knocked you out! Restarting level...");
+}
+
+function updateDucks() {
+  let removedSupport = false;
+
+  for (let i = ducks.length - 1; i >= 0; i--) {
+    const duck = ducks[i];
+    const isWaitingToRespawn = duck.col < 0 || duck.col >= COLS;
+    const nextCol = isWaitingToRespawn
+      ? (duck.direction === 1 ? 0 : COLS - 1)
+      : duck.col + duck.direction;
+
+    if (nextCol < 0 || nextCol >= COLS) {
+      const riderIndex = duck.row > 0 ? getPlayerAt(duck.row - 1, duck.col) : -1;
+      if (riderIndex !== -1) removedSupport = true;
+      duck.col = duck.direction === 1 ? COLS : -1;
+      continue;
+    }
+
+    const hitPlayerIndex = getPlayerAt(duck.row, nextCol);
+    if (
+      (board[duck.row][nextCol] !== CELL_TYPES.EMPTY && hitPlayerIndex === -1) ||
+      getDuckAt(duck.row, nextCol) !== -1
+    ) {
+      continue;
+    }
+
+    const riderIndex = !isWaitingToRespawn && duck.row > 0
+      ? getPlayerAt(duck.row - 1, duck.col)
+      : -1;
+    if (riderIndex !== -1) {
+      const rider = players[riderIndex];
+      const riderTargetPlayerIndex = getPlayerAt(rider.row, nextCol);
+      const riderTargetCell = board[rider.row][nextCol];
+      const riderIsBlocked =
+        riderTargetPlayerIndex !== -1 ||
+        ![
+          CELL_TYPES.EMPTY,
+          CELL_TYPES.OBJECTIVE,
+          CELL_TYPES.OBJECTIVE_COMPLETED
+        ].includes(riderTargetCell);
+
+      if (riderIsBlocked) {
+        // The duck keeps moving. The rider stays behind, loses support,
+        // and is allowed to fall after all ducks finish this movement tick.
+        removedSupport = true;
+      } else {
+        board[rider.row][rider.col] = getObjectiveCellTypeAt(rider.row, rider.col);
+        rider.col = nextCol;
+        board[rider.row][rider.col] = CELL_TYPES.PLAYER;
+        visitedSquares[rider.row][rider.col] = true;
+        checkObjectiveCompletion();
+        checkWinCondition();
+      }
+    }
+
+    duck.col = nextCol;
+    if (hitPlayerIndex !== -1) {
+      handleDuckCollision(hitPlayerIndex);
+    }
+  }
+
+  if (removedSupport && gravityEnabled && !antigravityEnabled && fallingPieces.length === 0) {
+    applyGravity();
+  }
+}
+
+function reverseMovingPlatform(platform) {
+  platform.direction *= -1;
+}
+
+function getGoalCellType() {
+  return goal && goal.type === "counter" ? CELL_TYPES.COUNTER_GOAL : CELL_TYPES.GOAL;
+}
+
+function updateHorizontalMovingPlatform(platform) {
+  const nextCol = platform.currentCol + platform.direction;
+  if (nextCol < platform.minCol || nextCol > platform.maxCol) {
+    reverseMovingPlatform(platform);
+    return;
+  }
+
+  const currentRow = platform.row;
+  const currentCol = platform.col;
+  const deltaCol = nextCol - currentCol;
+  if (deltaCol === 0) return;
+
+  const carriedPlayerIndex = getPlayerAt(currentRow - 1, currentCol);
+  const carriedPlayer = carriedPlayerIndex !== -1 ? players[carriedPlayerIndex] : null;
+  const carriedGoal =
+    goal && goal.row === currentRow - 1 && goal.col === currentCol ? goal : null;
+
+  if (
+    nextCol < 0 ||
+    nextCol >= COLS ||
+    board[currentRow][nextCol] !== CELL_TYPES.EMPTY
+  ) {
+    reverseMovingPlatform(platform);
+    return;
+  }
+
+  let carriedPlayerTargetCol = null;
+  if (carriedPlayer) {
+    carriedPlayerTargetCol = carriedPlayer.col + deltaCol;
+    if (carriedPlayerTargetCol < 0 || carriedPlayerTargetCol >= COLS) {
+      reverseMovingPlatform(platform);
+      return;
+    }
+
+    const targetCell = board[carriedPlayer.row][carriedPlayerTargetCol];
+    const targetPlayerIndex = getPlayerAt(carriedPlayer.row, carriedPlayerTargetCol);
+    if (targetPlayerIndex !== -1 || targetCell !== CELL_TYPES.EMPTY) {
+      reverseMovingPlatform(platform);
+      return;
+    }
+  }
+
+  let carriedGoalTargetCol = null;
+  if (carriedGoal) {
+    carriedGoalTargetCol = carriedGoal.col + deltaCol;
+    if (carriedGoalTargetCol < 0 || carriedGoalTargetCol >= COLS) {
+      reverseMovingPlatform(platform);
+      return;
+    }
+
+    const targetCell = board[carriedGoal.row][carriedGoalTargetCol];
+    const targetPlayerIndex = getPlayerAt(carriedGoal.row, carriedGoalTargetCol);
+    if (targetPlayerIndex !== -1 || targetCell !== CELL_TYPES.EMPTY) {
+      reverseMovingPlatform(platform);
+      return;
+    }
+  }
+
+  board[currentRow][currentCol] = CELL_TYPES.EMPTY;
+  if (carriedPlayer) {
+    board[carriedPlayer.row][carriedPlayer.col] = CELL_TYPES.EMPTY;
+    carriedPlayer.col = carriedPlayerTargetCol;
+    visitedSquares[carriedPlayer.row][carriedPlayer.col] = true;
+  }
+  if (carriedGoal) {
+    board[carriedGoal.row][carriedGoal.col] = CELL_TYPES.EMPTY;
+    carriedGoal.col = carriedGoalTargetCol;
+  }
+
+  platform.currentCol = nextCol;
+  platform.col = nextCol;
+  board[platform.row][platform.col] = CELL_TYPES.MOVING_PLATFORM;
+  if (carriedPlayer) {
+    board[carriedPlayer.row][carriedPlayer.col] = CELL_TYPES.PLAYER;
+  }
+  if (carriedGoal) {
+    board[carriedGoal.row][carriedGoal.col] = getGoalCellType();
+  }
+}
+
+function updateMovingPlatforms() {
+  for (const platform of movingPlatforms) {
+    if (platform.axis === "horizontal") {
+      updateHorizontalMovingPlatform(platform);
+      continue;
+    }
+
+    const nextLevel = platform.currentLevel + platform.direction;
+    if (nextLevel < platform.minLevel || nextLevel > platform.maxLevel) {
+      reverseMovingPlatform(platform);
+      continue;
+    }
+
+    const currentRow = platform.row;
+    const nextRow = platformLevelToRow(nextLevel);
+    const deltaRow = nextRow - currentRow;
+    if (deltaRow === 0) continue;
+
+    const carriedPlayerIndex = getPlayerAt(currentRow - 1, platform.col);
+    const carriedPlayer = carriedPlayerIndex !== -1 ? players[carriedPlayerIndex] : null;
+    const carriedGoal =
+      goal && goal.row === currentRow - 1 && goal.col === platform.col ? goal : null;
+    const platformDestinationPlayerIndex = getPlayerAt(nextRow, platform.col);
+    const platformDestinationIsCarriedPlayer =
+      carriedPlayer && platformDestinationPlayerIndex === carriedPlayerIndex;
+    const platformDestinationIsCarriedGoal =
+      carriedGoal && nextRow === carriedGoal.row && platform.col === carriedGoal.col;
+
+    if (
+      nextRow < 0 ||
+      nextRow >= ROWS ||
+      (
+        board[nextRow][platform.col] !== CELL_TYPES.EMPTY &&
+        !platformDestinationIsCarriedPlayer &&
+        !platformDestinationIsCarriedGoal
+      )
+    ) {
+      reverseMovingPlatform(platform);
+      continue;
+    }
+
+    let carriedPlayerTargetRow = null;
+    if (carriedPlayer) {
+      carriedPlayerTargetRow = carriedPlayer.row + deltaRow;
+      if (carriedPlayerTargetRow < 0 || carriedPlayerTargetRow >= ROWS) {
+        reverseMovingPlatform(platform);
+        continue;
+      }
+
+      const targetCell = board[carriedPlayerTargetRow][platform.col];
+      const targetPlayerIndex = getPlayerAt(carriedPlayerTargetRow, platform.col);
+      const targetIsCurrentPlatformCell = carriedPlayerTargetRow === currentRow;
+      if (
+        targetPlayerIndex !== -1 ||
+        (targetCell !== CELL_TYPES.EMPTY && !targetIsCurrentPlatformCell)
+      ) {
+        reverseMovingPlatform(platform);
+        continue;
+      }
+    }
+
+    let carriedGoalTargetRow = null;
+    if (carriedGoal) {
+      carriedGoalTargetRow = carriedGoal.row + deltaRow;
+      if (carriedGoalTargetRow < 0 || carriedGoalTargetRow >= ROWS) {
+        reverseMovingPlatform(platform);
+        continue;
+      }
+
+      const targetCell = board[carriedGoalTargetRow][platform.col];
+      const targetPlayerIndex = getPlayerAt(carriedGoalTargetRow, platform.col);
+      const targetIsCurrentPlatformCell = carriedGoalTargetRow === currentRow;
+      if (
+        targetPlayerIndex !== -1 ||
+        (targetCell !== CELL_TYPES.EMPTY && !targetIsCurrentPlatformCell)
+      ) {
+        reverseMovingPlatform(platform);
+        continue;
+      }
+    }
+
+    board[currentRow][platform.col] = CELL_TYPES.EMPTY;
+    if (carriedPlayer) {
+      board[carriedPlayer.row][carriedPlayer.col] = CELL_TYPES.EMPTY;
+      carriedPlayer.row = carriedPlayerTargetRow;
+      visitedSquares[carriedPlayer.row][carriedPlayer.col] = true;
+    }
+    if (carriedGoal) {
+      board[carriedGoal.row][carriedGoal.col] = CELL_TYPES.EMPTY;
+      carriedGoal.row = carriedGoalTargetRow;
+    }
+
+    platform.currentLevel = nextLevel;
+    platform.row = nextRow;
+    board[platform.row][platform.col] = CELL_TYPES.MOVING_PLATFORM;
+    if (carriedPlayer) {
+      board[carriedPlayer.row][carriedPlayer.col] = CELL_TYPES.PLAYER;
+    }
+    if (carriedGoal) {
+      board[carriedGoal.row][carriedGoal.col] = getGoalCellType();
     }
   }
 }
@@ -4243,6 +5615,80 @@ function updateExplodingPlayers() {
       explodingPlayers.splice(i, 1);
     }
   }
+}
+
+function handleLaserCollision(playerIndex, laserRow, laserCol) {
+  const player = players[playerIndex];
+  if (!player) return;
+
+  const explosionSound = document.getElementById("explosionSound");
+  if (explosionSound) {
+    playSound(explosionSound);
+  }
+
+  explodingPlayers.push({
+    x: laserCol * TILE_SIZE,
+    y: laserRow * TILE_SIZE,
+    velocityY: -8,
+    rotation: 0,
+    rotationSpeed: (Math.random() < 0.5 ? -1 : 1) * 0.3,
+    pieceType: player.pieceType
+  });
+
+  createExplosionParticles(laserCol * TILE_SIZE, laserRow * TILE_SIZE);
+
+  board[player.row][player.col] = CELL_TYPES.EMPTY;
+  players.splice(playerIndex, 1);
+  updateStatus("A player was cut down by a laser!");
+  updatePlayerCount();
+  shakeAmount = 24;
+  scheduleAutoRestartAfterDeath("You were hit by a laser! Restarting level...");
+
+  if (selectedPlayerIndex === playerIndex) {
+    selectedPlayerIndex = -1;
+  } else if (selectedPlayerIndex > playerIndex) {
+    selectedPlayerIndex--;
+  }
+
+  fallingPieces = fallingPieces.filter(piece => piece.playerIndex !== playerIndex);
+  risingPieces = risingPieces.filter(piece => piece.playerIndex !== playerIndex);
+
+  if (players.length === 0) {
+    updateStatus("Game Over! All players destroyed!");
+  }
+}
+
+function checkActiveLaserCollisions() {
+  if (mode !== "play" || gameWon || laserBlocks.length === 0) return;
+  if (!laserBlocks.some(laser => isLaserActive(laser))) return;
+
+  const hits = new Map();
+  for (let i = 0; i < players.length; i++) {
+    const player = players[i];
+    if (isCellInActiveLaser(player.row, player.col)) {
+      hits.set(i, { row: player.row, col: player.col });
+    }
+  }
+
+  for (const piece of fallingPieces) {
+    if (piece.playerIndex === "goal") continue;
+    const row = Math.max(0, Math.min(ROWS - 1, Math.floor((piece.y + TILE_SIZE / 2) / TILE_SIZE)));
+    if (isCellInActiveLaser(row, piece.col)) {
+      hits.set(piece.playerIndex, { row, col: piece.col });
+    }
+  }
+
+  for (const piece of risingPieces) {
+    if (piece.playerIndex === "goal") continue;
+    const row = Math.max(0, Math.min(ROWS - 1, Math.floor((piece.y + TILE_SIZE / 2) / TILE_SIZE)));
+    if (isCellInActiveLaser(row, piece.col)) {
+      hits.set(piece.playerIndex, { row, col: piece.col });
+    }
+  }
+
+  [...hits.entries()]
+    .sort((a, b) => b[0] - a[0])
+    .forEach(([playerIndex, hit]) => handleLaserCollision(playerIndex, hit.row, hit.col));
 }
 
 function handleBombCollision(player, playerIndex, bombRow, bombCol) {
@@ -4341,8 +5787,8 @@ function createInitialBurst(container, canvasRect, centerX, startY) {
 
 /**
  * game/07-input-loop.js
- * Input, antigravity, restart, game loop, modal scroll lock, boot
- * Split from game.js lines 4204-4657 — logic unchanged.
+ * Input, antigravity, restart, game loop, boot
+ * Split from game.monolith.js lines 5647-6125.
  */
 function handleMove(e) {
   if (showTransformerMenu && transformerPosition) {
@@ -4364,7 +5810,7 @@ function handleMove(e) {
 
   if (CM_EDITOR_PAGE && mode === "edit") {
     if (typeof window.cmEditorOnEditCell === "function") {
-      window.cmEditorOnEditCell(row, col);
+      window.cmEditorOnEditCell(row, col, x - col * TILE_SIZE, y - row * TILE_SIZE);
     }
     return;
   }
@@ -4378,6 +5824,25 @@ function handleMove(e) {
     // Check if clicked on a player
     const clickedPlayerIndex = getPlayerAt(row, col);
     if (clickedPlayerIndex !== -1) {
+      if (selectedPlayerIndex !== -1) {
+        const selectedPiece = players[selectedPlayerIndex];
+        const clickedPiece = players[clickedPlayerIndex];
+        const selectedKingClickedRook =
+          selectedPiece?.pieceType === "king" && clickedPiece?.pieceType === "castle_rook";
+        const selectedRookClickedKing =
+          selectedPiece?.pieceType === "castle_rook" && clickedPiece?.pieceType === "king";
+
+        if (selectedKingClickedRook || selectedRookClickedKing) {
+          const castled = selectedKingClickedRook
+            ? castleKingWithRook(selectedPlayerIndex, clickedPlayerIndex)
+            : castleKingWithRook(clickedPlayerIndex, selectedPlayerIndex);
+          if (castled) {
+            selectedPlayerIndex = -1;
+          }
+          return;
+        }
+      }
+
       selectedPlayerIndex = clickedPlayerIndex;
       const player = players[selectedPlayerIndex];
       updateStatus(`Selected ${player.pieceType} (player ${selectedPlayerIndex + 1} of ${players.length}). Click destination to move.`);
@@ -4650,11 +6115,16 @@ function gameLoop() {
   ctx.clearRect(-shakeX, -shakeY, canvas.width, canvas.height);
   updateFallingPieces();
   updateExplodingPlayers(); // 💣 Animate dead players
+  checkActiveLaserCollisions();
   tryCapturePendingMoveTrace(false);
 
   frameCount++;
   if (frameCount % 50 === 0) {
     updateBombs();
+  }
+  if (frameCount % 100 === 0) {
+    updateDucks();
+    updateMovingPlatforms();
   }
 
 
@@ -4794,6 +6264,7 @@ if (window.authReady && typeof window.authReady.finally === "function") {
 }
 updatePlayerCount();
 updateObjectiveCount();
+updateTargetPieceCount();
 
 window.cmGetCurrentLevelIndex = function () {
   return currentLevelIndex;

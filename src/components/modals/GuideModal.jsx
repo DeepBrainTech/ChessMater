@@ -55,6 +55,13 @@ export default function GuideModal() {
           <li>
             <strong>Bomb</strong>: can destroy pieces and alter board state.
           </li>
+          <li>
+            <strong>Black Target Pieces</strong>: must be captured before the goal unlocks.
+          </li>
+          <li>
+            <strong>Laser Block</strong>: solid block with selectable edge lasers that fire
+            on configured move intervals; touching an active beam fails the level.
+          </li>
         </ul>
 
         <h2>Win And Lose</h2>

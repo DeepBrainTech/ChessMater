@@ -1,8 +1,9 @@
 /**
  * game/04-level-rules.js
  * loadPuzzle, gravity, moves, win, undo, teleport, transformer
- * Split from game.js lines 1951-3060 — logic unchanged.
+ * Split from game.monolith.js lines 2758-4121.
  */
+// --- Load puzzle from JSON file ---
 function loadPuzzle(puzzleData) {
   currentPuzzleData = JSON.parse(JSON.stringify(puzzleData)); // Deep copy
   moveHistorySnapshots = [];
@@ -39,15 +40,82 @@ function loadPuzzle(puzzleData) {
       }
     }
     
+    bombs = [];
+    if (Array.isArray(puzzleData.bombs)) {
+      bombs = puzzleData.bombs
+        .filter(b => b.row < loadedRows && b.col < loadedCols)
+        .map(normalizeBombData);
+    }
+
+    laserBlocks = [];
+    if (Array.isArray(puzzleData.laserBlocks)) {
+      laserBlocks = puzzleData.laserBlocks
+        .map(normalizeLaserBlockData)
+        .filter(laser =>
+          Number.isFinite(laser.row) &&
+          Number.isFinite(laser.col) &&
+          laser.row >= 0 &&
+          laser.row < loadedRows &&
+          laser.col >= 0 &&
+          laser.col < loadedCols
+        );
+    }
+
+    ducks = [];
+    if (Array.isArray(puzzleData.ducks)) {
+      ducks = puzzleData.ducks
+        .map(normalizeDuckData)
+        .filter(duck =>
+          Number.isFinite(duck.row) &&
+          Number.isFinite(duck.col) &&
+          duck.row >= 0 &&
+          duck.row < loadedRows &&
+          duck.col >= 0 &&
+          duck.col < loadedCols
+        );
+    }
+
+    movingPlatforms = [];
+    if (Array.isArray(puzzleData.movingPlatforms)) {
+      movingPlatforms = puzzleData.movingPlatforms
+        .filter(platform => platform.row < loadedRows && platform.col < loadedCols)
+        .map(normalizeMovingPlatformData);
+    }
+
     // Recreate players (filter out ones that don't fit)
+    players = [];
     if (puzzleData.players && Array.isArray(puzzleData.players)) {
-      players = puzzleData.players
+      puzzleData.players
         .filter(player => player.row < loadedRows && player.col < loadedCols)
-        .map(player => ({ 
-          row: player.row, 
-          col: player.col, 
-          pieceType: player.pieceType || "rook"
-        }));
+        .forEach(player => {
+          const pieceType = player.pieceType || "rook";
+          if (isBoomPieceType(pieceType)) {
+            bombs.push(createBoomBomb(player.row, player.col, pieceType));
+            board[player.row][player.col] = CELL_TYPES.BOMB;
+            return;
+          }
+
+          players.push({
+            row: player.row,
+            col: player.col,
+            pieceType,
+            hasMoved: !!player.hasMoved
+          });
+        });
+    }
+    for (const b of bombs) {
+      board[b.row][b.col] = CELL_TYPES.BOMB;
+    }
+    for (const laser of laserBlocks) {
+      board[laser.row][laser.col] = CELL_TYPES.SOLID_BLOCK;
+    }
+    for (const platform of movingPlatforms) {
+      if (platform.axis === "horizontal") {
+        platform.col = clampPlatformCol(platform.currentCol);
+      } else {
+        platform.row = platformLevelToRow(platform.currentLevel);
+      }
+      board[platform.row][platform.col] = CELL_TYPES.MOVING_PLATFORM;
     }
     for (const p of players) {
       visitedSquares[p.row][p.col] = true;
@@ -82,24 +150,37 @@ function loadPuzzle(puzzleData) {
         }));
 
       // 💣 Recreate bombs from saved data
-      bombs = [];
-      if (Array.isArray(puzzleData.bombs)) {
-        bombs = puzzleData.bombs
-          .filter(b => b.row < loadedRows && b.col < loadedCols)
-          .map(b => ({
-            row: b.row,
-            col: b.col,
-            direction: b.direction || 1 // Default to moving right if direction not specified
-          }));
-        
-        // Update board with bomb positions
-        for (const b of bombs) {
-          board[b.row][b.col] = CELL_TYPES.BOMB;
-        }
-      }
-
       totalObjectives = objectives.length;
       objectivesCompleted = objectives.filter(obj => obj.completed).length;
+    } else {
+      objectives = [];
+      totalObjectives = 0;
+      objectivesCompleted = 0;
+    }
+
+    targetPieces = [];
+    if (Array.isArray(puzzleData.targetPieces)) {
+      targetPieces = puzzleData.targetPieces
+        .map(normalizeTargetPieceData)
+        .filter(piece =>
+          Number.isFinite(piece.row) &&
+          Number.isFinite(piece.col) &&
+          piece.row >= 0 &&
+          piece.row < loadedRows &&
+          piece.col >= 0 &&
+          piece.col < loadedCols
+        );
+      totalTargetPieces = targetPieces.length;
+      targetPiecesCaptured = targetPieces.filter(piece => piece.captured).length;
+      for (const piece of targetPieces) {
+        if (!piece.captured) {
+          board[piece.row][piece.col] = CELL_TYPES.BLACK_TARGET_PIECE;
+        }
+      }
+    } else {
+      targetPieces = [];
+      totalTargetPieces = 0;
+      targetPiecesCaptured = 0;
     }
 
     teleportBlocks = [];
@@ -118,12 +199,14 @@ function loadPuzzle(puzzleData) {
 
     updatePlayerCount();
     updateObjectiveCount();
+    updateTargetPieceCount();
     updateStatus(`Puzzle "${puzzleData.name}" loaded successfully! Size: ${loadedRows}x${loadedCols}`);
     // ✅ Reset state so pieces can move again
     mode = "play";
     gameWon = false;
     antigravityEnabled = false;
     antigravityUnlockedThisRun = false;
+    frameCount = 0;
     levelMoveCount = 0;
     updateMoveCountDisplay();
     updateAntigravityButtonLabel();
@@ -175,6 +258,18 @@ function decrementCounterAfterMove() {
 function isCellBlocked(row, col, ignorePlayer = null, fromDirection = null) {
   // Check if cell has a solid block (but allow transformer blocks)
   if (board[row][col] === CELL_TYPES.SOLID_BLOCK) {
+    return true;
+  }
+
+  if (board[row][col] === CELL_TYPES.MOVING_PLATFORM) {
+    return true;
+  }
+
+  if (getDuckAt(row, col) !== -1) {
+    return true;
+  }
+
+  if (board[row][col] === CELL_TYPES.BLACK_TARGET_PIECE) {
     return true;
   }
 
@@ -277,7 +372,7 @@ function updateFallingPieces() {
 
   for (let i = fallingPieces.length - 1; i >= 0; i--) {
     const piece = fallingPieces[i];
-    const targetY = piece.targetRow * TILE_SIZE;
+    let targetY = piece.targetRow * TILE_SIZE;
     const prevY = piece.y;
 
     // Move piece down
@@ -288,7 +383,18 @@ function updateFallingPieces() {
     const currentRow = Math.floor(piece.y / TILE_SIZE);
 
     if (currentRow !== prevRow) {
-      for (let r = prevRow + 1; r <= currentRow; r++) {
+      for (let r = prevRow + 1; r <= Math.min(currentRow, ROWS - 1); r++) {
+        // A falling piece can land on a duck that moves into the same column.
+        // The duck itself occupies row r, so the piece lands one cell above it.
+        if (getDuckAt(r, piece.col) !== -1 && r > 0) {
+          piece.targetRow = r - 1;
+          targetY = piece.targetRow * TILE_SIZE;
+          if (piece.y >= targetY) {
+            piece.y = targetY;
+          }
+          break;
+        }
+
         // Check if landing on a bomb during fall
         if (board[r][piece.col] === CELL_TYPES.BOMB) {
           // Handle bomb collision for falling piece
@@ -608,7 +714,7 @@ function checkWinCondition() {
     for (const player of players) {
       if (player.row === goal.row && player.col === goal.col) {
         gameWon = true;
-        updateStatus("Puzzle solved! All objectives completed and goal reached!");
+        updateStatus("Puzzle solved! All requirements completed and goal reached!");
         triggerConfetti();
         showLevelCompleteModal();
         syncProgressAfterWin();
@@ -653,6 +759,30 @@ function isPathClear(r1, c1, r2, c2, movingPlayer = null) {
   return true;
 }
 
+function isPawnForwardDestinationCell(row, col, movingPlayer) {
+  return board[row][col] !== CELL_TYPES.PHASE_BLOCK &&
+    !isCellBlocked(row, col, movingPlayer, "below");
+}
+
+function isPawnForwardPathCell(row, col, movingPlayer) {
+  if (board[row][col] === CELL_TYPES.MOVING_PLATFORM) {
+    return true;
+  }
+  return !isCellBlocked(row, col, movingPlayer, "below");
+}
+
+function isPawnDiagonalCaptureCell(row, col) {
+  const cellType = board[row][col];
+  return [
+    CELL_TYPES.OBJECTIVE,
+    CELL_TYPES.OBJECTIVE_COMPLETED,
+    CELL_TYPES.TRANSFORMER,
+    CELL_TYPES.GOAL,
+    CELL_TYPES.COUNTER_GOAL,
+    CELL_TYPES.BLACK_TARGET_PIECE
+  ].includes(cellType);
+}
+
 // --- Movement rules ---
 function isValidMove(playerIndex, newRow, newCol) {
   if (playerIndex < 0 || playerIndex >= players.length) return false;
@@ -675,6 +805,8 @@ function isValidMove(playerIndex, newRow, newCol) {
   // Block if the cell is otherwise invalid (except transformer and bomb)
   if (board[newRow][newCol] !== CELL_TYPES.TRANSFORMER && 
       board[newRow][newCol] !== CELL_TYPES.BOMB &&
+      board[newRow][newCol] !== CELL_TYPES.BLACK_TARGET_PIECE &&
+      getDuckAt(newRow, newCol) === -1 &&
       isCellBlocked(newRow, newCol, player, fromDirection)) {
     return false;
   }
@@ -683,6 +815,7 @@ function isValidMove(playerIndex, newRow, newCol) {
   // Use the player's specific piece type
   switch (player.pieceType) {
     case "rook":
+    case "castle_rook":
       if (r === newRow || c === newCol) return isPathClear(r, c, newRow, newCol, player);
       return false;
     case "bishop":
@@ -702,18 +835,107 @@ function isValidMove(playerIndex, newRow, newCol) {
     case "king":
       return Math.abs(newRow - r) <= 1 && Math.abs(newCol - c) <= 1;
     case "pawn":
-      // Pawns can only move forward one square
-      // In this puzzle, we'll assume all pawns move downward (increasing row)
-      if (newCol === c && newRow === r + 1) {
-        // Moving straight forward - can only move to empty square
-        return !isCellBlocked(newRow, newCol, player, "above");
-      } else if (Math.abs(newCol - c) === 1 && newRow === r + 1) {
-        // Capturing diagonally - can only move to occupied square (not blocks, but can capture other players)
-        return isCellBlocked(newRow, newCol, player, "above") && board[newRow][newCol] !== CELL_TYPES.SOLID_BLOCK && board[newRow][newCol] !== CELL_TYPES.PHASE_BLOCK && board[newRow][newCol] !== CELL_TYPES.PHASE_BLOCK_ACTIVE;
+      // Pawns move upward. First move can advance two squares; later moves advance one.
+      if (newCol === c && newRow === r - 1) {
+        return isPawnForwardDestinationCell(newRow, newCol, player);
+      } else if (newCol === c && newRow === r - 2 && !player.hasMoved) {
+        const middleRow = r - 1;
+        return middleRow >= 0 &&
+          isPawnForwardPathCell(middleRow, c, player) &&
+          isPawnForwardDestinationCell(newRow, newCol, player);
+      } else if (Math.abs(newCol - c) === 1 && newRow === r - 1) {
+        // Diagonal "captures" can take puzzle targets/blocks, like chess captures a piece.
+        return isPawnDiagonalCaptureCell(newRow, newCol);
       }
       return false;
   }
   return false;
+}
+
+function canCastle(kingIndex, rookIndex) {
+  if (kingIndex < 0 || rookIndex < 0 || kingIndex === rookIndex) return false;
+  const king = players[kingIndex];
+  const rook = players[rookIndex];
+  if (!king || !rook) return false;
+  if (king.pieceType !== "king" || rook.pieceType !== "castle_rook") return false;
+  if (king.hasMoved || rook.hasMoved) return false;
+  if (king.row !== rook.row) return false;
+
+  const direction = rook.col > king.col ? 1 : -1;
+  const kingTargetCol = king.col + direction * 2;
+  const rookTargetCol = kingTargetCol - direction;
+  if (kingTargetCol < 0 || kingTargetCol >= COLS || rookTargetCol < 0 || rookTargetCol >= COLS) return false;
+
+  const start = Math.min(king.col, rook.col) + 1;
+  const end = Math.max(king.col, rook.col);
+  for (let col = start; col < end; col++) {
+    if (board[king.row][col] !== CELL_TYPES.EMPTY || getPlayerAt(king.row, col) !== -1) {
+      return false;
+    }
+  }
+
+  const isOriginalKingOrRookCell = (col) =>
+    col === king.col || col === rook.col;
+  const isCastleTargetAvailable = (col) =>
+    board[king.row][col] === CELL_TYPES.EMPTY || isOriginalKingOrRookCell(col);
+
+  return (
+    isCastleTargetAvailable(kingTargetCol) &&
+    isCastleTargetAvailable(rookTargetCol)
+  );
+}
+
+function castleKingWithRook(kingIndex, rookIndex) {
+  if (!canCastle(kingIndex, rookIndex)) {
+    updateStatus("Castling is not available here");
+    return false;
+  }
+
+  const king = players[kingIndex];
+  const rook = players[rookIndex];
+  const oldKingRow = king.row;
+  const oldKingCol = king.col;
+  const oldRookRow = rook.row;
+  const oldRookCol = rook.col;
+  const direction = rook.col > king.col ? 1 : -1;
+  const kingTargetCol = king.col + direction * 2;
+  const rookTargetCol = kingTargetCol - direction;
+
+  saveUndoSnapshot();
+  queueMoveTraceCapture({
+    from: { row: oldKingRow, col: oldKingCol },
+    to: { row: oldKingRow, col: kingTargetCol },
+    pieceType: "king",
+    castling: direction > 0 ? "kingside" : "queenside",
+    rookFrom: { row: oldRookRow, col: oldRookCol },
+    rookTo: { row: oldRookRow, col: rookTargetCol }
+  });
+
+  board[oldKingRow][oldKingCol] = CELL_TYPES.EMPTY;
+  board[oldRookRow][oldRookCol] = CELL_TYPES.EMPTY;
+  king.col = kingTargetCol;
+  rook.col = rookTargetCol;
+  king.hasMoved = true;
+  rook.hasMoved = true;
+  board[king.row][king.col] = CELL_TYPES.PLAYER;
+  board[rook.row][rook.col] = CELL_TYPES.PLAYER;
+  visitedSquares[king.row][king.col] = true;
+  visitedSquares[rook.row][rook.col] = true;
+
+  levelMoveCount += 1;
+  updateMoveCountDisplay();
+  updateStatus(direction > 0 ? "Kingside castling!" : "Queenside castling!");
+  checkWinCondition();
+
+  if (gravityEnabled) {
+    applyGravity();
+  } else if (antigravityEnabled) {
+    applyAntigravity();
+  } else {
+    tryCapturePendingMoveTrace(true);
+  }
+
+  return true;
 }
 
 function movePlayer(playerIndex, newRow, newCol) {
@@ -727,7 +949,7 @@ function movePlayer(playerIndex, newRow, newCol) {
   if (!isValidMove(playerIndex, newRow, newCol)) {
     // Check if the move was invalid because goal is locked
     if (board[newRow][newCol] === CELL_TYPES.GOAL && !areAllObjectivesCompleted()) {
-      updateStatus("Complete all objectives first! " + objectivesCompleted + "/" + totalObjectives);
+      updateStatus("Complete all requirements first! " + getUnlockProgressText());
     } else {
       updateStatus("Invalid move for selected piece");
     }
@@ -744,8 +966,16 @@ function movePlayer(playerIndex, newRow, newCol) {
   levelMoveCount += 1;
   updateMoveCountDisplay();
 
-  // ✅ NEW: Check if moving into a bomb BEFORE moving
+  // Check the full movement path against active lasers before moving.
+  const laserHit = getActiveLaserHitOnMove(player, newRow, newCol);
+  if (laserHit) {
+    handleLaserCollision(playerIndex, laserHit.row, laserHit.col);
+    return;
+  }
+
   const isBombBlock = board[newRow][newCol] === CELL_TYPES.BOMB;
+  const isDuckHazard = getDuckAt(newRow, newCol) !== -1;
+  const isTargetPiece = board[newRow][newCol] === CELL_TYPES.BLACK_TARGET_PIECE;
 
   // Check if destination is ANY teleport block type BEFORE moving
   const isTeleportBlock = [
@@ -764,10 +994,20 @@ function movePlayer(playerIndex, newRow, newCol) {
     return; // Stop further processing
   }
 
+  if (isDuckHazard) {
+    handleDuckCollision(playerIndex);
+    return;
+  }
+
   board[player.row][player.col] = CELL_TYPES.EMPTY;
   player.row = newRow;
   player.col = newCol;
+  player.hasMoved = true;
   visitedSquares[newRow][newCol] = true;
+
+  if (isTargetPiece) {
+    completeTargetPiece(newRow, newCol);
+  }
 
   if (isTeleportBlock) {
     handleTeleport(player);
@@ -789,8 +1029,8 @@ function movePlayer(playerIndex, newRow, newCol) {
   checkObjectiveCompletion();
 
   // Check if player moved through a phase block from below and activate it
-  if (newRow < player.row) { // Moving upward
-    for (let r = newRow + 1; r < player.row; r++) {
+  if (newRow < fromRow) { // Moving upward
+    for (let r = newRow + 1; r < fromRow; r++) {
       if (board[r][newCol] === CELL_TYPES.PHASE_BLOCK) {
         activatePhaseBlock(r, newCol);
       }
@@ -853,8 +1093,14 @@ function saveUndoSnapshot() {
     objectives: cloneGameData(objectives),
     objectivesCompleted,
     totalObjectives,
+    targetPieces: cloneGameData(targetPieces),
+    targetPiecesCaptured,
+    totalTargetPieces,
     phaseBlockStates: cloneGameData(phaseBlockStates),
     bombs: cloneGameData(bombs),
+    laserBlocks: cloneGameData(laserBlocks),
+    ducks: cloneGameData(ducks),
+    movingPlatforms: cloneGameData(movingPlatforms),
     teleportBlocks: cloneGameData(teleportBlocks),
     playerTeleportCooldowns: Array.from(playerTeleportCooldowns.entries()),
     gameWon,
@@ -891,8 +1137,14 @@ async function undoMove() {
   objectives = cloneGameData(snapshot.objectives);
   objectivesCompleted = snapshot.objectivesCompleted;
   totalObjectives = snapshot.totalObjectives;
+  targetPieces = cloneGameData(snapshot.targetPieces || []);
+  targetPiecesCaptured = snapshot.targetPiecesCaptured || targetPieces.filter(piece => piece.captured).length;
+  totalTargetPieces = snapshot.totalTargetPieces || targetPieces.length;
   phaseBlockStates = cloneGameData(snapshot.phaseBlockStates);
   bombs = cloneGameData(snapshot.bombs);
+  laserBlocks = cloneGameData(snapshot.laserBlocks || []);
+  ducks = cloneGameData(snapshot.ducks || []);
+  movingPlatforms = cloneGameData(snapshot.movingPlatforms || []);
   teleportBlocks = cloneGameData(snapshot.teleportBlocks);
   playerTeleportCooldowns = new Map(snapshot.playerTeleportCooldowns || []);
   gameWon = snapshot.gameWon;
@@ -914,6 +1166,7 @@ async function undoMove() {
 
   updatePlayerCount();
   updateObjectiveCount();
+  updateTargetPieceCount();
   updateMoveCountDisplay();
   drawBoard();
 }
@@ -1062,16 +1315,17 @@ function handleTransformerMenuClick(e) {
   const buttonSize = 35;
   const spacing = 15;
   const menuWidth = 3 * buttonSize + 2 * spacing;
-  const menuHeight = 2 * buttonSize + spacing;
+  const menuHeight = 3 * buttonSize + 2 * spacing;
   const outerMargin = 20;
   
   const startX = centerX - menuWidth / 2;
   const startY = centerY - menuHeight / 2 - 10;
   
-  // Define the 2x3 grid layout
+  // Define the piece grid layout
   const pieceLayout = [
     ["rook", "bishop", "queen"],
-    ["knight", "king", "pawn"]
+    ["knight", "king", "pawn"],
+    ["castle_rook"]
   ];
   
   // Check if click is on any piece button

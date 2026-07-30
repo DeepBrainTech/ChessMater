@@ -451,6 +451,7 @@
           <div id="blockTipStats">
             <div class="player-count" id="playerCount">Players: 0</div>
             <div class="objective-count" id="objectiveCount">Objectives: 0/0</div>
+            <div class="objective-count" id="targetPieceCount">Target Pieces: 0/0</div>
           </div>
           <div class="control-group" style="margin-top:10px;">
             <label><input type="checkbox" id="levelFogToggle"> Fog of war (this level)</label>
@@ -470,22 +471,31 @@
           <label>Tool</label>
           <select id="editMode">
             <option value="player_rook">Rook</option>
+            <option value="player_castle_rook">Castle Rook</option>
             <option value="player_bishop">Bishop</option>
             <option value="player_queen">Queen</option>
             <option value="player_knight">Knight</option>
             <option value="player_king">King</option>
             <option value="player_pawn">Pawn</option>
+            <option value="player_boom_right">Boom Right</option>
+            <option value="player_boom_left">Boom Left</option>
             <option value="goal">Goal</option>
             <option value="counter_goal">Counter Goal</option>
             <option value="block">Solid Block</option>
+            <option value="laser_block">Laser Block</option>
             <option value="phase_block">Phase Block</option>
             <option value="transformer">Transformer Block</option>
             <option value="objective">Objective Block</option>
+            <option value="black_target">Black Target</option>
             <option value="teleport_purple">Purple Teleporter</option>
             <option value="teleport_green">Green Teleporter</option>
             <option value="teleport_blue">Blue Teleporter</option>
             <option value="teleport_orange">Orange Teleporter</option>
             <option value="bomb">Bomb Block</option>
+            <option value="duck_right">Duck Line from Left →</option>
+            <option value="duck_left">Duck Line from Right ←</option>
+            <option value="moving_platform">Vertical Moving Platform</option>
+            <option value="moving_platform_horizontal">Horizontal Moving Platform</option>
             <option value="erase">Erase</option>
           </select>
         </div>
@@ -496,6 +506,55 @@
         <div class="control-group" id="counterGoalSettings" style="display:none;">
           <label>Counter goal moves</label>
           <input type="number" id="counterGoalMoves" value="5" min="1" max="99">
+        </div>
+        <div class="control-group" id="blackTargetSettings" style="display:none;">
+          <label>Black target piece</label>
+          <select id="blackTargetPieceType">
+            <option value="rook">Rook</option>
+            <option value="knight">Knight</option>
+            <option value="bishop">Bishop</option>
+            <option value="queen">Queen</option>
+            <option value="king">King</option>
+            <option value="pawn">Pawn</option>
+          </select>
+        </div>
+        <div class="control-group" id="laserSettings" style="display:none;">
+          <label>Laser fires every</label>
+          <select id="laserFireEverySteps">
+            <option value="2">2 moves</option>
+            <option value="3">3 moves</option>
+            <option value="4">4 moves</option>
+            <option value="5">5 moves</option>
+            <option value="6">6 moves</option>
+            <option value="7">7 moves</option>
+            <option value="8">8 moves</option>
+            <option value="9">9 moves</option>
+            <option value="10">10 moves</option>
+            <option value="11">11 moves</option>
+            <option value="12">12 moves</option>
+            <option value="13">13 moves</option>
+            <option value="14">14 moves</option>
+            <option value="15">15 moves</option>
+            <option value="16">16 moves</option>
+            <option value="17">17 moves</option>
+            <option value="18">18 moves</option>
+            <option value="19">19 moves</option>
+            <option value="20">20 moves</option>
+          </select>
+        </div>
+        <div class="control-group" id="movingPlatformSettings" style="display:none;">
+          <label>Platform bottom level</label>
+          <input type="number" id="platformBottomLevel" value="0" min="0" max="9">
+          <label>Platform top level</label>
+          <input type="number" id="platformTopLevel" value="9" min="0" max="9">
+          <button type="button" id="confirmPlatformSettings">Confirm platform range</button>
+        </div>
+        <div class="control-group" id="horizontalMovingPlatformSettings" style="display:none;">
+          <label>Platform left column</label>
+          <input type="number" id="platformLeftCol" value="0" min="0" max="15">
+          <label>Platform right column</label>
+          <input type="number" id="platformRightCol" value="15" min="0" max="15">
+          <button type="button" id="confirmHorizontalPlatformSettings">Confirm horizontal range</button>
         </div>
       </div>
 

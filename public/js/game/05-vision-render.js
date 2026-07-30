@@ -1,7 +1,7 @@
 /**
  * game/05-vision-render.js
- * Valid moves, vision/fog, drawCellContent, drawBoard
- * Split from game.js lines 3061-3757 — logic unchanged.
+ * Valid moves, vision/fog, drawBoard
+ * Split from game.monolith.js lines 4122-4830.
  */
 function drawPossibleMoves() {
   if (mode !== "play" || selectedPlayerIndex === -1 || gameWon) return;
@@ -55,7 +55,7 @@ function drawPieceSelectionMenu() {
   const buttonSize = 35;
   const spacing = 15;
   const menuWidth = 3 * buttonSize + 2 * spacing;
-  const menuHeight = 2 * buttonSize + spacing;
+  const menuHeight = 3 * buttonSize + 2 * spacing;
   
   // Center the menu on the board
   const outerMargin = 20;
@@ -97,10 +97,11 @@ function drawPieceSelectionMenu() {
   ctx.textAlign = "center";
   ctx.fillText("Choose Piece Type", centerX, startY - outerMargin + 12);
   
-  // Define the 2x3 grid layout
+  // Define the piece grid layout
   const pieceLayout = [
     ["rook", "bishop", "queen"],
-    ["knight", "king", "pawn"]
+    ["knight", "king", "pawn"],
+    ["castle_rook"]
   ];
   
   // Draw piece options
@@ -129,7 +130,10 @@ function drawPieceSelectionMenu() {
       ctx.textAlign = "center";
       ctx.textBaseline = "top";
       
-      const displayName = pieceType.charAt(0).toUpperCase() + pieceType.slice(1);
+      const displayName = pieceType
+        .split("_")
+        .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+        .join(" ");
       ctx.fillText(displayName, btnX + buttonSize/2, btnY + buttonSize + 3);
     });
   });
@@ -144,8 +148,9 @@ function drawPieceSelectionMenu() {
   ctx.textBaseline = "alphabetic";
 }
 
-//visible for only piece can move to
+// Fog reveals each player piece plus the eight surrounding squares.
 function getVisibleSquares() {
+  syncVisitedSquaresSize();
   const visible = Array.from({ length: ROWS }, () => Array(COLS).fill(false));
 
   if (!fogEnabled || (CM_EDITOR_PAGE && mode === "edit")) {
@@ -155,22 +160,15 @@ function getVisibleSquares() {
     return visible;
   }
 
-  if (selectedPlayerIndex >= 0) {
-    const p = players[selectedPlayerIndex];
-    visible[p.row][p.col] = true;
+  players.forEach(player => {
+    revealAdjacentSquares(visible, player.row, player.col);
+  });
 
-    // Show all valid move targets in fog
-    for (let r = 0; r < ROWS; r++) {
-      for (let c = 0; c < COLS; c++) {
-        if (isValidMove(selectedPlayerIndex, r, c) || visitedSquares[r][c]) {
-          visible[r][c] = true;
-        }
-      }
-    }
-  }
   for (let r = 0; r < ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
-      if (visitedSquares[r][c]) {
+      if (visible[r][c]) {
+        visitedSquares[r][c] = true;
+      } else if (visitedSquares[r][c]) {
         visible[r][c] = true;
       }
     }
@@ -193,97 +191,18 @@ function getValidMovesFor(playerIndex) {
 
 function getVisionForPiece(row, col, pieceType, playerIndex) {
   const visionSquares = [];
-  
-  // Always include current position
-  visionSquares.push([row, col]);
-  
-  switch (pieceType) {
-    case "rook":
-      // Rooks see in straight lines until blocked
-      addLineOfSight(visionSquares, row, col, 1, 0, playerIndex);  // Down
-      addLineOfSight(visionSquares, row, col, -1, 0, playerIndex); // Up
-      addLineOfSight(visionSquares, row, col, 0, 1, playerIndex);  // Right
-      addLineOfSight(visionSquares, row, col, 0, -1, playerIndex); // Left
-      break;
-      
-    case "bishop":
-      // Bishops see in diagonals until blocked
-      addLineOfSight(visionSquares, row, col, 1, 1, playerIndex);   // Down-right
-      addLineOfSight(visionSquares, row, col, 1, -1, playerIndex);  // Down-left
-      addLineOfSight(visionSquares, row, col, -1, 1, playerIndex);  // Up-right
-      addLineOfSight(visionSquares, row, col, -1, -1, playerIndex); // Up-left
-      break;
-      
-    case "queen":
-      // Queens see in all directions until blocked
-      for (let dr = -1; dr <= 1; dr++) {
-        for (let dc = -1; dc <= 1; dc++) {
-          if (dr === 0 && dc === 0) continue;
-          addLineOfSight(visionSquares, row, col, dr, dc, playerIndex);
-        }
-      }
-      break;
-      
-    case "knight":
-      // Knights see all knight moves (2+1 pattern)
-      const knightMoves = [
-        [2, 1], [2, -1], [-2, 1], [-2, -1],
-        [1, 2], [1, -2], [-1, 2], [-1, -2]
-      ];
-      knightMoves.forEach(([dr, dc]) => {
-        const newRow = row + dr;
-        const newCol = col + dc;
-        if (newRow >= 0 && newRow < ROWS && newCol >= 0 && newCol < COLS) {
-          visionSquares.push([newRow, newCol]);
-        }
-      });
-      break;
-      
-    case "king":
-      // Kings see all adjacent squares
-      for (let dr = -1; dr <= 1; dr++) {
-        for (let dc = -1; dc <= 1; dc++) {
-          if (dr === 0 && dc === 0) continue;
-          const newRow = row + dr;
-          const newCol = col + dc;
-          if (newRow >= 0 && newRow < ROWS && newCol >= 0 && newCol < COLS) {
-            visionSquares.push([newRow, newCol]);
-          }
-        }
-      }
-      break;
-      
-    case "pawn":
-      // Pawns see forward and diagonal for capturing
-      const newRow = row + 1; // Assuming pawns move downward
-      if (newRow < ROWS) {
-        visionSquares.push([newRow, col]); // Forward
-        if (col > 0) visionSquares.push([newRow, col - 1]); // Diagonal left
-        if (col < COLS - 1) visionSquares.push([newRow, col + 1]); // Diagonal right
-      }
-      break;
-  }
-  
-  return visionSquares;
-}
 
-// Helper function to add line-of-sight squares until blocked
-function addLineOfSight(visionSquares, startRow, startCol, dr, dc, playerIndex) {
-  let r = startRow + dr;
-  let c = startCol + dc;
-  
-  while (r >= 0 && r < ROWS && c >= 0 && c < COLS) {
-    visionSquares.push([r, c]);
-    
-    // Stop if we hit a blocking cell (but allow seeing through players)
-    if (board[r][c] === CELL_TYPES.SOLID_BLOCK || 
-        board[r][c] === CELL_TYPES.PHASE_BLOCK_ACTIVE) {
-      break;
+  for (let dr = -1; dr <= 1; dr++) {
+    for (let dc = -1; dc <= 1; dc++) {
+      const visibleRow = row + dr;
+      const visibleCol = col + dc;
+      if (isInsideBoard(visibleRow, visibleCol)) {
+        visionSquares.push([visibleRow, visibleCol]);
+      }
     }
-    
-    r += dr;
-    c += dc;
   }
+
+  return visionSquares;
 }
 
 // Add this function to draw the content of a cell
@@ -296,23 +215,17 @@ function drawCellContent(cellType, x, y, row, col) {
   
   // Draw inactive phase block (blue semi-transparent)
   if (cellType === CELL_TYPES.PHASE_BLOCK) {
-    ctx.fillStyle = "rgba(52, 152, 219, 0.3)";
-    ctx.fillRect(x+3, y+3, TILE_SIZE-6, TILE_SIZE-6);
-    
-    // Draw upward arrow to indicate you can pass through from below
-    ctx.fillStyle = "rgba(25, 118, 210, 0.6)";
-    ctx.beginPath();
-    ctx.moveTo(x + TILE_SIZE/2, y + TILE_SIZE - 10);
-    ctx.lineTo(x + TILE_SIZE/2 - 8, y + TILE_SIZE - 18);
-    ctx.lineTo(x + TILE_SIZE/2 + 8, y + TILE_SIZE - 18);
-    ctx.closePath();
-    ctx.fill();
+    drawInactivePhaseBlock(ctx, x, y, TILE_SIZE);
   }
   
   // Draw active phase block (solid blue)
   if (cellType === CELL_TYPES.PHASE_BLOCK_ACTIVE) {
     ctx.fillStyle = "rgba(41, 128, 185, 0.8)";
     ctx.fillRect(x+3, y+3, TILE_SIZE-6, TILE_SIZE-6);
+  }
+
+  if (cellType === CELL_TYPES.MOVING_PLATFORM) {
+    drawMovingPlatform(ctx, x, y, TILE_SIZE, getMovingPlatformAxisAt(row, col));
   }
   
   // Draw transformer block (purple with question mark)
@@ -372,9 +285,128 @@ function drawCellContent(cellType, x, y, row, col) {
   if (cellType === CELL_TYPES.COUNTER_GOAL && goal && goal.row === row && goal.col === col) {
     ctx.drawImage(pieceImages.target, x+8, y+8, TILE_SIZE-16, TILE_SIZE-16);
   }
+
+  if (cellType === CELL_TYPES.BLACK_TARGET_PIECE) {
+    const targetIndex = getTargetPieceAt(row, col);
+    const targetPiece = targetIndex !== -1 ? targetPieces[targetIndex] : null;
+    drawBlackTargetPiece(ctx, x, y, TILE_SIZE, targetPiece ? targetPiece.pieceType : "pawn");
+  }
 }
 
 // --- Drawing ---
+function drawCounterGoalBadge(x, y, counter, centerY = y + TILE_SIZE / 2) {
+  ctx.save();
+  ctx.fillStyle = "rgba(0,0,0,0.7)";
+  ctx.beginPath();
+  ctx.arc(x + TILE_SIZE / 2, centerY, 14, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = (counter <= 3) ? "red" : "white";
+  ctx.font = "bold 16px Arial";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(counter, x + TILE_SIZE / 2, centerY);
+  ctx.restore();
+}
+
+function drawLaserEmitter(renderCtx, x, y, tile, laser) {
+  const plate = Math.max(5, tile * 0.12);
+  const inset = Math.max(9, tile * 0.18);
+  const active = isLaserActive(laser);
+  const enabledDirections = normalizeLaserDirections(laser && laser.directions);
+  const countdown = getLaserCountdown(laser);
+
+  renderCtx.save();
+  renderCtx.lineWidth = 1.5;
+
+  const barsByDirection = {
+    up: [x + inset, y + 2, tile - inset * 2, plate],
+    down: [x + inset, y + tile - plate - 2, tile - inset * 2, plate],
+    left: [x + 2, y + inset, plate, tile - inset * 2],
+    right: [x + tile - plate - 2, y + inset, plate, tile - inset * 2]
+  };
+
+  for (const direction of DEFAULT_LASER_DIRECTIONS) {
+    const [barX, barY, width, height] = barsByDirection[direction];
+    const enabled = enabledDirections.includes(direction);
+    renderCtx.fillStyle = enabled
+      ? (active ? "#ff3b30" : "#6c1f1a")
+      : "rgba(30, 30, 30, 0.72)";
+    renderCtx.strokeStyle = enabled
+      ? (active ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.35)")
+      : "rgba(255,255,255,0.18)";
+    renderCtx.fillRect(barX, barY, width, height);
+    renderCtx.strokeRect(barX, barY, width, height);
+  }
+
+  const badgeRadius = Math.max(9, tile * 0.24);
+  const centerX = x + tile / 2;
+  const centerY = y + tile / 2;
+  renderCtx.fillStyle = active ? "rgba(255, 59, 48, 0.92)" : "rgba(20, 24, 31, 0.78)";
+  renderCtx.strokeStyle = active ? "rgba(255, 255, 255, 0.95)" : "rgba(255, 255, 255, 0.78)";
+  renderCtx.lineWidth = Math.max(1.5, tile * 0.035);
+  renderCtx.beginPath();
+  renderCtx.arc(centerX, centerY, badgeRadius, 0, Math.PI * 2);
+  renderCtx.fill();
+  renderCtx.stroke();
+
+  renderCtx.fillStyle = "#ffffff";
+  renderCtx.font = `bold ${Math.max(11, Math.floor(tile * 0.34))}px Arial`;
+  renderCtx.textAlign = "center";
+  renderCtx.textBaseline = "middle";
+  renderCtx.fillText(String(countdown), centerX, centerY + 0.5);
+
+  renderCtx.restore();
+}
+
+function drawLaserCell(renderCtx, x, y, direction) {
+  const beamWidth = Math.max(8, TILE_SIZE * 0.16);
+  const glowWidth = Math.max(18, TILE_SIZE * 0.34);
+  const isVertical = direction === "up" || direction === "down";
+  const centerX = x + TILE_SIZE / 2;
+  const centerY = y + TILE_SIZE / 2;
+
+  renderCtx.save();
+  renderCtx.fillStyle = "rgba(255, 64, 64, 0.16)";
+  if (isVertical) {
+    renderCtx.fillRect(centerX - glowWidth / 2, y, glowWidth, TILE_SIZE);
+  } else {
+    renderCtx.fillRect(x, centerY - glowWidth / 2, TILE_SIZE, glowWidth);
+  }
+
+  renderCtx.fillStyle = "rgba(255, 0, 0, 0.75)";
+  if (isVertical) {
+    renderCtx.fillRect(centerX - beamWidth / 2, y, beamWidth, TILE_SIZE);
+  } else {
+    renderCtx.fillRect(x, centerY - beamWidth / 2, TILE_SIZE, beamWidth);
+  }
+
+  renderCtx.fillStyle = "rgba(255, 255, 255, 0.9)";
+  const coreWidth = Math.max(2, beamWidth * 0.28);
+  if (isVertical) {
+    renderCtx.fillRect(centerX - coreWidth / 2, y, coreWidth, TILE_SIZE);
+  } else {
+    renderCtx.fillRect(x, centerY - coreWidth / 2, TILE_SIZE, coreWidth);
+  }
+  renderCtx.restore();
+}
+
+function drawLaserEffects(visible) {
+  for (const laser of laserBlocks) {
+    if (laser.row < 0 || laser.row >= ROWS || laser.col < 0 || laser.col >= COLS) continue;
+    if (fogEnabled && !visible[laser.row][laser.col]) continue;
+    drawLaserEmitter(ctx, laser.col * TILE_SIZE, laser.row * TILE_SIZE, TILE_SIZE, laser);
+  }
+
+  for (const laser of laserBlocks) {
+    if (!isLaserActive(laser)) continue;
+    for (const cell of getLaserCellsFromBlock(laser)) {
+      if (fogEnabled && !visible[cell.row][cell.col]) continue;
+      drawLaserCell(ctx, cell.col * TILE_SIZE, cell.row * TILE_SIZE, cell.direction);
+    }
+  }
+}
+
 function drawBoard() {
   const visible = fogEnabled ? getVisibleSquares() : null;
   for (let r = 0; r < ROWS; r++) {
@@ -418,17 +450,7 @@ function drawBoard() {
       // Draw inactive phase block (blue semi-transparent) - adjust size
       if (board[r][c] === CELL_TYPES.PHASE_BLOCK) {
         if (!fogEnabled || visible[r][c]) {
-          ctx.fillStyle = "rgba(52, 152, 219, 0.3)";
-          ctx.fillRect(x+3, y+3, TILE_SIZE-6, TILE_SIZE-6);
-          
-          // Draw upward arrow to indicate you can pass through from below
-          ctx.fillStyle = "rgba(25, 118, 210, 0.6)";
-          ctx.beginPath();
-          ctx.moveTo(x + TILE_SIZE/2, y + TILE_SIZE - 10);
-          ctx.lineTo(x + TILE_SIZE/2 - 8, y + TILE_SIZE - 18);
-          ctx.lineTo(x + TILE_SIZE/2 + 8, y + TILE_SIZE - 18);
-          ctx.closePath();
-          ctx.fill();
+          drawInactivePhaseBlock(ctx, x, y, TILE_SIZE);
         }
       }
       
@@ -437,6 +459,12 @@ function drawBoard() {
         if (!fogEnabled || visible[r][c]) {
           ctx.fillStyle = "rgba(41, 128, 185, 0.8)";
           ctx.fillRect(x+3, y+3, TILE_SIZE-6, TILE_SIZE-6);
+        }
+      }
+
+      if (board[r][c] === CELL_TYPES.MOVING_PLATFORM) {
+        if (!fogEnabled || visible[r][c]) {
+          drawMovingPlatform(ctx, x, y, TILE_SIZE, getMovingPlatformAxisAt(r, c));
         }
       }
       
@@ -479,16 +507,7 @@ function drawBoard() {
           CELL_TYPES.TELEPORT_ORANGE
       ].includes(board[r][c])) {
           if (!fogEnabled || visible[r][c]) {
-              const color = TELEPORT_COLORS[board[r][c]];
-              if (color) {
-                  ctx.fillStyle = color.fill;
-                  ctx.beginPath();
-                  ctx.arc(x + TILE_SIZE / 2, y + TILE_SIZE / 2, TILE_SIZE / 3, 0, Math.PI * 2);
-                  ctx.fill();
-                  ctx.strokeStyle = color.stroke;
-                  ctx.lineWidth = 2;
-                  ctx.stroke();
-              }
+              drawTeleporterDoor(ctx, x, y, TILE_SIZE, board[r][c], getTeleporterDoorRole(r, c, board[r][c]));
           }
       }
       
@@ -524,34 +543,24 @@ function drawBoard() {
             // Check if there's a teleport block at this position
             const teleportBlock = teleportBlocks.find(tp => tp.row === r && tp.col === c);
             if (teleportBlock) {
-                const color = TELEPORT_COLORS[teleportBlock.type];
-                if (color) {
-                    // Draw teleport block underneath
-                    ctx.fillStyle = color.fill;
-                    ctx.beginPath();
-                    ctx.arc(x + TILE_SIZE / 2, y + TILE_SIZE / 2, TILE_SIZE / 3, 0, Math.PI * 2);
-                    ctx.fill();
-                    ctx.strokeStyle = color.stroke;
-                    ctx.lineWidth = 2;
-                    ctx.stroke();
-                }
+                drawTeleporterDoor(ctx, x, y, TILE_SIZE, teleportBlock.type, getTeleporterDoorRole(r, c, teleportBlock.type));
             }
             
-            // Draw the player piece on top
-            ctx.drawImage(pieceImages[player.pieceType], x+8, y+8, TILE_SIZE-16, TILE_SIZE-16);
+          // Draw the player piece on top
+          ctx.drawImage(pieceImages[player.pieceType], x+8, y+8, TILE_SIZE-16, TILE_SIZE-16);
+          if (player.pieceType === "castle_rook") {
+            drawCastleRookMarker(ctx, x, y, TILE_SIZE);
           }
         }
+      }
       }
 
       if (teleportBlocks.some(tp => tp.row === r && tp.col === c) && board[r][c] !== CELL_TYPES.PLAYER) {
         if (!fogEnabled || visible[r][c]) {
-            ctx.fillStyle = "rgba(155, 89, 182, 0.8)";
-            ctx.beginPath();
-            ctx.arc(x + TILE_SIZE / 2, y + TILE_SIZE / 2, TILE_SIZE / 3, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.strokeStyle = "rgba(255, 255, 255, 0.6)";
-            ctx.lineWidth = 2;
-            ctx.stroke();
+            const teleportBlock = teleportBlocks.find(tp => tp.row === r && tp.col === c);
+            if (teleportBlock) {
+              drawTeleporterDoor(ctx, x, y, TILE_SIZE, teleportBlock.type, getTeleporterDoorRole(r, c, teleportBlock.type));
+            }
         }
       }
 
@@ -634,21 +643,14 @@ function drawBoard() {
       // Check if there's a teleport block at this position
       const teleportBlock = teleportBlocks.find(tp => tp.row === player.row && tp.col === player.col);
       if (teleportBlock) {
-        const color = TELEPORT_COLORS[teleportBlock.type];
-        if (color) {
-          // Draw teleport block underneath
-          ctx.fillStyle = color.fill;
-          ctx.beginPath();
-          ctx.arc(x + TILE_SIZE / 2, y + TILE_SIZE / 2, TILE_SIZE / 3, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.strokeStyle = color.stroke;
-          ctx.lineWidth = 2;
-          ctx.stroke();
-        }
+        drawTeleporterDoor(ctx, x, y, TILE_SIZE, teleportBlock.type, getTeleporterDoorRole(player.row, player.col, teleportBlock.type));
       }
       
       // Draw the player piece on top
       ctx.drawImage(pieceImages[player.pieceType], x+8, y+8, TILE_SIZE-16, TILE_SIZE-16);
+      if (player.pieceType === "castle_rook") {
+        drawCastleRookMarker(ctx, x, y, TILE_SIZE);
+      }
     }
   });
 
@@ -666,24 +668,16 @@ function drawBoard() {
     if (!fogEnabled || visible[goal.row][goal.col]) {
       // Draw base king image
       ctx.drawImage(pieceImages.target, x+8, y+8, TILE_SIZE-16, TILE_SIZE-16);
+      const goalLocked = !areAllObjectivesCompleted() ||
+        (goal.type === "counter" && goal.counter <= 0);
 
       // If it's a counter goal, draw counter
-      if (goal.type === "counter") {
-        ctx.fillStyle = "rgba(0,0,0,0.7)";
-        ctx.beginPath();
-        ctx.arc(x + TILE_SIZE/2, y + TILE_SIZE/2, 14, 0, Math.PI*2);
-        ctx.fill();
-
-        ctx.fillStyle = (goal.counter <= 3) ? "red" : "white";
-        ctx.font = "bold 16px Arial";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(goal.counter, x + TILE_SIZE/2, y + TILE_SIZE/2);
+      if (goal.type === "counter" && !goalLocked) {
+        drawCounterGoalBadge(x, y, goal.counter);
       }
 
       // Lock overlay
-      if (!areAllObjectivesCompleted() ||
-        (goal.type === "counter" && goal.counter <= 0)) {
+      if (goalLocked) {
         ctx.fillStyle = "rgba(0,0,0,0.7)";
         ctx.beginPath();
         ctx.arc(x + TILE_SIZE/2, y + TILE_SIZE/2, 12, 0, Math.PI*2);
@@ -695,8 +689,26 @@ function drawBoard() {
         ctx.textBaseline = "middle";
         ctx.fillText("🔒", x + TILE_SIZE/2, y + TILE_SIZE/2);
       }
+
+      if (goal.type === "counter" && goalLocked) {
+        drawCounterGoalBadge(x, y, goal.counter, y + 10);
+      }
     }
   }
+
+  for (const duck of ducks) {
+    const isOnBoard =
+      duck.row >= 0 &&
+      duck.row < ROWS &&
+      duck.col >= 0 &&
+      duck.col < COLS;
+    if (isOnBoard && (!fogEnabled || visible[duck.row][duck.col])) {
+      drawDuck(ctx, duck);
+    }
+  }
+
+  drawLaserEffects(visible);
+  drawPlatformLevelGuide();
 }
 
 // --- Confetti Celebration ---

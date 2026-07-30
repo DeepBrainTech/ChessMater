@@ -1,7 +1,7 @@
 /**
  * game/07-input-loop.js
- * Input, antigravity, restart, game loop, modal scroll lock, boot
- * Split from game.js lines 4204-4657 — logic unchanged.
+ * Input, antigravity, restart, game loop, boot
+ * Split from game.monolith.js lines 5647-6125.
  */
 function handleMove(e) {
   if (showTransformerMenu && transformerPosition) {
@@ -23,7 +23,7 @@ function handleMove(e) {
 
   if (CM_EDITOR_PAGE && mode === "edit") {
     if (typeof window.cmEditorOnEditCell === "function") {
-      window.cmEditorOnEditCell(row, col);
+      window.cmEditorOnEditCell(row, col, x - col * TILE_SIZE, y - row * TILE_SIZE);
     }
     return;
   }
@@ -37,6 +37,25 @@ function handleMove(e) {
     // Check if clicked on a player
     const clickedPlayerIndex = getPlayerAt(row, col);
     if (clickedPlayerIndex !== -1) {
+      if (selectedPlayerIndex !== -1) {
+        const selectedPiece = players[selectedPlayerIndex];
+        const clickedPiece = players[clickedPlayerIndex];
+        const selectedKingClickedRook =
+          selectedPiece?.pieceType === "king" && clickedPiece?.pieceType === "castle_rook";
+        const selectedRookClickedKing =
+          selectedPiece?.pieceType === "castle_rook" && clickedPiece?.pieceType === "king";
+
+        if (selectedKingClickedRook || selectedRookClickedKing) {
+          const castled = selectedKingClickedRook
+            ? castleKingWithRook(selectedPlayerIndex, clickedPlayerIndex)
+            : castleKingWithRook(clickedPlayerIndex, selectedPlayerIndex);
+          if (castled) {
+            selectedPlayerIndex = -1;
+          }
+          return;
+        }
+      }
+
       selectedPlayerIndex = clickedPlayerIndex;
       const player = players[selectedPlayerIndex];
       updateStatus(`Selected ${player.pieceType} (player ${selectedPlayerIndex + 1} of ${players.length}). Click destination to move.`);
@@ -309,11 +328,16 @@ function gameLoop() {
   ctx.clearRect(-shakeX, -shakeY, canvas.width, canvas.height);
   updateFallingPieces();
   updateExplodingPlayers(); // 💣 Animate dead players
+  checkActiveLaserCollisions();
   tryCapturePendingMoveTrace(false);
 
   frameCount++;
   if (frameCount % 50 === 0) {
     updateBombs();
+  }
+  if (frameCount % 100 === 0) {
+    updateDucks();
+    updateMovingPlatforms();
   }
 
 
@@ -453,6 +477,7 @@ if (window.authReady && typeof window.authReady.finally === "function") {
 }
 updatePlayerCount();
 updateObjectiveCount();
+updateTargetPieceCount();
 
 window.cmGetCurrentLevelIndex = function () {
   return currentLevelIndex;

@@ -4,6 +4,7 @@ import { subscribeGameUi } from "../game/uiBridge.js";
 export default function LevelSidePanel() {
   const [players, setPlayers] = useState(0);
   const [objectives, setObjectives] = useState({ completed: 0, total: 0 });
+  const [targets, setTargets] = useState({ captured: 0, total: 0 });
 
   useEffect(() => {
     return subscribeGameUi((event) => {
@@ -12,6 +13,12 @@ export default function LevelSidePanel() {
         setObjectives({
           completed: event.completed,
           total: event.totalObjectives,
+        });
+      }
+      if (event.type === "targetPieceCount") {
+        setTargets({
+          captured: event.captured,
+          total: event.totalTargetPieces,
         });
       }
     });
@@ -26,9 +33,11 @@ export default function LevelSidePanel() {
         <div className="objective-count" id="objectiveCount">
           Objectives: {objectives.completed}/{objectives.total}
         </div>
+        <div className="objective-count" id="targetPieceCount">
+          Target Pieces: {targets.captured}/{targets.total}
+        </div>
       </div>
       <div className="level-selector">
-        {/* Populated by src/page/levelSelect.js (same flow as legacy page-ui). */}
         <div className="level-grid" id="levelGrid"></div>
       </div>
     </div>

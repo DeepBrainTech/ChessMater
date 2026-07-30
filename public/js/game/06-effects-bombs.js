@@ -1,7 +1,7 @@
 /**
  * game/06-effects-bombs.js
- * Confetti, explosions, bombs
- * Split from game.js lines 3758-4203 — logic unchanged.
+ * Confetti, bombs, ducks, platforms, lasers collisions
+ * Split from game.monolith.js lines 4831-5646.
  */
 function triggerConfetti() {
   //const Winsound = new Audio("assets/audio/woo-hoo-82843.mp3");
@@ -262,16 +262,22 @@ function moveBombs() {
 function updateBombs() {
   for (let i = bombs.length - 1; i >= 0; i--) {
     const bomb = bombs[i];
-    const nextCol = bomb.col + bomb.direction;
+    const nextRow = isBoomBomb(bomb) ? bomb.row + bomb.rowDirection : bomb.row;
+    const nextCol = isBoomBomb(bomb) ? bomb.col + bomb.colDirection : bomb.col + bomb.direction;
 
     // Check bounds - bounce if hitting the edge
-    if (nextCol < 0 || nextCol >= COLS) {
-      bomb.direction *= -1; // Reverse direction
+    if (nextRow < 0 || nextRow >= ROWS || nextCol < 0 || nextCol >= COLS) {
+      if (isBoomBomb(bomb)) {
+        bomb.rowDirection *= -1;
+        bomb.colDirection *= -1;
+      } else {
+        bomb.direction *= -1; // Reverse direction
+      }
       continue;
     }
 
     // Check for collision with ANY player (regardless of selection state)
-    const hitPlayerIndex = players.findIndex(p => p.row === bomb.row && p.col === nextCol);
+    const hitPlayerIndex = players.findIndex(p => p.row === nextRow && p.col === nextCol);
     if (hitPlayerIndex !== -1) {
       const player = players[hitPlayerIndex];
 
@@ -313,22 +319,312 @@ function updateBombs() {
       
       // Move the bomb to the player's position and continue
       board[bomb.row][bomb.col] = CELL_TYPES.EMPTY;
+      bomb.row = nextRow;
       bomb.col = nextCol;
       board[bomb.row][bomb.col] = CELL_TYPES.BOMB;
       continue; // Skip the rest of the logic for this bomb this frame
     }
 
     // Only move if the next position is empty
-    if (board[bomb.row][nextCol] === CELL_TYPES.EMPTY) {
+    if (board[nextRow][nextCol] === CELL_TYPES.EMPTY) {
       // Clear current position
       board[bomb.row][bomb.col] = CELL_TYPES.EMPTY;
       
       // Move bomb
+      bomb.row = nextRow;
       bomb.col = nextCol;
       board[bomb.row][bomb.col] = CELL_TYPES.BOMB;
     } else {
       // If the next position is blocked by something else, bounce
-      bomb.direction *= -1;
+      if (isBoomBomb(bomb)) {
+        bomb.rowDirection *= -1;
+        bomb.colDirection *= -1;
+      } else {
+        bomb.direction *= -1;
+      }
+    }
+  }
+}
+
+function handleDuckCollision(playerIndex) {
+  const player = players[playerIndex];
+  if (!player) return;
+
+  explodingPlayers.push({
+    x: player.col * TILE_SIZE,
+    y: player.row * TILE_SIZE,
+    velocityY: -7,
+    velocityX: 0,
+    rotation: 0,
+    rotationSpeed: (Math.random() < 0.5 ? -1 : 1) * 0.22,
+    pieceType: player.pieceType
+  });
+
+  if (board[player.row][player.col] === CELL_TYPES.PLAYER) {
+    board[player.row][player.col] = CELL_TYPES.EMPTY;
+  }
+
+  players.splice(playerIndex, 1);
+  updatePlayerCount();
+  selectedPlayerIndex = -1;
+  shakeAmount = 18;
+  updateStatus("🦆 You ran into a duck!");
+  scheduleAutoRestartAfterDeath("🦆 The duck knocked you out! Restarting level...");
+}
+
+function updateDucks() {
+  let removedSupport = false;
+
+  for (let i = ducks.length - 1; i >= 0; i--) {
+    const duck = ducks[i];
+    const isWaitingToRespawn = duck.col < 0 || duck.col >= COLS;
+    const nextCol = isWaitingToRespawn
+      ? (duck.direction === 1 ? 0 : COLS - 1)
+      : duck.col + duck.direction;
+
+    if (nextCol < 0 || nextCol >= COLS) {
+      const riderIndex = duck.row > 0 ? getPlayerAt(duck.row - 1, duck.col) : -1;
+      if (riderIndex !== -1) removedSupport = true;
+      duck.col = duck.direction === 1 ? COLS : -1;
+      continue;
+    }
+
+    const hitPlayerIndex = getPlayerAt(duck.row, nextCol);
+    if (
+      (board[duck.row][nextCol] !== CELL_TYPES.EMPTY && hitPlayerIndex === -1) ||
+      getDuckAt(duck.row, nextCol) !== -1
+    ) {
+      continue;
+    }
+
+    const riderIndex = !isWaitingToRespawn && duck.row > 0
+      ? getPlayerAt(duck.row - 1, duck.col)
+      : -1;
+    if (riderIndex !== -1) {
+      const rider = players[riderIndex];
+      const riderTargetPlayerIndex = getPlayerAt(rider.row, nextCol);
+      const riderTargetCell = board[rider.row][nextCol];
+      const riderIsBlocked =
+        riderTargetPlayerIndex !== -1 ||
+        ![
+          CELL_TYPES.EMPTY,
+          CELL_TYPES.OBJECTIVE,
+          CELL_TYPES.OBJECTIVE_COMPLETED
+        ].includes(riderTargetCell);
+
+      if (riderIsBlocked) {
+        // The duck keeps moving. The rider stays behind, loses support,
+        // and is allowed to fall after all ducks finish this movement tick.
+        removedSupport = true;
+      } else {
+        board[rider.row][rider.col] = getObjectiveCellTypeAt(rider.row, rider.col);
+        rider.col = nextCol;
+        board[rider.row][rider.col] = CELL_TYPES.PLAYER;
+        visitedSquares[rider.row][rider.col] = true;
+        checkObjectiveCompletion();
+        checkWinCondition();
+      }
+    }
+
+    duck.col = nextCol;
+    if (hitPlayerIndex !== -1) {
+      handleDuckCollision(hitPlayerIndex);
+    }
+  }
+
+  if (removedSupport && gravityEnabled && !antigravityEnabled && fallingPieces.length === 0) {
+    applyGravity();
+  }
+}
+
+function reverseMovingPlatform(platform) {
+  platform.direction *= -1;
+}
+
+function getGoalCellType() {
+  return goal && goal.type === "counter" ? CELL_TYPES.COUNTER_GOAL : CELL_TYPES.GOAL;
+}
+
+function updateHorizontalMovingPlatform(platform) {
+  const nextCol = platform.currentCol + platform.direction;
+  if (nextCol < platform.minCol || nextCol > platform.maxCol) {
+    reverseMovingPlatform(platform);
+    return;
+  }
+
+  const currentRow = platform.row;
+  const currentCol = platform.col;
+  const deltaCol = nextCol - currentCol;
+  if (deltaCol === 0) return;
+
+  const carriedPlayerIndex = getPlayerAt(currentRow - 1, currentCol);
+  const carriedPlayer = carriedPlayerIndex !== -1 ? players[carriedPlayerIndex] : null;
+  const carriedGoal =
+    goal && goal.row === currentRow - 1 && goal.col === currentCol ? goal : null;
+
+  if (
+    nextCol < 0 ||
+    nextCol >= COLS ||
+    board[currentRow][nextCol] !== CELL_TYPES.EMPTY
+  ) {
+    reverseMovingPlatform(platform);
+    return;
+  }
+
+  let carriedPlayerTargetCol = null;
+  if (carriedPlayer) {
+    carriedPlayerTargetCol = carriedPlayer.col + deltaCol;
+    if (carriedPlayerTargetCol < 0 || carriedPlayerTargetCol >= COLS) {
+      reverseMovingPlatform(platform);
+      return;
+    }
+
+    const targetCell = board[carriedPlayer.row][carriedPlayerTargetCol];
+    const targetPlayerIndex = getPlayerAt(carriedPlayer.row, carriedPlayerTargetCol);
+    if (targetPlayerIndex !== -1 || targetCell !== CELL_TYPES.EMPTY) {
+      reverseMovingPlatform(platform);
+      return;
+    }
+  }
+
+  let carriedGoalTargetCol = null;
+  if (carriedGoal) {
+    carriedGoalTargetCol = carriedGoal.col + deltaCol;
+    if (carriedGoalTargetCol < 0 || carriedGoalTargetCol >= COLS) {
+      reverseMovingPlatform(platform);
+      return;
+    }
+
+    const targetCell = board[carriedGoal.row][carriedGoalTargetCol];
+    const targetPlayerIndex = getPlayerAt(carriedGoal.row, carriedGoalTargetCol);
+    if (targetPlayerIndex !== -1 || targetCell !== CELL_TYPES.EMPTY) {
+      reverseMovingPlatform(platform);
+      return;
+    }
+  }
+
+  board[currentRow][currentCol] = CELL_TYPES.EMPTY;
+  if (carriedPlayer) {
+    board[carriedPlayer.row][carriedPlayer.col] = CELL_TYPES.EMPTY;
+    carriedPlayer.col = carriedPlayerTargetCol;
+    visitedSquares[carriedPlayer.row][carriedPlayer.col] = true;
+  }
+  if (carriedGoal) {
+    board[carriedGoal.row][carriedGoal.col] = CELL_TYPES.EMPTY;
+    carriedGoal.col = carriedGoalTargetCol;
+  }
+
+  platform.currentCol = nextCol;
+  platform.col = nextCol;
+  board[platform.row][platform.col] = CELL_TYPES.MOVING_PLATFORM;
+  if (carriedPlayer) {
+    board[carriedPlayer.row][carriedPlayer.col] = CELL_TYPES.PLAYER;
+  }
+  if (carriedGoal) {
+    board[carriedGoal.row][carriedGoal.col] = getGoalCellType();
+  }
+}
+
+function updateMovingPlatforms() {
+  for (const platform of movingPlatforms) {
+    if (platform.axis === "horizontal") {
+      updateHorizontalMovingPlatform(platform);
+      continue;
+    }
+
+    const nextLevel = platform.currentLevel + platform.direction;
+    if (nextLevel < platform.minLevel || nextLevel > platform.maxLevel) {
+      reverseMovingPlatform(platform);
+      continue;
+    }
+
+    const currentRow = platform.row;
+    const nextRow = platformLevelToRow(nextLevel);
+    const deltaRow = nextRow - currentRow;
+    if (deltaRow === 0) continue;
+
+    const carriedPlayerIndex = getPlayerAt(currentRow - 1, platform.col);
+    const carriedPlayer = carriedPlayerIndex !== -1 ? players[carriedPlayerIndex] : null;
+    const carriedGoal =
+      goal && goal.row === currentRow - 1 && goal.col === platform.col ? goal : null;
+    const platformDestinationPlayerIndex = getPlayerAt(nextRow, platform.col);
+    const platformDestinationIsCarriedPlayer =
+      carriedPlayer && platformDestinationPlayerIndex === carriedPlayerIndex;
+    const platformDestinationIsCarriedGoal =
+      carriedGoal && nextRow === carriedGoal.row && platform.col === carriedGoal.col;
+
+    if (
+      nextRow < 0 ||
+      nextRow >= ROWS ||
+      (
+        board[nextRow][platform.col] !== CELL_TYPES.EMPTY &&
+        !platformDestinationIsCarriedPlayer &&
+        !platformDestinationIsCarriedGoal
+      )
+    ) {
+      reverseMovingPlatform(platform);
+      continue;
+    }
+
+    let carriedPlayerTargetRow = null;
+    if (carriedPlayer) {
+      carriedPlayerTargetRow = carriedPlayer.row + deltaRow;
+      if (carriedPlayerTargetRow < 0 || carriedPlayerTargetRow >= ROWS) {
+        reverseMovingPlatform(platform);
+        continue;
+      }
+
+      const targetCell = board[carriedPlayerTargetRow][platform.col];
+      const targetPlayerIndex = getPlayerAt(carriedPlayerTargetRow, platform.col);
+      const targetIsCurrentPlatformCell = carriedPlayerTargetRow === currentRow;
+      if (
+        targetPlayerIndex !== -1 ||
+        (targetCell !== CELL_TYPES.EMPTY && !targetIsCurrentPlatformCell)
+      ) {
+        reverseMovingPlatform(platform);
+        continue;
+      }
+    }
+
+    let carriedGoalTargetRow = null;
+    if (carriedGoal) {
+      carriedGoalTargetRow = carriedGoal.row + deltaRow;
+      if (carriedGoalTargetRow < 0 || carriedGoalTargetRow >= ROWS) {
+        reverseMovingPlatform(platform);
+        continue;
+      }
+
+      const targetCell = board[carriedGoalTargetRow][platform.col];
+      const targetPlayerIndex = getPlayerAt(carriedGoalTargetRow, platform.col);
+      const targetIsCurrentPlatformCell = carriedGoalTargetRow === currentRow;
+      if (
+        targetPlayerIndex !== -1 ||
+        (targetCell !== CELL_TYPES.EMPTY && !targetIsCurrentPlatformCell)
+      ) {
+        reverseMovingPlatform(platform);
+        continue;
+      }
+    }
+
+    board[currentRow][platform.col] = CELL_TYPES.EMPTY;
+    if (carriedPlayer) {
+      board[carriedPlayer.row][carriedPlayer.col] = CELL_TYPES.EMPTY;
+      carriedPlayer.row = carriedPlayerTargetRow;
+      visitedSquares[carriedPlayer.row][carriedPlayer.col] = true;
+    }
+    if (carriedGoal) {
+      board[carriedGoal.row][carriedGoal.col] = CELL_TYPES.EMPTY;
+      carriedGoal.row = carriedGoalTargetRow;
+    }
+
+    platform.currentLevel = nextLevel;
+    platform.row = nextRow;
+    board[platform.row][platform.col] = CELL_TYPES.MOVING_PLATFORM;
+    if (carriedPlayer) {
+      board[carriedPlayer.row][carriedPlayer.col] = CELL_TYPES.PLAYER;
+    }
+    if (carriedGoal) {
+      board[carriedGoal.row][carriedGoal.col] = getGoalCellType();
     }
   }
 }
@@ -354,6 +650,80 @@ function updateExplodingPlayers() {
       explodingPlayers.splice(i, 1);
     }
   }
+}
+
+function handleLaserCollision(playerIndex, laserRow, laserCol) {
+  const player = players[playerIndex];
+  if (!player) return;
+
+  const explosionSound = document.getElementById("explosionSound");
+  if (explosionSound) {
+    playSound(explosionSound);
+  }
+
+  explodingPlayers.push({
+    x: laserCol * TILE_SIZE,
+    y: laserRow * TILE_SIZE,
+    velocityY: -8,
+    rotation: 0,
+    rotationSpeed: (Math.random() < 0.5 ? -1 : 1) * 0.3,
+    pieceType: player.pieceType
+  });
+
+  createExplosionParticles(laserCol * TILE_SIZE, laserRow * TILE_SIZE);
+
+  board[player.row][player.col] = CELL_TYPES.EMPTY;
+  players.splice(playerIndex, 1);
+  updateStatus("A player was cut down by a laser!");
+  updatePlayerCount();
+  shakeAmount = 24;
+  scheduleAutoRestartAfterDeath("You were hit by a laser! Restarting level...");
+
+  if (selectedPlayerIndex === playerIndex) {
+    selectedPlayerIndex = -1;
+  } else if (selectedPlayerIndex > playerIndex) {
+    selectedPlayerIndex--;
+  }
+
+  fallingPieces = fallingPieces.filter(piece => piece.playerIndex !== playerIndex);
+  risingPieces = risingPieces.filter(piece => piece.playerIndex !== playerIndex);
+
+  if (players.length === 0) {
+    updateStatus("Game Over! All players destroyed!");
+  }
+}
+
+function checkActiveLaserCollisions() {
+  if (mode !== "play" || gameWon || laserBlocks.length === 0) return;
+  if (!laserBlocks.some(laser => isLaserActive(laser))) return;
+
+  const hits = new Map();
+  for (let i = 0; i < players.length; i++) {
+    const player = players[i];
+    if (isCellInActiveLaser(player.row, player.col)) {
+      hits.set(i, { row: player.row, col: player.col });
+    }
+  }
+
+  for (const piece of fallingPieces) {
+    if (piece.playerIndex === "goal") continue;
+    const row = Math.max(0, Math.min(ROWS - 1, Math.floor((piece.y + TILE_SIZE / 2) / TILE_SIZE)));
+    if (isCellInActiveLaser(row, piece.col)) {
+      hits.set(piece.playerIndex, { row, col: piece.col });
+    }
+  }
+
+  for (const piece of risingPieces) {
+    if (piece.playerIndex === "goal") continue;
+    const row = Math.max(0, Math.min(ROWS - 1, Math.floor((piece.y + TILE_SIZE / 2) / TILE_SIZE)));
+    if (isCellInActiveLaser(row, piece.col)) {
+      hits.set(piece.playerIndex, { row, col: piece.col });
+    }
+  }
+
+  [...hits.entries()]
+    .sort((a, b) => b[0] - a[0])
+    .forEach(([playerIndex, hit]) => handleLaserCollision(playerIndex, hit.row, hit.col));
 }
 
 function handleBombCollision(player, playerIndex, bombRow, bombCol) {

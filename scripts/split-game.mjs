@@ -2,68 +2,72 @@ import fs from "fs";
 import path from "path";
 
 const monolithPath = "public/js/game.monolith.js";
-const livePath = "public/js/game.js";
-
-// Prefer existing monolith backup; otherwise current game.js if it still looks like the monolith.
-let src;
-if (fs.existsSync(monolithPath)) {
-  src = fs.readFileSync(monolithPath, "utf8");
-} else {
-  src = fs.readFileSync(livePath, "utf8");
-  if (src.length < 50000) {
-    throw new Error("game.js looks already split; restore game.monolith.js first");
-  }
-  fs.copyFileSync(livePath, monolithPath);
-  console.log("backed up monolith to", monolithPath);
+if (!fs.existsSync(monolithPath)) {
+  throw new Error("Missing public/js/game.monolith.js (expected main's game.js copy)");
 }
 
+const src = fs.readFileSync(monolithPath, "utf8");
 const lines = src.split(/\r?\n/);
 
+/** 1-based inclusive ranges for classic shared-global parts (main fog/laser version). */
 const parts = [
   {
     file: "01-state.js",
     start: 1,
-    end: 161,
+    end: 259,
     banner: "DOM refs, constants, images, mutable game state",
   },
   {
     file: "02-api-shop-exchange.js",
-    start: 162,
-    end: 1027,
-    banner:
-      "API auth, credits, portal shop, exchange modal defs (setup*() calls deferred — no cross-file hoist)",
+    start: 260,
+    end: 1125,
+    banner: "API/credits/shop/exchange modal defs (setup calls deferred)",
   },
   {
     file: "03-audio-canvas-hud-replay.js",
-    start: 1039,
-    end: 1950,
-    banner: "Audio, canvas, HUD, replay, objectives + deferred setup*() from former lines 1029-1038",
+    start: 1138,
+    end: 2757,
+    banner: "Audio, HUD, replay, objectives, lasers/platforms helpers",
   },
   {
     file: "04-level-rules.js",
-    start: 1951,
-    end: 3060,
+    start: 2758,
+    end: 4121,
     banner: "loadPuzzle, gravity, moves, win, undo, teleport, transformer",
   },
   {
     file: "05-vision-render.js",
-    start: 3061,
-    end: 3757,
-    banner: "Valid moves, vision/fog, drawCellContent, drawBoard",
+    start: 4122,
+    end: 4830,
+    banner: "Valid moves, vision/fog, drawBoard",
   },
   {
     file: "06-effects-bombs.js",
-    start: 3758,
-    end: 4203,
-    banner: "Confetti, explosions, bombs",
+    start: 4831,
+    end: 5646,
+    banner: "Confetti, bombs, ducks, platforms, lasers collisions",
   },
   {
     file: "07-input-loop.js",
-    start: 4204,
+    start: 5647,
     end: lines.length,
-    banner: "Input, antigravity, restart, game loop, modal scroll lock, boot",
+    banner: "Input, antigravity, restart, game loop, boot",
   },
 ];
+
+const deferredSetup = `
+// Deferred from monolith ~1127-1135 (must run after openHintModal / setupReplayStepNav exist).
+setupAntigravityExchangeModal();
+setupReplayExchangeModal();
+setupInGameWalkthrough();
+setupReplayStepNav();
+setupHintModal();
+window.openAntigravityExchangeModal = openAntigravityExchangeModal;
+window.openReplayExchangeModal = openReplayExchangeModal;
+window.handleSolutionGuideAction = handleSolutionGuideAction;
+window.openInGameWalkthroughModal = openInGameWalkthroughModal;
+window.openHintModal = openHintModal;
+`;
 
 const outDir = "public/js/game";
 fs.mkdirSync(outDir, { recursive: true });
@@ -73,10 +77,15 @@ const concatChunks = [];
 
 for (const part of parts) {
   const slice = lines.slice(part.start - 1, part.end);
-  const body =
-    `/**\n * game/${part.file}\n * ${part.banner}\n * Split from game.js lines ${part.start}-${part.end} — logic unchanged.\n */\n` +
+  let body =
+    `/**\n * game/${part.file}\n * ${part.banner}\n * Split from game.monolith.js lines ${part.start}-${part.end}.\n */\n` +
     slice.join("\n").replace(/\n+$/, "") +
     "\n";
+
+  if (part.file === "03-audio-canvas-hud-replay.js") {
+    body = body.replace(/\n+$/, "") + "\n" + deferredSetup + "\n";
+  }
+
   const dest = path.join(outDir, part.file);
   fs.writeFileSync(dest, body);
   const url = "/js/game/" + part.file;
@@ -85,24 +94,34 @@ for (const part of parts) {
   console.log("wrote", dest, "lines", part.end - part.start + 1);
 }
 
+// Keep existing 00-assets-config.js if present; ensure it's first in manifest.
+const assetsFile = "00-assets-config.js";
+const assetsPath = path.join(outDir, assetsFile);
+if (!fs.existsSync(assetsPath)) {
+  throw new Error("Expected " + assetsPath);
+}
+const fullManifest = ["/js/game/" + assetsFile, ...manifest];
+
 fs.writeFileSync(
   path.join(outDir, "manifest.json"),
-  JSON.stringify({ scripts: manifest }, null, 2) + "\n"
+  JSON.stringify({ scripts: fullManifest }, null, 2) + "\n"
 );
 
-// Generated single-file bundle for any leftover <script src="js/game.js"> consumers.
+const assetsBody = fs.readFileSync(assetsPath, "utf8");
 const generated =
-  "/** GENERATED FILE — edit public/js/game/*.js then run: node scripts/split-game.mjs */\n" +
+  "/** GENERATED FILE — edit public/js/game/*.js then run: node scripts/concat-game.mjs */\n\n" +
+  assetsBody +
+  "\n" +
   concatChunks.join("\n");
-fs.writeFileSync(livePath, generated);
+fs.writeFileSync("public/js/game.js", generated);
 
 fs.writeFileSync(
   "src/boot/gameScriptManifest.js",
   `/** Classic game script parts (shared global scope). Source: public/js/game/ */\nexport const GAME_SCRIPT_PARTS = ${JSON.stringify(
-    manifest,
+    fullManifest,
     null,
     2
   )};\n`
 );
 
-console.log("updated public/js/game.js (concat) + src/boot/gameScriptManifest.js");
+console.log("updated game.js concat + manifest (", fullManifest.length, "scripts)");

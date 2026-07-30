@@ -1,7 +1,7 @@
 /**
  * game/02-api-shop-exchange.js
- * API auth, credits, portal shop, exchange modal defs (setup*() calls deferred — no cross-file hoist)
- * Split from game.js lines 162-1027 — logic unchanged.
+ * API/credits/shop/exchange modal defs (setup calls deferred)
+ * Split from game.monolith.js lines 260-1125.
  */
 function updateUndoButtonLabel() {
   if (!undoMoveButton) return;
