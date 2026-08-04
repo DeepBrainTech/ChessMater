@@ -1,0 +1,20 @@
+/* modals-shared.css */
+html.modal-scroll-lock,
+body.modal-scroll-lock {
+  overflow: hidden !important;
+  overscroll-behavior: none;
+}
+html.modal-scroll-lock {
+  height: 100%;
+}
+body.modal-scroll-lock {
+  position: fixed;
+  width: 100%;
+  left: 0;
+  right: 0;
+  min-height: 100dvh;
+  box-sizing: border-box;
+  padding-right: calc(20px + var(--modal-scrollbar-width, 0px));
+  background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d);
+  background-attachment: fixed;
+}

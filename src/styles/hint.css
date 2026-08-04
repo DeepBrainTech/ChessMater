@@ -1,0 +1,242 @@
+/* hint.css */
+.block-tip-modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 10001;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: none;
+}
+
+.block-tip-modal.active {
+  display: flex;
+}
+
+.block-tip-modal.active .block-tip-content {
+  touch-action: pan-y;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.block-tip-content {
+  background: #ffffff;
+  color: #2c3e50;
+  padding: 20px;
+  border-radius: 12px;
+  width: min(92vw, 480px);
+  max-height: 72vh;
+  overflow-y: auto;
+  box-shadow: 0 10px 35px rgba(0,0,0,0.35);
+}
+
+.block-tip-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.block-tip-header h3 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.close-block-tip {
+  border: none;
+  background: #e9ecef;
+  color: #2c3e50;
+  border-radius: 999px;
+  width: 34px;
+  height: 34px;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.hint-section {
+  margin-top: 16px;
+}
+.hint-section:first-of-type {
+  margin-top: 0;
+}
+.hint-section-title {
+  margin: 0 0 8px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #6c7a89;
+}
+#blockDescription {
+  margin: 0;
+  line-height: 1.5;
+  font-size: 0.95rem;
+}
+.hint-solution-divider {
+  border: none;
+  border-top: 1px solid #e2e8f0;
+  margin: 18px 0;
+}
+.hint-solution-summary {
+  margin: 0 0 10px;
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+.hint-solution-note {
+  margin: 8px 0 0;
+  font-size: 0.84rem;
+  color: #6c7a89;
+  line-height: 1.4;
+}
+.hint-solution-action {
+  display: inline-block;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 16px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(180deg, #b07cc6 0%, #9b59b6 100%);
+  cursor: pointer;
+  box-shadow: 0 2px 10px rgba(155, 89, 182, 0.35);
+}
+.hint-solution-action:hover:not(:disabled) {
+  filter: brightness(1.05);
+}
+.hint-solution-action:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.leaderboard-content {
+  background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d);
+  padding: 30px;
+  border-radius: 15px;
+  max-width: 600px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+  color: #fff;
+}
+
+.leaderboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.leaderboard-header h2 {
+  margin: 0;
+  font-size: 2rem;
+  text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+}
+
+.close-leaderboard {
+  background: rgba(255,255,255,0.2);
+  border: none;
+  color: white;
+  font-size: 1.5rem;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.close-leaderboard:hover {
+  background: rgba(255,255,255,0.3);
+  transform: rotate(90deg);
+}
+
+.leaderboard-filter {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.leaderboard-filter label {
+  font-weight: bold;
+}
+
+.leaderboard-filter select {
+  flex: 1;
+  max-width: 300px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+}
+
+.leaderboard-filter select option {
+  color: #111;
+}
+
+.leaderboard-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.leaderboard-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px;
+  margin-bottom: 10px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 8px;
+  backdrop-filter: blur(10px);
+}
+
+.leaderboard-rank {
+  font-size: 1.5rem;
+  font-weight: bold;
+  min-width: 50px;
+}
+
+.leaderboard-rank.gold {
+  color: #ffd700;
+}
+
+.leaderboard-rank.silver {
+  color: #c0c0c0;
+}
+
+.leaderboard-rank.bronze {
+  color: #cd7f32;
+}
+
+.leaderboard-user {
+  flex: 1;
+  margin-left: 15px;
+  font-size: 1.1rem;
+}
+
+.leaderboard-score {
+  font-size: 1.2rem;
+  font-weight: bold;
+  min-width: 80px;
+  text-align: right;
+}
+
+.leaderboard-loading {
+  text-align: center;
+  padding: 40px;
+  font-size: 1.2rem;
+}
+
+.leaderboard-error {
+  text-align: center;
+  padding: 40px;
+  color: #ff6b6b;
+  font-size: 1.1rem;
+}

@@ -1,0 +1,202 @@
+/* start-screen.css */
+.start-screen {
+  position: fixed;
+  inset: 0;
+  background: linear-gradient(120deg, #1e3c72, #2a5298, #e52d27, #ff6e00);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+  color: #fff;
+}
+
+#mainContainer {
+  display: none;
+}
+body.in-game #mainContainer {
+  display: block;
+}
+
+/* Top controls inside ChessMater container */
+#gameTopRightControls {
+  position: static;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  margin: -4px 0 14px;
+  z-index: 100;
+}
+#gameTopRightControls .controls-left,
+#gameTopRightControls .controls-right {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.top-stats {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  color: #2c3e50;
+  font-size: 14px;
+  font-weight: 600;
+  margin-right: 6px;
+}
+.top-stats .player-count,
+.top-stats .objective-count {
+  margin: 0;
+  text-align: left;
+  white-space: nowrap;
+}
+.top-stats .move-count,
+.top-stats .fewest-other-moves {
+  margin: 0;
+  text-align: left;
+  white-space: nowrap;
+}
+#blockTipToggle {
+  background: #9b59b6;
+  position: relative;
+}
+#blockTipToggle.hint-toggle--notify::after {
+  content: "";
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #f1c40f;
+  box-shadow: 0 0 0 2px #9b59b6;
+}
+#blockTipStats {
+  margin-top: 8px;
+  color: #2c3e50;
+  font-size: 14px;
+  font-weight: 600;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  width: 100%;
+  box-sizing: border-box;
+}
+#blockTipStats .player-count,
+#blockTipStats .objective-count {
+  margin: 0;
+  text-align: left;
+  white-space: nowrap;
+  width: 100%;
+}
+#gameTopRightControls button {
+  display: none;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 12px;
+  color: #fff;
+  font-weight: bold;
+  font-size: 14px;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+}
+body.in-game #gameTopRightControls button {
+  display: inline-block;
+}
+#musicToggle {
+  background: #3498db;
+}
+#restartLevelBtn {
+  background: #e74c3c;
+}
+#antigravityToggle {
+  background-color: #e67e22;
+}
+
+.start-screen h1 {
+  font-size: 3rem;
+  margin-bottom: 20px;
+  text-shadow: 2px 2px 5px #000;
+}
+
+#startButton {
+  padding: 12px 24px;
+  font-size: 1.2rem;
+  font-weight: bold;
+  background: linear-gradient(145deg, #2d9cdb, #4a69bd);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  box-shadow: 2px 2px 10px rgba(0,0,0,0.3);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+}
+
+#startButton:hover {
+  filter: brightness(1.05);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(0,0,0,0.28);
+}
+
+.start-screen-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  align-items: center;
+}
+
+#leaderboardButton {
+  padding: 12px 24px;
+  font-size: 1.2rem;
+  font-weight: bold;
+  background: linear-gradient(145deg, #f39c12, #d35400);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  box-shadow: 2px 2px 10px rgba(0,0,0,0.3);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+}
+
+#leaderboardButton:hover {
+  filter: brightness(1.05);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(0,0,0,0.28);
+}
+#instructionsButton {
+  padding: 12px 24px;
+  font-size: 1.1rem;
+  font-weight: bold;
+  background: linear-gradient(145deg, #e74c3c, #b71c1c);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  box-shadow: 2px 2px 10px rgba(0,0,0,0.3);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+}
+#instructionsButton:hover {
+  filter: brightness(1.05);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(0,0,0,0.28);
+}
+
+#loginPrompt {
+  margin-top: 12px;
+  padding: 10px 16px;
+  background: rgba(231, 76, 60, 0.2);
+  border: 1px solid #e74c3c;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 0.95rem;
+  text-align: center;
+}
+#loginPrompt a {
+  color: #f1c40f;
+  text-decoration: underline;
+  margin-left: 6px;
+}
+#loginPrompt a:hover {
+  color: #f39c12;
+}

@@ -2,6 +2,7 @@
   "name": "chessmater",
   "compatibility_date": "2026-02-12",
   "assets": {
-    "directory": "./public"
+    // Run `npm run build` before deploy — Vite outputs the React app here.
+    "directory": "./dist"
   }
 }
