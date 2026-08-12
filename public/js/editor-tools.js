@@ -821,6 +821,7 @@
       if (mode === "play" && gravityEnabled && !gameWon) {
         applyGravity();
       }
+      updateAntigravityButtonLabel();
       updateEditorUndoButton();
     });
   }
