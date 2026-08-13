@@ -317,71 +317,37 @@ function activatePhaseBlock(row, col) {
   }
 }
 
-function isGravityPassableCell(row, col, playerStartCells) {
-  return playerStartCells.has(`${row},${col}`) ||
-    !isCellBlocked(row, col, null, "above");
-}
-
-function getGravityFallTargets() {
-  const playerStartCells = new Set(players.map(player => `${player.row},${player.col}`));
-  const finalRowsByColumn = new Map();
-  const orderedPlayers = players
-    .map((player, playerIndex) => ({ player, playerIndex }))
-    .sort((a, b) => a.player.col - b.player.col || b.player.row - a.player.row);
-  const targets = [];
-
-  for (const { player, playerIndex } of orderedPlayers) {
-    let targetRow = player.row;
-    let finalRows = finalRowsByColumn.get(player.col);
-    if (!finalRows) {
-      finalRows = new Set();
-      finalRowsByColumn.set(player.col, finalRows);
-    }
-
-    while (
-      targetRow < ROWS - 1 &&
-      isGravityPassableCell(targetRow + 1, player.col, playerStartCells) &&
-      !finalRows.has(targetRow + 1)
-    ) {
-      targetRow++;
-    }
-
-    finalRows.add(targetRow);
-    if (targetRow !== player.row) {
-      targets.push({ player, playerIndex, targetRow });
-    }
-  }
-
-  return targets;
-}
-
 // --- Apply gravity to all pieces ---
 function applyGravity() {
   if (gameWon) return;
 
-  const fallTargets = getGravityFallTargets();
-  for (const { player, playerIndex, targetRow } of fallTargets) {
-    const landingCellType = board[targetRow][player.col];
-    const isTeleportBlock = [
-      CELL_TYPES.TELEPORT_PURPLE,
-      CELL_TYPES.TELEPORT_GREEN,
-      CELL_TYPES.TELEPORT_BLUE,
-      CELL_TYPES.TELEPORT_ORANGE
-    ].includes(landingCellType);
+  for (let i = 0; i < players.length; i++) {
+    const player = players[i];
+    const newRow = findFallPosition(player.row, player.col);
 
-    fallingPieces.push({
-      playerIndex,
-      startRow: player.row,
-      targetRow,
-      col: player.col,
-      y: player.row * TILE_SIZE,
-      pieceType: player.pieceType,
-      isTeleport: isTeleportBlock,
-      teleportType: isTeleportBlock ? landingCellType : null
-    });
+    if (newRow !== player.row) {
+      const landingCellType = board[newRow][player.col];
+      const isTeleportBlock = [
+        CELL_TYPES.TELEPORT_PURPLE,
+        CELL_TYPES.TELEPORT_GREEN,
+        CELL_TYPES.TELEPORT_BLUE,
+        CELL_TYPES.TELEPORT_ORANGE
+      ].includes(landingCellType);
 
-    // Clear board spot early so ghost rendering is manual
-    board[player.row][player.col] = CELL_TYPES.EMPTY;
+      fallingPieces.push({
+        playerIndex: i,
+        startRow: player.row,
+        targetRow: newRow,
+        col: player.col,
+        y: player.row * TILE_SIZE,
+        pieceType: player.pieceType,
+        isTeleport: isTeleportBlock,
+        teleportType: isTeleportBlock ? landingCellType : null
+      });
+
+      // Clear board spot early so ghost rendering is manual
+      board[player.row][player.col] = CELL_TYPES.EMPTY;
+    }
   }
 
   if (goal) {
@@ -799,11 +765,7 @@ function isPawnForwardDestinationCell(row, col, movingPlayer) {
 }
 
 function isPawnForwardPathCell(row, col, movingPlayer) {
-  if (
-    board[row][col] === CELL_TYPES.PHASE_BLOCK ||
-    board[row][col] === CELL_TYPES.MOVING_PLATFORM ||
-    getDuckAt(row, col) !== -1
-  ) {
+  if (board[row][col] === CELL_TYPES.MOVING_PLATFORM) {
     return true;
   }
   return !isCellBlocked(row, col, movingPlayer, "below");
@@ -1066,6 +1028,14 @@ function movePlayer(playerIndex, newRow, newCol) {
   // Rest of the function remains the same...
   checkObjectiveCompletion();
 
+  // Check if player moved through a phase block from below and activate it
+  if (newRow < fromRow) { // Moving upward
+    for (let r = newRow + 1; r < fromRow; r++) {
+      if (board[r][newCol] === CELL_TYPES.PHASE_BLOCK) {
+        activatePhaseBlock(r, newCol);
+      }
+    }
+  }
   checkWinCondition();
 
   // Apply gravity or antigravity after moving

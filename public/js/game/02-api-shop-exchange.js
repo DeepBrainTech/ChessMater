@@ -14,9 +14,7 @@ function updateUndoButtonLabel() {
 function updateAntigravityButtonLabel() {
   if (!antigravityToggleButton) return;
   const state = antigravityEnabled ? "ON" : "OFF";
-  if (CM_FREE_ANTIGRAVITY) {
-    antigravityToggleButton.textContent = `Antigravity ${state}`;
-  } else if (antigravityUnlockedThisRun) {
+  if (antigravityUnlockedThisRun) {
     antigravityToggleButton.textContent = `Antigravity ${state}`;
   } else {
     antigravityToggleButton.textContent = `Antigravity(${antigravityCredits})`;

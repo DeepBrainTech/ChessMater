@@ -613,12 +613,6 @@ function drawBoard() {
     ctx.drawImage(pieceImages[piece.pieceType], x+8, piece.y+8, TILE_SIZE-16, TILE_SIZE-16);
   });
 
-  risingPieces.forEach(piece => {
-    const x = piece.col * TILE_SIZE;
-    ctx.globalAlpha = 1.0;
-    ctx.drawImage(pieceImages[piece.pieceType], x+8, piece.currentY+8, TILE_SIZE-16, TILE_SIZE-16);
-  });
-
   // Draw exploding players with rotation effect
   for (const p of explodingPlayers) {
     const img = pieceImages[p.pieceType];

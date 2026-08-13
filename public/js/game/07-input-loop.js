@@ -51,8 +51,8 @@ function handleMove(e) {
             : castleKingWithRook(clickedPlayerIndex, selectedPlayerIndex);
           if (castled) {
             selectedPlayerIndex = -1;
-            return;
           }
+          return;
         }
       }
 
@@ -76,63 +76,35 @@ function handleMove(e) {
   }
 };
 
-function isAntigravityPassableCell(row, col, playerStartCells) {
-  const cellType = board[row][col];
-  return cellType === CELL_TYPES.EMPTY ||
-    (cellType === CELL_TYPES.PLAYER && playerStartCells.has(`${row},${col}`));
-}
-
-function getAntigravityRiseTargets() {
-  const playerStartCells = new Set(players.map(player => `${player.row},${player.col}`));
-  const finalRowsByColumn = new Map();
-  const orderedPlayers = players
-    .map((player, playerIndex) => ({ player, playerIndex }))
-    .sort((a, b) => a.player.col - b.player.col || a.player.row - b.player.row);
-  const targets = [];
-
-  for (const { player, playerIndex } of orderedPlayers) {
-    let targetRow = player.row;
-    let finalRows = finalRowsByColumn.get(player.col);
-    if (!finalRows) {
-      finalRows = new Set();
-      finalRowsByColumn.set(player.col, finalRows);
-    }
-
-    while (
-      targetRow > 0 &&
-      isAntigravityPassableCell(targetRow - 1, player.col, playerStartCells) &&
-      !finalRows.has(targetRow - 1)
-    ) {
-      targetRow--;
-    }
-
-    finalRows.add(targetRow);
-    if (targetRow !== player.row) {
-      targets.push({ player, playerIndex, targetRow });
-    }
-  }
-
-  return targets;
-}
-
 function applyAntigravity() {
   risingPieces = [];
-
-  const riseTargets = getAntigravityRiseTargets();
-  for (const { player, playerIndex, targetRow } of riseTargets) {
-    risingPieces.push({
-      playerIndex,
-      startRow: player.row,
-      targetRow,
-      col: player.col,
-      startY: player.row * TILE_SIZE,
-      targetY: targetRow * TILE_SIZE,
-      currentY: player.row * TILE_SIZE,
-      pieceType: player.pieceType
-    });
-
-    // Remove from board (we'll animate it)
-    board[player.row][player.col] = CELL_TYPES.EMPTY;
+  
+  // First, collect all pieces that need to rise
+  for (let i = 0; i < players.length; i++) {
+    const player = players[i];
+    let targetRow = player.row;
+    
+    // Find how high this piece can rise
+    while (targetRow > 0 && board[targetRow - 1][player.col] === CELL_TYPES.EMPTY) {
+      targetRow--;
+    }
+    
+    if (targetRow !== player.row) {
+      // Set up animation info
+      risingPieces.push({
+        playerIndex: i,
+        startRow: player.row,
+        targetRow: targetRow,
+        col: player.col,
+        startY: player.row * TILE_SIZE,
+        targetY: targetRow * TILE_SIZE,
+        currentY: player.row * TILE_SIZE,
+        pieceType: player.pieceType
+      });
+      
+      // Remove from board (we'll animate it)
+      board[player.row][player.col] = CELL_TYPES.EMPTY;
+    }
   }
   
   // Start the animation loop if we have pieces to rise
@@ -223,14 +195,7 @@ function updateRisingPieces(timestamp) {
 async function toggleAntigravity() {
   if (gameWon) return;
 
-  if (CM_EDITOR_PAGE && mode !== "play") {
-    updateStatus("Switch to Play test to use Antigravity.");
-    return;
-  }
-
-  if (CM_FREE_ANTIGRAVITY) {
-    antigravityUnlockedThisRun = true;
-  } else if (!antigravityUnlockedThisRun) {
+  if (!antigravityUnlockedThisRun) {
     if (antigravityCredits <= 0) {
       openAntigravityExchangeModal();
       return;

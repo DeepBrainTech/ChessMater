@@ -1,0 +1,123 @@
+/* mobile.css */
+/* --- MOBILE LAYOUT --- */
+@media screen and (max-width: 900px) {
+  /* 1. Force Vertical Layout (Stack Canvas & Tip Box) */
+  #gameLayoutRow {
+    flex-direction: column !important;
+    align-items: center !important;
+    gap: 10px !important;
+    width: 100%;
+  }
+  #gameSidePanel {
+    width: 100% !important;
+    flex: none !important;
+    align-items: center;
+  }
+
+  /* 2. Center and resize the Canvas — must reset flex (desktop flex:4 1 0 + basis 0 collapses
+     to zero height in column layout when parent height is auto; iPhone Safari). */
+  .canvas-container {
+    flex: none !important;
+    flex-grow: 0 !important;
+    flex-shrink: 0 !important;
+    flex-basis: auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin: 0 auto;
+    min-width: 0 !important;
+    overflow: visible;
+  }
+  
+  /* Let game.js resizeCanvas() set width/height via inline px — !important here
+     overrides inline styles and height:auto often collapses canvas to 0 in flex column. */
+  canvas {
+    max-width: 100% !important;
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  /* Top-right controls on mobile */
+  #gameTopRightControls {
+    margin: 0 0 10px;
+    flex-wrap: wrap;
+  }
+  #gameTopRightControls .controls-left,
+  #gameTopRightControls .controls-right {
+    gap: 6px;
+  }
+  #gameTopRightControls button {
+    font-size: 12px;
+    padding: 6px 9px;
+  }
+  .top-stats {
+    width: 100%;
+    justify-content: center;
+    margin-right: 0;
+  }
+
+  .level-selector {
+    max-width: 90vw !important;
+  }
+  .level-grid {
+    max-height: 300px !important;
+  }
+
+  /* Portal button mobile styles */
+  .portal-button {
+    top: 10px !important;
+    left: 10px !important;
+    padding: 8px 16px !important;
+    font-size: 12px !important;
+  }
+
+  /* Leaderboard mobile styles */
+  .leaderboard-content {
+    padding: 20px !important;
+    max-width: 95% !important;
+  }
+
+  .leaderboard-header h2 {
+    font-size: 1.5rem !important;
+  }
+
+  .leaderboard-item {
+    padding: 12px !important;
+    font-size: 0.9rem !important;
+  }
+
+  .leaderboard-rank {
+    font-size: 1.2rem !important;
+    min-width: 40px !important;
+  }
+
+  .leaderboard-user {
+    font-size: 1rem !important;
+  }
+
+  .leaderboard-score {
+    font-size: 1rem !important;
+    min-width: 60px !important;
+  }
+
+  .leaderboard-filter {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .leaderboard-filter select {
+    max-width: 100%;
+  }
+
+  .start-screen-buttons {
+    gap: 12px !important;
+  }
+
+  #startButton, #leaderboardButton, #instructionsButton {
+    padding: 10px 20px !important;
+    font-size: 1rem !important;
+  }
+}

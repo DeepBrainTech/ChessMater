@@ -15,9 +15,6 @@
 
 const CM_EDITOR_PAGE =
   typeof window !== "undefined" && window.CM_EDITOR_PAGE === true;
-const CM_FREE_ANTIGRAVITY =
-  CM_EDITOR_PAGE ||
-  (typeof window !== "undefined" && window.CM_FREE_ANTIGRAVITY === true);
 
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");

@@ -6112,3 +6112,5 @@ const LEVELS = [
 
 
   ];
+
+window.LEVELS = LEVELS;
