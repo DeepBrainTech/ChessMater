@@ -70,6 +70,9 @@ window.CM_ASSETS = {
 
 const CM_EDITOR_PAGE =
   typeof window !== "undefined" && window.CM_EDITOR_PAGE === true;
+const CM_FREE_ANTIGRAVITY =
+  CM_EDITOR_PAGE ||
+  (typeof window !== "undefined" && window.CM_FREE_ANTIGRAVITY === true);
 
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
@@ -339,7 +342,9 @@ function updateUndoButtonLabel() {
 function updateAntigravityButtonLabel() {
   if (!antigravityToggleButton) return;
   const state = antigravityEnabled ? "ON" : "OFF";
-  if (antigravityUnlockedThisRun) {
+  if (CM_FREE_ANTIGRAVITY) {
+    antigravityToggleButton.textContent = `Antigravity ${state}`;
+  } else if (antigravityUnlockedThisRun) {
     antigravityToggleButton.textContent = `Antigravity ${state}`;
   } else {
     antigravityToggleButton.textContent = `Antigravity(${antigravityCredits})`;
@@ -3197,37 +3202,71 @@ function activatePhaseBlock(row, col) {
   }
 }
 
+function isGravityPassableCell(row, col, playerStartCells) {
+  return playerStartCells.has(`${row},${col}`) ||
+    !isCellBlocked(row, col, null, "above");
+}
+
+function getGravityFallTargets() {
+  const playerStartCells = new Set(players.map(player => `${player.row},${player.col}`));
+  const finalRowsByColumn = new Map();
+  const orderedPlayers = players
+    .map((player, playerIndex) => ({ player, playerIndex }))
+    .sort((a, b) => a.player.col - b.player.col || b.player.row - a.player.row);
+  const targets = [];
+
+  for (const { player, playerIndex } of orderedPlayers) {
+    let targetRow = player.row;
+    let finalRows = finalRowsByColumn.get(player.col);
+    if (!finalRows) {
+      finalRows = new Set();
+      finalRowsByColumn.set(player.col, finalRows);
+    }
+
+    while (
+      targetRow < ROWS - 1 &&
+      isGravityPassableCell(targetRow + 1, player.col, playerStartCells) &&
+      !finalRows.has(targetRow + 1)
+    ) {
+      targetRow++;
+    }
+
+    finalRows.add(targetRow);
+    if (targetRow !== player.row) {
+      targets.push({ player, playerIndex, targetRow });
+    }
+  }
+
+  return targets;
+}
+
 // --- Apply gravity to all pieces ---
 function applyGravity() {
   if (gameWon) return;
 
-  for (let i = 0; i < players.length; i++) {
-    const player = players[i];
-    const newRow = findFallPosition(player.row, player.col);
+  const fallTargets = getGravityFallTargets();
+  for (const { player, playerIndex, targetRow } of fallTargets) {
+    const landingCellType = board[targetRow][player.col];
+    const isTeleportBlock = [
+      CELL_TYPES.TELEPORT_PURPLE,
+      CELL_TYPES.TELEPORT_GREEN,
+      CELL_TYPES.TELEPORT_BLUE,
+      CELL_TYPES.TELEPORT_ORANGE
+    ].includes(landingCellType);
 
-    if (newRow !== player.row) {
-      const landingCellType = board[newRow][player.col];
-      const isTeleportBlock = [
-        CELL_TYPES.TELEPORT_PURPLE,
-        CELL_TYPES.TELEPORT_GREEN,
-        CELL_TYPES.TELEPORT_BLUE,
-        CELL_TYPES.TELEPORT_ORANGE
-      ].includes(landingCellType);
+    fallingPieces.push({
+      playerIndex,
+      startRow: player.row,
+      targetRow,
+      col: player.col,
+      y: player.row * TILE_SIZE,
+      pieceType: player.pieceType,
+      isTeleport: isTeleportBlock,
+      teleportType: isTeleportBlock ? landingCellType : null
+    });
 
-      fallingPieces.push({
-        playerIndex: i,
-        startRow: player.row,
-        targetRow: newRow,
-        col: player.col,
-        y: player.row * TILE_SIZE,
-        pieceType: player.pieceType,
-        isTeleport: isTeleportBlock,
-        teleportType: isTeleportBlock ? landingCellType : null
-      });
-
-      // Clear board spot early so ghost rendering is manual
-      board[player.row][player.col] = CELL_TYPES.EMPTY;
-    }
+    // Clear board spot early so ghost rendering is manual
+    board[player.row][player.col] = CELL_TYPES.EMPTY;
   }
 
   if (goal) {
@@ -3645,7 +3684,11 @@ function isPawnForwardDestinationCell(row, col, movingPlayer) {
 }
 
 function isPawnForwardPathCell(row, col, movingPlayer) {
-  if (board[row][col] === CELL_TYPES.MOVING_PLATFORM) {
+  if (
+    board[row][col] === CELL_TYPES.PHASE_BLOCK ||
+    board[row][col] === CELL_TYPES.MOVING_PLATFORM ||
+    getDuckAt(row, col) !== -1
+  ) {
     return true;
   }
   return !isCellBlocked(row, col, movingPlayer, "below");
@@ -3908,14 +3951,6 @@ function movePlayer(playerIndex, newRow, newCol) {
   // Rest of the function remains the same...
   checkObjectiveCompletion();
 
-  // Check if player moved through a phase block from below and activate it
-  if (newRow < fromRow) { // Moving upward
-    for (let r = newRow + 1; r < fromRow; r++) {
-      if (board[r][newCol] === CELL_TYPES.PHASE_BLOCK) {
-        activatePhaseBlock(r, newCol);
-      }
-    }
-  }
   checkWinCondition();
 
   // Apply gravity or antigravity after moving
@@ -4861,6 +4896,12 @@ function drawBoard() {
     // falling piece
     ctx.globalAlpha = 1.0;
     ctx.drawImage(pieceImages[piece.pieceType], x+8, piece.y+8, TILE_SIZE-16, TILE_SIZE-16);
+  });
+
+  risingPieces.forEach(piece => {
+    const x = piece.col * TILE_SIZE;
+    ctx.globalAlpha = 1.0;
+    ctx.drawImage(pieceImages[piece.pieceType], x+8, piece.currentY+8, TILE_SIZE-16, TILE_SIZE-16);
   });
 
   // Draw exploding players with rotation effect
@@ -5838,8 +5879,8 @@ function handleMove(e) {
             : castleKingWithRook(clickedPlayerIndex, selectedPlayerIndex);
           if (castled) {
             selectedPlayerIndex = -1;
+            return;
           }
-          return;
         }
       }
 
@@ -5863,35 +5904,63 @@ function handleMove(e) {
   }
 };
 
-function applyAntigravity() {
-  risingPieces = [];
-  
-  // First, collect all pieces that need to rise
-  for (let i = 0; i < players.length; i++) {
-    const player = players[i];
+function isAntigravityPassableCell(row, col, playerStartCells) {
+  const cellType = board[row][col];
+  return cellType === CELL_TYPES.EMPTY ||
+    (cellType === CELL_TYPES.PLAYER && playerStartCells.has(`${row},${col}`));
+}
+
+function getAntigravityRiseTargets() {
+  const playerStartCells = new Set(players.map(player => `${player.row},${player.col}`));
+  const finalRowsByColumn = new Map();
+  const orderedPlayers = players
+    .map((player, playerIndex) => ({ player, playerIndex }))
+    .sort((a, b) => a.player.col - b.player.col || a.player.row - b.player.row);
+  const targets = [];
+
+  for (const { player, playerIndex } of orderedPlayers) {
     let targetRow = player.row;
-    
-    // Find how high this piece can rise
-    while (targetRow > 0 && board[targetRow - 1][player.col] === CELL_TYPES.EMPTY) {
+    let finalRows = finalRowsByColumn.get(player.col);
+    if (!finalRows) {
+      finalRows = new Set();
+      finalRowsByColumn.set(player.col, finalRows);
+    }
+
+    while (
+      targetRow > 0 &&
+      isAntigravityPassableCell(targetRow - 1, player.col, playerStartCells) &&
+      !finalRows.has(targetRow - 1)
+    ) {
       targetRow--;
     }
-    
+
+    finalRows.add(targetRow);
     if (targetRow !== player.row) {
-      // Set up animation info
-      risingPieces.push({
-        playerIndex: i,
-        startRow: player.row,
-        targetRow: targetRow,
-        col: player.col,
-        startY: player.row * TILE_SIZE,
-        targetY: targetRow * TILE_SIZE,
-        currentY: player.row * TILE_SIZE,
-        pieceType: player.pieceType
-      });
-      
-      // Remove from board (we'll animate it)
-      board[player.row][player.col] = CELL_TYPES.EMPTY;
+      targets.push({ player, playerIndex, targetRow });
     }
+  }
+
+  return targets;
+}
+
+function applyAntigravity() {
+  risingPieces = [];
+
+  const riseTargets = getAntigravityRiseTargets();
+  for (const { player, playerIndex, targetRow } of riseTargets) {
+    risingPieces.push({
+      playerIndex,
+      startRow: player.row,
+      targetRow,
+      col: player.col,
+      startY: player.row * TILE_SIZE,
+      targetY: targetRow * TILE_SIZE,
+      currentY: player.row * TILE_SIZE,
+      pieceType: player.pieceType
+    });
+
+    // Remove from board (we'll animate it)
+    board[player.row][player.col] = CELL_TYPES.EMPTY;
   }
   
   // Start the animation loop if we have pieces to rise
@@ -5982,7 +6051,14 @@ function updateRisingPieces(timestamp) {
 async function toggleAntigravity() {
   if (gameWon) return;
 
-  if (!antigravityUnlockedThisRun) {
+  if (CM_EDITOR_PAGE && mode !== "play") {
+    updateStatus("Switch to Play test to use Antigravity.");
+    return;
+  }
+
+  if (CM_FREE_ANTIGRAVITY) {
+    antigravityUnlockedThisRun = true;
+  } else if (!antigravityUnlockedThisRun) {
     if (antigravityCredits <= 0) {
       openAntigravityExchangeModal();
       return;
