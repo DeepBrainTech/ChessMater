@@ -41,7 +41,7 @@ export async function initStartFlow() {
     if (isStartScreenVisible) {
       portalButton.textContent = "Back to Main Portal";
       portalButton.onclick = () => {
-        window.open("https://deepbraintechnology.com/", "_blank");
+        window.location.href = "https://deepbraintechnology.com/";
       };
     } else {
       portalButton.textContent = "Back to Home";
