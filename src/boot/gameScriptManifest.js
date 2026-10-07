@@ -1,5 +1,6 @@
 /** Classic game script parts (shared global scope). Source: public/js/game/ */
 export const GAME_SCRIPT_PARTS = [
+  "/js/game/00-portal-commerce.js",
   "/js/game/00-assets-config.js",
   "/js/game/01-state.js",
   "/js/game/02-api-shop-exchange.js",

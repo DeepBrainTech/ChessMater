@@ -3,11 +3,12 @@ const express = require('express');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
 const pool = require('./db');
+const { verifyReplayGrant } = require('./portal-grants');
 
 const app = express();
 
 // ChessMater JWT config — must match main portal (same secret, aud, iss) or verify returns 401 invalid signature
-const CHESSMATER_SECRET = process.env.CHESSMATER_JWT_SECRET || 'CHESSMATER';
+const CHESSMATER_SECRET = process.env.CHESSMATER_JWT_SECRET;
 const CHESSMATER_ALG = process.env.CHESSMATER_JWT_ALG || 'HS256';
 const CHESSMATER_AUD = process.env.CHESSMATER_JWT_AUD || 'chessmater';
 const CHESSMATER_ISS = process.env.CHESSMATER_JWT_ISS || 'main-portal';
@@ -78,7 +79,7 @@ app.use((req, res, next) => {
   }
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Grant-Token');
   if (req.method === 'OPTIONS') {
     return res.status(204).end();
   }
@@ -93,7 +94,7 @@ const corsOptions = {
   },
   credentials: true,
   methods: ['GET', 'POST', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Grant-Token'],
 };
 
 app.use(cors(corsOptions));
@@ -114,11 +115,20 @@ function parseCookies(cookieHeader) {
 }
 
 function verifyPortalToken(token) {
-  return jwt.verify(token, CHESSMATER_SECRET, {
+  if (!CHESSMATER_SECRET || CHESSMATER_SECRET === 'CHESSMATER' || CHESSMATER_SECRET.startsWith('change-this-')) {
+    throw new Error('game_signing_not_configured');
+  }
+  const claims = jwt.verify(token, CHESSMATER_SECRET, {
     algorithms: [CHESSMATER_ALG],
     audience: CHESSMATER_AUD,
     issuer: CHESSMATER_ISS
   });
+  if (typeof claims === 'string' || !Number.isSafeInteger(claims.user_id)
+    || claims.user_id <= 0 || typeof claims.username !== 'string'
+    || !Number.isSafeInteger(claims.exp) || 'purpose' in claims) {
+    throw new Error('invalid_game_token');
+  }
+  return claims;
 }
 
 function verifySessionToken(token) {
@@ -813,30 +823,6 @@ app.get('/undo-credits', authenticate, async (req, res) => {
   }
 });
 
-app.post('/undo-credits/grant', authenticate, async (req, res) => {
-  const parsedAmount = Number.parseInt(req.body?.amount, 10);
-  const amount = Number.isFinite(parsedAmount) && parsedAmount > 0 ? parsedAmount : 1;
-
-  try {
-    const result = await pool.query(
-      `
-      INSERT INTO user_progress (portal_user_id, max_unlocked, undo_credits)
-      VALUES ($1, 1, $2)
-      ON CONFLICT (portal_user_id)
-      DO UPDATE SET undo_credits = user_progress.undo_credits + EXCLUDED.undo_credits
-      RETURNING undo_credits
-      `,
-      [req.user.user_id, amount]
-    );
-
-    const undoCredits = Number.parseInt(result.rows[0]?.undo_credits, 10);
-    res.json({ success: true, undoCredits: Number.isFinite(undoCredits) ? undoCredits : 0 });
-  } catch (err) {
-    console.error('Error granting undo credits:', err);
-    res.status(500).json({ error: 'Failed to grant undo credits' });
-  }
-});
-
 app.post('/undo-credits/use', authenticate, async (req, res) => {
   const parsedAmount = Number.parseInt(req.body?.amount, 10);
   const amount = Number.isFinite(parsedAmount) && parsedAmount > 0 ? parsedAmount : 1;
@@ -884,30 +870,6 @@ app.get('/antigravity-credits', authenticate, async (req, res) => {
   } catch (err) {
     console.error('Error fetching antigravity credits:', err);
     res.status(500).json({ error: 'Failed to fetch antigravity credits' });
-  }
-});
-
-app.post('/antigravity-credits/grant', authenticate, async (req, res) => {
-  const parsedAmount = Number.parseInt(req.body?.amount, 10);
-  const amount = Number.isFinite(parsedAmount) && parsedAmount > 0 ? parsedAmount : 1;
-
-  try {
-    const result = await pool.query(
-      `
-      INSERT INTO user_progress (portal_user_id, max_unlocked, antigravity_credits)
-      VALUES ($1, 1, $2)
-      ON CONFLICT (portal_user_id)
-      DO UPDATE SET antigravity_credits = user_progress.antigravity_credits + EXCLUDED.antigravity_credits
-      RETURNING antigravity_credits
-      `,
-      [req.user.user_id, amount]
-    );
-
-    const credits = Number.parseInt(result.rows[0]?.antigravity_credits, 10);
-    res.json({ success: true, antigravityCredits: Number.isFinite(credits) ? credits : 0 });
-  } catch (err) {
-    console.error('Error granting antigravity credits:', err);
-    res.status(500).json({ error: 'Failed to grant antigravity credits' });
   }
 });
 
@@ -965,6 +927,15 @@ app.get('/replay-unlocks/status', authenticate, async (req, res) => {
 });
 
 app.post('/replay-unlocks/activate', authenticate, async (req, res) => {
+  const level = req.body?.level;
+  if (!Number.isSafeInteger(level) || level <= 0 || level > 999999) {
+    return res.status(400).json({ error: 'Invalid level parameter' });
+  }
+  try {
+    verifyReplayGrant(req.headers['x-grant-token'], req.user.user_id, level);
+  } catch (_) {
+    return res.status(402).json({ error: 'invalid_paid_grant' });
+  }
   try {
     const parsedLevel = Number.parseInt(req.body?.level, 10);
     if (!Number.isFinite(parsedLevel) || parsedLevel <= 0) {
@@ -1122,12 +1093,16 @@ app.get('/leaderboard', authenticate, async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 
-(async () => {
-  await ensureTables();
-  app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-  });
-})();
+if (require.main === module) {
+  (async () => {
+    await ensureTables();
+    app.listen(PORT, () => {
+      console.log('Server running on port ' + PORT);
+    });
+  })();
+}
+
+module.exports = { app, verifyPortalToken };
 
 
 

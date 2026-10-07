@@ -3,6 +3,7 @@ import path from "path";
 
 const outDir = "public/js/game";
 const parts = [
+  "00-portal-commerce.js",
   "00-assets-config.js",
   "01-state.js",
   "02-api-shop-exchange.js",
@@ -13,11 +14,14 @@ const parts = [
   "07-input-loop.js",
 ];
 
-const chunks = parts.map((f) => fs.readFileSync(path.join(outDir, f), "utf8"));
+const chunks = parts.map((f) =>
+  `// BEGIN GAME PART: ${f}\n` + fs.readFileSync(path.join(outDir, f), "utf8") + `\n// END GAME PART: ${f}\n`
+);
 const generated =
   "/** GENERATED FILE — edit public/js/game/*.js then run: node scripts/concat-game.mjs */\n\n" +
   chunks.join("\n");
-fs.writeFileSync("public/js/game.js", generated);
+fs.writeFileSync("public/js/game.js", generated, "utf8");
+fs.writeFileSync("public/js/game.monolith.js", generated, "utf8");
 
 const manifest = parts.map((f) => "/js/game/" + f);
 fs.writeFileSync(

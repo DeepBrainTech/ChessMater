@@ -1,5 +1,206 @@
 /** GENERATED FILE — edit public/js/game/*.js then run: node scripts/concat-game.mjs */
 
+// BEGIN GAME PART: 00-portal-commerce.js
+(function () {
+class PortalApiError extends Error {
+    constructor(status, code) {
+        super(code);
+        this.status = status;
+        this.code = code;
+        this.name = "PortalApiError";
+    }
+}
+class PortalGameClient {
+    constructor(baseUrl, apiSlug, gameKey = apiSlug) {
+        this.apiSlug = apiSlug;
+        this.gameKey = gameKey;
+        this.baseUrl = baseUrl.replace(/\/$/, "");
+    }
+    async request(path, init = {}) {
+        const response = await fetch(this.baseUrl + path, {
+            ...init,
+            credentials: "include",
+            cache: "no-store",
+        });
+        const payload = await response.json().catch(() => null);
+        if (!response.ok || !payload?.success) {
+            const detail = payload?.detail;
+            const code = typeof detail === "string" ? detail
+                : Array.isArray(detail) ? "validation_error"
+                    : typeof payload?.message === "string" ? payload.message : "portal_request_failed";
+            throw new PortalApiError(response.status, code);
+        }
+        return payload.data;
+    }
+    purchasePath(productId) {
+        return "/api/games/" + encodeURIComponent(this.apiSlug)
+            + "/purchases/" + encodeURIComponent(productId);
+    }
+    assets() {
+        return this.request("/api/user/assets");
+    }
+    inventory() {
+        return this.request("/api/user/shop/inventory");
+    }
+    catalog() {
+        const query = new URLSearchParams({ game_mode: this.gameKey });
+        return this.request("/api/games/shop/catalog?" + query);
+    }
+    startSession(timezone) {
+        return this.request("/api/games/" + encodeURIComponent(this.apiSlug) + "/token", {
+            method: "POST",
+            headers: timezone ? { "X-User-Timezone": timezone } : undefined,
+        });
+    }
+    refreshSession() {
+        return this.request("/api/games/" + encodeURIComponent(this.apiSlug) + "/session");
+    }
+    quote(productId) {
+        return this.request(this.purchasePath(productId) + "/quote");
+    }
+    redeemGrant(productId, request) {
+        return this.request(this.purchasePath(productId) + "/redeem", {
+            method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(request),
+        });
+    }
+    redeemItem(request) {
+        const query = new URLSearchParams({ ...request, game_mode: this.gameKey });
+        return this.request("/api/user/shop/redeem?" + query, { method: "POST" });
+    }
+    consumeItem(request, count = 1) {
+        const query = new URLSearchParams({ ...request, count: String(count), game_mode: this.gameKey });
+        return this.request("/api/user/shop/consume?" + query, { method: "POST" });
+    }
+    checkout(asset, bundleId, locale) {
+        const kind = asset === "coins" ? "coin" : "diamond";
+        return this.request("/api/billing/" + kind + "-checkout-session", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ bundle_id: bundleId, locale }),
+        });
+    }
+}
+/** Generate once per user action, then keep this object when retrying a lost response. */
+function newPurchaseRequest(target) {
+    return { request_id: crypto.randomUUID(), target };
+}
+function newItemRequest(itemId) {
+    return { request_id: crypto.randomUUID(), item_id: itemId };
+}
+/** Browser-side retries are scoped to the signed-in game account. */
+class PortalInventoryClient extends PortalGameClient {
+    constructor(base, slug, accountId, gameKey = slug) {
+        super(base, slug, gameKey);
+        this.accountId = accountId;
+        this.pending = new Map();
+        this.busy = new Set();
+        this.storagePrefix = `portal-commerce:${base}:${gameKey}:`;
+    }
+    key(operation) {
+        const userId = this.accountId();
+        if (!Number.isSafeInteger(userId) || !userId || userId < 0) {
+            throw new PortalApiError(401, 'game_account_required');
+        }
+        return `${this.storagePrefix}${userId}:${operation}`;
+    }
+    read(key) {
+        try {
+            return sessionStorage.getItem(key) ?? this.pending.get(key) ?? null;
+        }
+        catch {
+            return this.pending.get(key) ?? null;
+        }
+    }
+    write(key, value) {
+        this.pending.set(key, value);
+        try {
+            sessionStorage.setItem(key, value);
+        }
+        catch { /* In-memory retries still work. */ }
+    }
+    remove(key) {
+        this.pending.delete(key);
+        try {
+            sessionStorage.removeItem(key);
+        }
+        catch { /* Storage can be disabled. */ }
+    }
+    async assertAccount() {
+        const expected = this.accountId();
+        const session = await this.refreshSession();
+        if (!expected || session.user.id !== expected) {
+            throw new PortalApiError(401, 'portal_account_mismatch');
+        }
+    }
+    async mutate(operation, send, keep = false) {
+        const key = this.key(operation);
+        if (this.busy.has(key))
+            throw new PortalApiError(409, 'operation_in_progress');
+        this.busy.add(key);
+        try {
+            await this.assertAccount();
+            let id = this.read(key);
+            if (!id) {
+                id = crypto.randomUUID();
+                this.write(key, id);
+            }
+            const result = await send(id);
+            if (!keep)
+                this.remove(key);
+            return result;
+        }
+        catch (error) {
+            if (keep && error instanceof PortalApiError && error.code === 'purchase_session_expired') {
+                this.remove(key);
+            }
+            throw error;
+        }
+        finally {
+            this.busy.delete(key);
+        }
+    }
+    buyItem(itemId) {
+        return this.mutate(`redeem:${itemId}`, id => this.redeemItem({ item_id: itemId, request_id: id }));
+    }
+    useItem(itemId, count = 1) {
+        return this.mutate(`consume:${itemId}:${count}`, id => this.consumeItem({ item_id: itemId, request_id: id }, count));
+    }
+    hasPendingUse(itemId, count = 1) {
+        try {
+            return !!this.read(this.key(`consume:${itemId}:${count}`));
+        }
+        catch {
+            return false;
+        }
+    }
+    buyGrant(productId, target) {
+        return this.mutate(`grant:${productId}:${target}`, id => this.redeemGrant(productId, { target, request_id: id }), true);
+    }
+    finishGrant(productId, target) {
+        this.remove(this.key(`grant:${productId}:${target}`));
+    }
+}
+/** This identifies browser retry storage; the server verifies authentication. */
+function gameAccountId(token) {
+    try {
+        const part = token?.split('.')[1];
+        if (!part)
+            return null;
+        const claims = JSON.parse(atob(part.replace(/-/g, '+').replace(/_/g, '/')));
+        return Number.isSafeInteger(claims.user_id) && claims.user_id > 0 ? claims.user_id : null;
+    }
+    catch {
+        return null;
+    }
+}
+
+window.PortalInventoryClient = PortalInventoryClient;
+window.PortalApiError = PortalApiError;
+window.gameAccountId = gameAccountId;
+})();
+
+// END GAME PART: 00-portal-commerce.js
+
+// BEGIN GAME PART: 00-assets-config.js
 /**
  * Central asset URLs for ChessMater.
  *
@@ -53,6 +254,9 @@ window.CM_ASSETS = {
   blocks: {},
 };
 
+// END GAME PART: 00-assets-config.js
+
+// BEGIN GAME PART: 01-state.js
 /**
  * game/01-state.js
  * DOM refs, constants, images, mutable game state
@@ -323,6 +527,9 @@ let replayUnlockedForLevel = false;
 let antigravityUnlockedThisRun = false;
 let autoRestartScheduled = false;
 
+// END GAME PART: 01-state.js
+
+// BEGIN GAME PART: 02-api-shop-exchange.js
 /**
  * game/02-api-shop-exchange.js
  * API/credits/shop/exchange modal defs (setup calls deferred)
@@ -410,11 +617,7 @@ async function refreshGameTokenFromPortal(force = false) {
       }
       const sessionData = await sessionRes.json().catch(() => null);
       const sessionToken =
-        sessionData?.data?.game_token ||
-        sessionData?.data?.token ||
-        sessionData?.game_token ||
-        sessionData?.token ||
-        null;
+        sessionData?.data?.game_token || null;
       if (sessionRes.ok && sessionToken && typeof sessionToken === "string") {
         window.cmToken = sessionToken;
         if (sessionData?.data?.user) {
@@ -477,7 +680,9 @@ async function syncUndoCreditsFromServer() {
     if (!res.ok) return false;
     const data = await res.json();
     const credits = Number.parseInt(data?.undoCredits, 10);
-    undoCredits = Number.isFinite(credits) ? credits : 0;
+    localUndoCredits = Number.isFinite(credits) ? credits : 0;
+    await syncPortalInventory();
+    undoCredits = localUndoCredits + (portalQuantities[PORTAL_UNDO_ITEM_ID] || 0);
     updateUndoButtonLabel();
     return true;
   } catch (_) {
@@ -494,122 +699,83 @@ async function syncAntigravityCreditsFromServer() {
     if (!res.ok) return false;
     const data = await res.json();
     const credits = Number.parseInt(data?.antigravityCredits, 10);
-    antigravityCredits = Number.isFinite(credits) ? credits : 0;
+    localAntigravityCredits = Number.isFinite(credits) ? credits : 0;
+    await syncPortalInventory();
+    antigravityCredits = localAntigravityCredits + (portalQuantities[PORTAL_ANTIGRAVITY_ITEM_ID] || 0);
     updateAntigravityButtonLabel();
     return true;
   } catch (_) {
     return false;
   }
-}
-
-async function grantUndoCredit(amount = 1) {
-  const parsed = Number.parseInt(amount, 10);
-  if (!Number.isFinite(parsed) || parsed <= 0) return;
-
-  try {
-    const res = await apiFetchWithAuthRetry("/undo-credits/grant", {
-      method: "POST",
-      headers: buildAuthHeaders(),
-      body: JSON.stringify({ amount: parsed })
-    });
-    if (res.ok) {
-      const data = await res.json();
-      const credits = Number.parseInt(data?.undoCredits, 10);
-      undoCredits = Number.isFinite(credits) ? credits : undoCredits + parsed;
-      updateUndoButtonLabel();
-      return;
-    }
-  } catch (_) {}
-
-  undoCredits += parsed;
-  updateUndoButtonLabel();
 }
 
 async function consumeUndoCredit(amount = 1) {
-  const parsed = Number.parseInt(amount, 10);
-  if (!Number.isFinite(parsed) || parsed <= 0) return false;
-
-  try {
-    const res = await apiFetchWithAuthRetry("/undo-credits/use", {
-      method: "POST",
-      headers: buildAuthHeaders(),
-      body: JSON.stringify({ amount: parsed })
-    });
-    if (res.status === 400) {
-      return false;
-    }
-    if (res.ok) {
-      const data = await res.json();
-      const credits = Number.parseInt(data?.undoCredits, 10);
-      undoCredits = Number.isFinite(credits) ? credits : Math.max(undoCredits - parsed, 0);
-      updateUndoButtonLabel();
-      return true;
-    }
-  } catch (_) {}
-
-  if (undoCredits < parsed) return false;
-  undoCredits -= parsed;
-  updateUndoButtonLabel();
-  return true;
-}
-
-async function grantAntigravityCreditsFromServerOnly(amount = 1) {
-  const parsed = Number.parseInt(amount, 10);
-  if (!Number.isFinite(parsed) || parsed <= 0) return false;
-  try {
-    const res = await apiFetchWithAuthRetry("/antigravity-credits/grant", {
-      method: "POST",
-      headers: buildAuthHeaders(),
-      body: JSON.stringify({ amount: parsed })
-    });
-    if (!res.ok) return false;
-    const data = await res.json();
-    const credits = Number.parseInt(data?.antigravityCredits, 10);
-    antigravityCredits = Number.isFinite(credits) ? credits : antigravityCredits + parsed;
-    updateAntigravityButtonLabel();
-    return true;
-  } catch (_) {
-    return false;
-  }
+  return consumeGameCredit(PORTAL_UNDO_ITEM_ID, '/undo-credits/use', amount);
 }
 
 async function consumeAntigravityCredit(amount = 1) {
-  const parsed = Number.parseInt(amount, 10);
-  if (!Number.isFinite(parsed) || parsed <= 0) return false;
+  return consumeGameCredit(PORTAL_ANTIGRAVITY_ITEM_ID, '/antigravity-credits/use', amount);
+}
+
+let localUndoCredits = 0;
+let localAntigravityCredits = 0;
+let portalQuantities = {};
+const creditUsesBusy = new Set();
+let cmCommerceClient = null;
+let cmCommerceBase = '';
+
+function getPortalCommerce() {
+  const base = normalizePortalApiBase(window.cmPortalApiBase || '');
+  if (!base) throw new Error('Portal session not available.');
+  if (!cmCommerceClient || cmCommerceBase !== base) {
+    cmCommerceBase = base;
+    cmCommerceClient = new window.PortalInventoryClient(base, 'chessmater', () =>
+      window.gameAccountId(window.cmToken) || Number(window.cmUser?.portal_user_id || window.cmUser?.user_id || window.cmUser?.id) || null);
+  }
+  return cmCommerceClient;
+}
+
+async function syncPortalInventory() {
   try {
-    const res = await apiFetchWithAuthRetry("/antigravity-credits/use", {
-      method: "POST",
-      headers: buildAuthHeaders(),
-      body: JSON.stringify({ amount: parsed })
-    });
-    if (res.status === 400) return false;
-    if (res.ok) {
-      const data = await res.json();
-      const credits = Number.parseInt(data?.antigravityCredits, 10);
-      antigravityCredits = Number.isFinite(credits) ? credits : Math.max(antigravityCredits - parsed, 0);
-      updateAntigravityButtonLabel();
+    const portal = getPortalCommerce();
+    await portal.assertAccount();
+    const inventory = await portal.inventory();
+    portalQuantities = Object.fromEntries(inventory.items.map(item => [item.item_id, item.quantity]));
+  } catch (_) { /* Unavailable inventory cannot authorize a game action. */ }
+  undoCredits = localUndoCredits + (portalQuantities[PORTAL_UNDO_ITEM_ID] || 0);
+  antigravityCredits = localAntigravityCredits + (portalQuantities[PORTAL_ANTIGRAVITY_ITEM_ID] || 0);
+  updateUndoButtonLabel();
+  updateAntigravityButtonLabel();
+}
+
+async function consumeGameCredit(itemId, localPath, amount) {
+  if (!Number.isSafeInteger(amount) || amount <= 0 || creditUsesBusy.has(itemId)) return false;
+  creditUsesBusy.add(itemId);
+  try {
+    if ((portalQuantities[itemId] || 0) >= amount || (portalUndoShopAvailable() && getPortalCommerce().hasPendingUse(itemId, amount))) {
+      const used = await getPortalCommerce().useItem(itemId, amount);
+      portalQuantities[itemId] = used.inventory_quantity;
+      await syncPortalInventory();
       return true;
     }
-  } catch (_) {}
-
-  if (antigravityCredits < parsed) return false;
-  antigravityCredits -= parsed;
-  updateAntigravityButtonLabel();
-  return true;
+    const res = await apiFetchWithAuthRetry(localPath, { method: 'POST',
+      headers: buildAuthHeaders(), body: JSON.stringify({ amount }) });
+    if (!res.ok) return false;
+    const data = await res.json();
+    if (!data.success) return false;
+    if (itemId === PORTAL_UNDO_ITEM_ID) localUndoCredits = data.undoCredits;
+    else localAntigravityCredits = data.antigravityCredits;
+    await syncPortalInventory();
+    return true;
+  } catch (_) { return false; }
+  finally { creditUsesBusy.delete(itemId); }
 }
 
 /** Main portal shop item (must match portal config). */
 const PORTAL_UNDO_ITEM_ID = "chess_mater_undo";
 const PORTAL_ANTIGRAVITY_ITEM_ID = "chess_mater_antigravity";
-const PORTAL_REPLAY_ITEM_ID = "chess_mater_reply";
+const PORTAL_REPLAY_ITEM_ID = "replay";
 const PORTAL_UNDO_GAME_MODE = "chessmater";
-
-/** Fallback display prices when portal catalog/item fetch fails or API base is unset (align with shop_items.py). */
-const SHOP_ITEM_FALLBACK_COST = {
-  [PORTAL_UNDO_ITEM_ID]: { coins: 5, diamonds: 0, flowers: 0 },
-  [PORTAL_ANTIGRAVITY_ITEM_ID]: { coins: 5, diamonds: 0, flowers: 0 },
-  [PORTAL_REPLAY_ITEM_ID]: { coins: 0, diamonds: 2, flowers: 0 }
-};
 
 const shopPriceCache = {};
 let shopCatalogWarmPromise = null;
@@ -635,10 +801,6 @@ function normalizePortalShopCost(raw) {
   };
 }
 
-function getFallbackShopCost(itemId) {
-  return SHOP_ITEM_FALLBACK_COST[itemId] || { coins: 0, diamonds: 0, flowers: 0 };
-}
-
 const CM_CURRENCY_ICON_SRC = {
   coin: (window.CM_ASSETS && window.CM_ASSETS.ui && window.CM_ASSETS.ui.coin) || "/assets/images/coin.svg",
   diamond: (window.CM_ASSETS && window.CM_ASSETS.ui && window.CM_ASSETS.ui.diamond) || "/assets/images/diamond.svg",
@@ -652,6 +814,7 @@ function currencyIconImgHtml(kind) {
 }
 
 function formatShopCostForExchangeLineHtml(cost) {
+  if (!cost) return "—";
   const c = normalizePortalShopCost(cost);
   const parts = [];
   if (c.coins > 0) {
@@ -669,7 +832,7 @@ function formatShopCostForExchangeLineHtml(cost) {
       `<span class="undo-exchange-cost-part">${currencyIconImgHtml("flower")}<span class="undo-exchange-cost-num">${c.flowers}</span></span>`
     );
   }
-  if (!parts.length) return "—";
+  if (!parts.length) return "0";
   return parts.join('<span class="undo-exchange-cost-sep">, </span>');
 }
 
@@ -708,27 +871,21 @@ async function warmShopPriceCache() {
 }
 
 async function ensureShopCostCached(itemId) {
-  if (shopPriceCache[itemId]) return shopPriceCache[itemId];
-  const base = normalizePortalApiBase(window.cmPortalApiBase || "");
-  if (!base) return getFallbackShopCost(itemId);
-
-  await warmShopPriceCache();
-  if (shopPriceCache[itemId]) return shopPriceCache[itemId];
-
   try {
-    const res = await fetch(
-      `${base}/api/games/shop/item?item_id=${encodeURIComponent(itemId)}&game_mode=${encodeURIComponent(PORTAL_UNDO_GAME_MODE)}`,
-      { method: "GET" }
-    );
-    const json = await res.json().catch(() => null);
-    if (res.ok && json && json.success !== false && json.data && json.data.cost && typeof json.data.cost === "object") {
-      const c = normalizePortalShopCost(json.data.cost);
-      shopPriceCache[itemId] = c;
-      return c;
+    const portal = getPortalCommerce();
+    let cost;
+    if (itemId === PORTAL_REPLAY_ITEM_ID) {
+      cost = (await portal.quote('replay')).cost;
+    } else {
+      cost = (await portal.catalog()).items[itemId]?.cost;
     }
-  } catch (_) {}
-
-  return getFallbackShopCost(itemId);
+    if (!cost || Object.values(cost).some(value => !Number.isSafeInteger(value) || value < 0)) throw new Error('invalid_shop_cost');
+    shopPriceCache[itemId] = normalizePortalShopCost(cost);
+    return shopPriceCache[itemId];
+  } catch (_) {
+    delete shopPriceCache[itemId];
+    return null;
+  }
 }
 
 async function getPortalAssets() {
@@ -763,82 +920,15 @@ async function postPortalRedeemUndo() {
 }
 
 async function postPortalRedeemItem(itemId) {
-  const base = normalizePortalApiBase(window.cmPortalApiBase || "");
-  if (!base) return { ok: false, message: "Portal session not available." };
-  const url = `${base}/api/user/shop/redeem?item_id=${encodeURIComponent(itemId)}&game_mode=${encodeURIComponent(PORTAL_UNDO_GAME_MODE)}`;
   try {
-    const res = await fetch(url, {
-      method: "POST",
-      credentials: "include",
-      headers: {
-        "X-User-Timezone": Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"
-      }
-    });
-    const data = await res.json().catch(() => null);
-    if (!res.ok) {
-      const msg =
-        (data && (data.message || data.error || data.detail)) ||
-        `Redeem failed (${res.status}).`;
-      return { ok: false, message: String(msg) };
-    }
-    if (data && data.success === false) {
-      const msg = (data.message || data.error || "Redeem rejected.") + "";
-      return { ok: false, message: msg };
-    }
-    return { ok: true };
+    const result = await getPortalCommerce().buyItem(itemId);
+    portalQuantities[itemId] = result.inventory_quantity;
+    await syncPortalInventory();
+    return { ok: true, data: result };
   } catch (err) {
-    return { ok: false, message: err && err.message ? err.message : "Network error during redeem." };
+    return { ok: false, message: err?.message || 'Redeem failed.' };
   }
 }
-
-async function grantUndoCreditsFromServerOnly(amount = 1) {
-  const parsed = Number.parseInt(amount, 10);
-  if (!Number.isFinite(parsed) || parsed <= 0) return false;
-  try {
-    const res = await apiFetchWithAuthRetry("/undo-credits/grant", {
-      method: "POST",
-      headers: buildAuthHeaders(),
-      body: JSON.stringify({ amount: parsed })
-    });
-    if (!res.ok) return false;
-    const data = await res.json();
-    const credits = Number.parseInt(data?.undoCredits, 10);
-    if (Number.isFinite(credits)) {
-      undoCredits = credits;
-    } else {
-      undoCredits += parsed;
-    }
-    updateUndoButtonLabel();
-    return true;
-  } catch (_) {
-    return false;
-  }
-}
-
-const undoExchangeModal = document.getElementById("undoExchangeModal");
-const undoExchangeCoinsEl = document.getElementById("undoExchangeCoins");
-const undoExchangeDiamondsEl = document.getElementById("undoExchangeDiamonds");
-const undoExchangeFlowersEl = document.getElementById("undoExchangeFlowers");
-const undoExchangeMessageEl = document.getElementById("undoExchangeMessage");
-const undoExchangeRedeemBtn = document.getElementById("undoExchangeRedeemBtn");
-const undoExchangeCloseBtn = document.getElementById("undoExchangeCloseBtn");
-const undoExchangeCostTextEl = document.getElementById("undoExchangeCostText");
-const antigravityExchangeModal = document.getElementById("antigravityExchangeModal");
-const antigravityExchangeCoinsEl = document.getElementById("antigravityExchangeCoins");
-const antigravityExchangeDiamondsEl = document.getElementById("antigravityExchangeDiamonds");
-const antigravityExchangeFlowersEl = document.getElementById("antigravityExchangeFlowers");
-const antigravityExchangeMessageEl = document.getElementById("antigravityExchangeMessage");
-const antigravityExchangeRedeemBtn = document.getElementById("antigravityExchangeRedeemBtn");
-const antigravityExchangeCloseBtn = document.getElementById("antigravityExchangeCloseBtn");
-const antigravityExchangeCostTextEl = document.getElementById("antigravityExchangeCostText");
-const replayExchangeModal = document.getElementById("replayExchangeModal");
-const replayExchangeCoinsEl = document.getElementById("replayExchangeCoins");
-const replayExchangeDiamondsEl = document.getElementById("replayExchangeDiamonds");
-const replayExchangeFlowersEl = document.getElementById("replayExchangeFlowers");
-const replayExchangeMessageEl = document.getElementById("replayExchangeMessage");
-const replayExchangeRedeemBtn = document.getElementById("replayExchangeRedeemBtn");
-const replayExchangeCloseBtn = document.getElementById("replayExchangeCloseBtn");
-const replayExchangeCostTextEl = document.getElementById("replayExchangeCostText");
 
 function setUndoExchangeBalanceCells(coinsText, diamondsText, flowersText) {
   if (undoExchangeCoinsEl) undoExchangeCoinsEl.textContent = coinsText;
@@ -857,7 +947,7 @@ function setUndoExchangeMessage(text, kind) {
 
 function setUndoExchangeBusy(busy) {
   if (!undoExchangeRedeemBtn) return;
-  undoExchangeRedeemBtn.disabled = !!busy || !portalUndoShopAvailable();
+  undoExchangeRedeemBtn.disabled = !!busy || !portalUndoShopAvailable() || !shopPriceCache[PORTAL_UNDO_ITEM_ID];
 }
 
 function closeUndoExchangeModal() {
@@ -889,12 +979,13 @@ async function openUndoExchangeModal() {
   setUndoExchangeMessage("");
   undoExchangeModal.classList.add("active");
   undoExchangeModal.setAttribute("aria-hidden", "false");
-  setUndoExchangeBusy(false);
+  setUndoExchangeBusy(true);
   const [, cost] = await Promise.all([
     refreshUndoExchangeAssetsDisplay(),
     ensureShopCostCached(PORTAL_UNDO_ITEM_ID)
   ]);
   if (undoExchangeCostTextEl) undoExchangeCostTextEl.innerHTML = formatShopCostForExchangeLineHtml(cost);
+  setUndoExchangeBusy(false);
 }
 
 async function handleUndoExchangeRedeem() {
@@ -905,17 +996,6 @@ async function handleUndoExchangeRedeem() {
   if (!redeem.ok) {
     setUndoExchangeMessage(redeem.message || "Redeem failed.", "error");
     setUndoExchangeBusy(false);
-    await refreshUndoExchangeAssetsDisplay();
-    return;
-  }
-  const granted = await grantUndoCreditsFromServerOnly(1);
-  if (!granted) {
-    setUndoExchangeMessage(
-      "Portal redeem may have succeeded, but adding undo credits failed. Please refresh or contact support if coins were deducted.",
-      "error"
-    );
-    setUndoExchangeBusy(false);
-    await syncUndoCreditsFromServer();
     await refreshUndoExchangeAssetsDisplay();
     return;
   }
@@ -979,13 +1059,13 @@ async function fetchReplayUnlockStatusForLevel(levelNumber) {
   }
 }
 
-async function activateReplayUnlockForLevel(levelNumber) {
+async function activateReplayUnlockForLevel(levelNumber, grantToken) {
   const lvl = Number.parseInt(levelNumber, 10);
   if (!Number.isFinite(lvl) || lvl <= 0) return false;
   try {
     const res = await apiFetchWithAuthRetry("/replay-unlocks/activate", {
       method: "POST",
-      headers: buildAuthHeaders(),
+      headers: { ...buildAuthHeaders(), "X-Grant-Token": grantToken },
       body: JSON.stringify({ level: lvl })
     });
     return res.ok;
@@ -1019,7 +1099,7 @@ async function refreshAntigravityExchangeAssetsDisplay() {
 
 function setAntigravityExchangeBusy(busy) {
   if (!antigravityExchangeRedeemBtn) return;
-  antigravityExchangeRedeemBtn.disabled = !!busy || !portalUndoShopAvailable();
+  antigravityExchangeRedeemBtn.disabled = !!busy || !portalUndoShopAvailable() || !shopPriceCache[PORTAL_ANTIGRAVITY_ITEM_ID];
 }
 
 async function openAntigravityExchangeModal() {
@@ -1028,12 +1108,13 @@ async function openAntigravityExchangeModal() {
   setGenericExchangeMessage(antigravityExchangeMessageEl, "");
   antigravityExchangeModal.classList.add("active");
   antigravityExchangeModal.setAttribute("aria-hidden", "false");
-  setAntigravityExchangeBusy(false);
+  setAntigravityExchangeBusy(true);
   const [, cost] = await Promise.all([
     refreshAntigravityExchangeAssetsDisplay(),
     ensureShopCostCached(PORTAL_ANTIGRAVITY_ITEM_ID)
   ]);
   if (antigravityExchangeCostTextEl) antigravityExchangeCostTextEl.innerHTML = formatShopCostForExchangeLineHtml(cost);
+  setAntigravityExchangeBusy(false);
 }
 
 async function handleAntigravityExchangeRedeem() {
@@ -1044,14 +1125,6 @@ async function handleAntigravityExchangeRedeem() {
   if (!redeem.ok) {
     setGenericExchangeMessage(antigravityExchangeMessageEl, redeem.message || "Redeem failed.", "error");
     setAntigravityExchangeBusy(false);
-    await refreshAntigravityExchangeAssetsDisplay();
-    return;
-  }
-  const granted = await grantAntigravityCreditsFromServerOnly(1);
-  if (!granted) {
-    setGenericExchangeMessage(antigravityExchangeMessageEl, "Portal redeem may have succeeded, but adding antigravity credits failed. Please refresh.", "error");
-    setAntigravityExchangeBusy(false);
-    await syncAntigravityCreditsFromServer();
     await refreshAntigravityExchangeAssetsDisplay();
     return;
   }
@@ -1100,7 +1173,7 @@ async function refreshReplayExchangeAssetsDisplay() {
 
 function setReplayExchangeBusy(busy) {
   if (!replayExchangeRedeemBtn) return;
-  replayExchangeRedeemBtn.disabled = !!busy || !portalUndoShopAvailable();
+  replayExchangeRedeemBtn.disabled = !!busy || !portalUndoShopAvailable() || !shopPriceCache[PORTAL_REPLAY_ITEM_ID];
 }
 
 async function openReplayExchangeModal() {
@@ -1109,12 +1182,13 @@ async function openReplayExchangeModal() {
   setGenericExchangeMessage(replayExchangeMessageEl, "");
   replayExchangeModal.classList.add("active");
   replayExchangeModal.setAttribute("aria-hidden", "false");
-  setReplayExchangeBusy(false);
+  setReplayExchangeBusy(true);
   const [, cost] = await Promise.all([
     refreshReplayExchangeAssetsDisplay(),
     ensureShopCostCached(PORTAL_REPLAY_ITEM_ID)
   ]);
   if (replayExchangeCostTextEl) replayExchangeCostTextEl.innerHTML = formatShopCostForExchangeLineHtml(cost);
+  setReplayExchangeBusy(false);
 }
 
 async function handleReplayExchangeRedeem() {
@@ -1123,14 +1197,25 @@ async function handleReplayExchangeRedeem() {
   if (!Number.isFinite(levelNumber) || levelNumber <= 0) return;
   setGenericExchangeMessage(replayExchangeMessageEl, "");
   setReplayExchangeBusy(true);
-  const redeem = await postPortalRedeemItem(PORTAL_REPLAY_ITEM_ID);
-  if (!redeem.ok) {
-    setGenericExchangeMessage(replayExchangeMessageEl, redeem.message || "Redeem failed.", "error");
+  let grant;
+  try {
+    const portal = getPortalCommerce();
+    if (await fetchReplayUnlockStatusForLevel(levelNumber)) {
+      portal.finishGrant('replay', 'level:' + levelNumber);
+      replayUnlockedForLevel = true;
+      await fetchFewestOtherMovesForCurrentLevel();
+      updateLevelCompleteReplayDisplay();
+      setReplayExchangeBusy(false);
+      closeReplayExchangeModal();
+      return;
+    }
+    grant = await portal.buyGrant('replay', 'level:' + levelNumber);
+  } catch (err) {
+    setGenericExchangeMessage(replayExchangeMessageEl, err?.message || 'Redeem failed.', 'error');
     setReplayExchangeBusy(false);
-    await refreshReplayExchangeAssetsDisplay();
     return;
   }
-  const activated = await activateReplayUnlockForLevel(levelNumber);
+  const activated = await activateReplayUnlockForLevel(levelNumber, grant.grant_token);
   if (!activated) {
     setGenericExchangeMessage(replayExchangeMessageEl, "Redeem succeeded, but replay unlock sync failed. Please refresh.", "error");
     setReplayExchangeBusy(false);
@@ -1138,6 +1223,7 @@ async function handleReplayExchangeRedeem() {
     return;
   }
 
+  getPortalCommerce().finishGrant('replay', 'level:' + levelNumber);
   replayUnlockedForLevel = true;
   await fetchFewestOtherMovesForCurrentLevel();
   updateLevelCompleteReplayDisplay();
@@ -1206,6 +1292,9 @@ function setupHintModal() {
   }
 }
 
+// END GAME PART: 02-api-shop-exchange.js
+
+// BEGIN GAME PART: 03-audio-canvas-hud-replay.js
 /**
  * game/03-audio-canvas-hud-replay.js
  * Audio, HUD, replay, objectives, lasers/platforms helpers
@@ -2878,6 +2967,9 @@ window.openInGameWalkthroughModal = openInGameWalkthroughModal;
 window.openHintModal = openHintModal;
 
 
+// END GAME PART: 03-audio-canvas-hud-replay.js
+
+// BEGIN GAME PART: 04-level-rules.js
 /**
  * game/04-level-rules.js
  * loadPuzzle, gravity, moves, win, undo, teleport, transformer
@@ -3562,12 +3654,14 @@ function syncProgressAfterWin() {
       if (!data) return;
       const credits = Number.parseInt(data?.undoCredits, 10);
       if (Number.isFinite(credits)) {
-        undoCredits = credits;
+        localUndoCredits = credits;
+        undoCredits = localUndoCredits + (portalQuantities[PORTAL_UNDO_ITEM_ID] || 0);
         updateUndoButtonLabel();
       }
       const antiCredits = Number.parseInt(data?.antigravityCredits, 10);
       if (Number.isFinite(antiCredits)) {
-        antigravityCredits = antiCredits;
+        localAntigravityCredits = antiCredits;
+        antigravityCredits = localAntigravityCredits + (portalQuantities[PORTAL_ANTIGRAVITY_ITEM_ID] || 0);
         updateAntigravityButtonLabel();
       }
     })
@@ -4248,6 +4342,9 @@ function handleTransformerMenuClick(e) {
 
 // --- Draw possible moves for selected player ---
 
+// END GAME PART: 04-level-rules.js
+
+// BEGIN GAME PART: 05-vision-render.js
 /**
  * game/05-vision-render.js
  * Valid moves, vision/fog, drawBoard
@@ -4963,6 +5060,9 @@ function drawBoard() {
 
 // --- Confetti Celebration ---
 
+// END GAME PART: 05-vision-render.js
+
+// BEGIN GAME PART: 06-effects-bombs.js
 /**
  * game/06-effects-bombs.js
  * Confetti, bombs, ducks, platforms, lasers collisions
@@ -5785,6 +5885,9 @@ function createInitialBurst(container, canvasRect, centerX, startY) {
 
 // --- Click handler ---
 
+// END GAME PART: 06-effects-bombs.js
+
+// BEGIN GAME PART: 07-input-loop.js
 /**
  * game/07-input-loop.js
  * Input, antigravity, restart, game loop, boot
@@ -6279,3 +6382,5 @@ window.loadPuzzle = loadPuzzle;
 window.updateStatus = updateStatus;
 
 gameLoop();
+
+// END GAME PART: 07-input-loop.js

@@ -176,11 +176,7 @@ export function bootstrapAuth() {
           }
           const sessionData = await sessionRes.json().catch(() => null);
           const freshGameToken =
-            sessionData?.data?.game_token ||
-            sessionData?.data?.token ||
-            sessionData?.game_token ||
-            sessionData?.token ||
-            null;
+            sessionData?.data?.game_token || null;
           const portalUser = sessionData?.data?.user || null;
           if (sessionRes.ok && typeof freshGameToken === "string" && freshGameToken) {
             window.cmToken = freshGameToken;

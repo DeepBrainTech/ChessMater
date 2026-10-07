@@ -682,12 +682,14 @@ function syncProgressAfterWin() {
       if (!data) return;
       const credits = Number.parseInt(data?.undoCredits, 10);
       if (Number.isFinite(credits)) {
-        undoCredits = credits;
+        localUndoCredits = credits;
+        undoCredits = localUndoCredits + (portalQuantities[PORTAL_UNDO_ITEM_ID] || 0);
         updateUndoButtonLabel();
       }
       const antiCredits = Number.parseInt(data?.antigravityCredits, 10);
       if (Number.isFinite(antiCredits)) {
-        antigravityCredits = antiCredits;
+        localAntigravityCredits = antiCredits;
+        antigravityCredits = localAntigravityCredits + (portalQuantities[PORTAL_ANTIGRAVITY_ITEM_ID] || 0);
         updateAntigravityButtonLabel();
       }
     })
