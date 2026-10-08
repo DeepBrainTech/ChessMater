@@ -41,7 +41,9 @@ export async function initStartFlow() {
     if (isStartScreenVisible) {
       portalButton.textContent = "Back to Main Portal";
       portalButton.onclick = () => {
-        window.location.href = "https://deepbraintechnology.com/";
+        const locale = (localStorage.getItem("cm_locale") || "en").toLowerCase();
+        const prefix = /^(zh|zn)/.test(locale) ? "zn" : "en";
+        window.location.href = `https://deepbraintechnology.com/${prefix}/braingames`;
       };
     } else {
       portalButton.textContent = "Back to Home";
