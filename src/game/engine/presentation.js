@@ -382,7 +382,7 @@ export function register(game) {
     game.fewestOtherMovesUserName = typeof userName === "string" ? userName.trim() : "";
     game.replayUnlockedForLevel = !!replayUnlocked;
     game.fewestOtherMovesReplayPath = game.sanitizeReplayPath(replayPath);
-    game.fewestOtherMovesReplayStepNumbers = game.buildReplayStepNumbers(game.fewestOtherMovesReplayPath || []);
+    game.fewestOtherMovesReplayMoveCounts = game.buildReplayMoveCounts(game.fewestOtherMovesReplayPath || []);
     if (game.fewestOtherMovesReplayPath) {
       game.levelCompleteReplayIndex = 0;
     }

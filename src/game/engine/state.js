@@ -268,7 +268,7 @@ export function initialize(game) {
   game.fewestOtherMovesForLevel = null;
   game.fewestOtherMovesUserName = "";
   game.fewestOtherMovesReplayPath = null;
-  game.fewestOtherMovesReplayStepNumbers = [];
+  game.fewestOtherMovesReplayMoveCounts = [];
   game.currentLevelMoveTrace = [];
   game.pendingMoveTraceEntry = null;
   game.levelCompleteReplayIndex = 0;

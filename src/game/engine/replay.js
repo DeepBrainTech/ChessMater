@@ -46,39 +46,14 @@ export function register(game) {
     const moveMeta = step && step.move ? step.move : null;
     return !!(moveMeta && moveMeta.from && Number.isFinite(Number(moveMeta.from.row)) && Number.isFinite(Number(moveMeta.from.col)) && moveMeta.to && Number.isFinite(Number(moveMeta.to.row)) && Number.isFinite(Number(moveMeta.to.col)));
   };
-  game.buildReplayStepNumbers = function (path) {
+  game.buildReplayMoveCounts = function (path) {
     if (!Array.isArray(path) || !path.length) return [];
-    const numbers = Array(path.length).fill(0);
-    const moveOrdinals = Array(path.length).fill(0);
     let moveCounter = 0;
-    for (let i = 0; i < path.length; i++) {
-      if (game.hasReplayPlayerMove(path[i])) {
-        moveCounter += 1;
-        moveOrdinals[i] = moveCounter;
-      }
-    }
-    for (let i = 0; i < path.length; i++) {
-      if (i === 0) {
-        numbers[i] = 0;
-        continue;
-      }
-      if (moveOrdinals[i] > 0) {
-        numbers[i] = moveOrdinals[i];
-        continue;
-      }
-
-      // System-only frames share the next move number (if any), so users see
-      // "antigravity result -> move" under one logical step.
-      let nextMoveOrdinal = 0;
-      for (let j = i + 1; j < path.length; j++) {
-        if (moveOrdinals[j] > 0) {
-          nextMoveOrdinal = moveOrdinals[j];
-          break;
-        }
-      }
-      numbers[i] = nextMoveOrdinal > 0 ? nextMoveOrdinal : moveCounter;
-    }
-    return numbers;
+    // The initial board is action zero. Count completed moves, never future moves.
+    return path.map((step, index) => {
+      if (index > 0 && game.hasReplayPlayerMove(step)) moveCounter += 1;
+      return moveCounter;
+    });
   };
   game.drawReplayCellDecoration = function (replayCtx, cellType, x, y, tile, row = null, col = null, targetPiecesData = []) {
     const inset = Math.max(1, Math.floor(tile * 0.08));
@@ -233,14 +208,20 @@ export function register(game) {
       game.drawReplayPlayerPiece(replayCtx, p.pieceType, p.row, p.col, ox, oy, tile);
     }
     if (stepEl) {
-      const logicalStep = game.fewestOtherMovesReplayStepNumbers[safeIndex] || 0;
-      const totalLogicalSteps = Number.isFinite(game.fewestOtherMovesForLevel) ? game.fewestOtherMovesForLevel : game.fewestOtherMovesReplayStepNumbers.length ? Math.max(...game.fewestOtherMovesReplayStepNumbers) : 0;
-      stepEl.textContent = `Step: ${logicalStep}/${totalLogicalSteps}`;
+      const moveCounts = game.fewestOtherMovesReplayMoveCounts;
+      const completedMoves = moveCounts[safeIndex] || 0;
+      const totalMoves = Number.isFinite(game.fewestOtherMovesForLevel)
+        ? game.fewestOtherMovesForLevel
+        : moveCounts.at(-1) || 0;
+      const totalActions = game.fewestOtherMovesReplayPath.length - 1;
+      stepEl.textContent = `Action: ${safeIndex}/${totalActions} · Moves: ${completedMoves}/${totalMoves}`;
     }
     if (eventEl) {
       const moveMeta = snapshot && snapshot.move ? snapshot.move : null;
-      if (moveMeta && moveMeta.antigravityApplied) {
-        eventEl.textContent = "Antigravity used on this step.";
+      if (moveMeta?.systemEvent === "toggle_antigravity") {
+        eventEl.textContent = "Antigravity enabled.";
+      } else if (moveMeta?.antigravityApplied) {
+        eventEl.textContent = "Antigravity applied after this move.";
       } else {
         eventEl.textContent = "";
       }

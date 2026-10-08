@@ -89,10 +89,32 @@ try {
         game.drawBoard();
         const snapshot = game.buildCurrentReplaySnapshot();
         game.fewestOtherMovesReplayPath = [snapshot];
-        game.fewestOtherMovesReplayStepNumbers = [0];
+        game.fewestOtherMovesReplayMoveCounts = [0];
         game.drawLevelCompleteReplaySnapshot(0);
         game.drawInGameWalkthroughSnapshot(0);
       }
+      const initial = game.buildCurrentReplaySnapshot();
+      const counterPath = [initial,
+        { ...initial, move: { systemEvent: 'toggle_antigravity', antigravityApplied: true } },
+        { ...initial, move: { from: { row: 0, col: 0 }, to: { row: 0, col: 1 } } },
+      ];
+      game.updateFewestOtherMovesDisplay(1, counterPath, 'Smoke test', true);
+      game.inGameWalkthroughModal.classList.add('active');
+      game.drawInGameWalkthroughSnapshot(0);
+      game.stepReplayNavigation('next');
+      if (game.inGameWalkthroughStep.textContent !== 'Action: 1/2 · Moves: 0/1') throw new Error('Hint antigravity counters failed');
+      game.stepReplayNavigation('next');
+      if (game.inGameWalkthroughStep.textContent !== 'Action: 2/2 · Moves: 1/1') throw new Error('Hint move counters failed');
+      game.stepReplayNavigation('prev');
+      if (game.inGameWalkthroughStep.textContent !== 'Action: 1/2 · Moves: 0/1') throw new Error('Hint reverse navigation failed');
+      game.inGameWalkthroughModal.classList.remove('active');
+      game.levelCompleteModal.classList.add('active');
+      game.drawLevelCompleteReplaySnapshot(0);
+      game.stepReplayNavigation('next');
+      if (game.levelCompleteReplayStep.textContent !== 'Action: 1/2 · Moves: 0/1') throw new Error('Completion antigravity counters failed');
+      game.stepReplayNavigation('next');
+      if (game.levelCompleteReplayStep.textContent !== 'Action: 2/2 · Moves: 1/1') throw new Error('Completion move counters failed');
+      game.levelCompleteModal.classList.remove('active');
       const board = Array.from({ length: 4 }, (_, row) => Array(6).fill(row === 3 ? game.CELL_TYPES.SOLID_BLOCK : 0));
       game.loadPuzzle({ name: 'Smoke test', rows: 4, cols: 6, board, players: [{ row: 2, col: 0, pieceType: 'rook' }], goal: { row: 2, col: 5 }, objectives: [], bombs: [] });
       game.gravityEnabled = false;
