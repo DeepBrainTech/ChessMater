@@ -1,5 +1,7 @@
+import { session } from '../services/session.js';
+import { game } from '../game/runtime.js';
 function isLoggedIn() {
-  return !!(window.cmUser && (window.cmToken || window.cmSessionReady));
+  return !!(session.cmUser && (session.cmToken || session.cmSessionReady));
 }
 
 export function initLeaderboardAndGuide() {
@@ -15,8 +17,8 @@ export function initLeaderboardAndGuide() {
   function populateLeaderboardModes() {
     if (!leaderboardModeSelect) return;
     const levelCount =
-      typeof window.LEVELS !== "undefined" && Array.isArray(window.LEVELS)
-        ? window.LEVELS.length
+      typeof game.LEVELS !== "undefined" && Array.isArray(game.LEVELS)
+        ? game.LEVELS.length
         : 35;
     const previous = leaderboardModeSelect.value;
     leaderboardModeSelect.innerHTML = "";
@@ -45,7 +47,7 @@ export function initLeaderboardAndGuide() {
 
   function getLeaderboardRequestUrl() {
     const raw = leaderboardModeSelect ? leaderboardModeSelect.value : "progress";
-    const base = `${window.API_BASE_URL || "https://chessmater-production.up.railway.app"}/leaderboard`;
+    const base = `${session.API_BASE_URL || "https://chessmater-production.up.railway.app"}/leaderboard`;
     if (!raw || raw === "progress") return base;
     if (raw.startsWith("level:")) {
       const level = Number.parseInt(raw.split(":")[1], 10);
@@ -57,13 +59,13 @@ export function initLeaderboardAndGuide() {
   }
 
   async function fetchWithUnifiedAuthRetry(path, options = {}) {
-    if (typeof window.apiFetchWithAuthRetry === "function") {
-      return window.apiFetchWithAuthRetry(path, options);
+    if (typeof game.apiFetchWithAuthRetry === "function") {
+      return game.apiFetchWithAuthRetry(path, options);
     }
-    const base = window.API_BASE_URL || "https://chessmater-production.up.railway.app";
+    const base = session.API_BASE_URL || "https://chessmater-production.up.railway.app";
     const firstHeaders = { ...(options.headers || {}) };
-    if (!firstHeaders.Authorization && window.cmToken) {
-      firstHeaders.Authorization = `Bearer ${window.cmToken}`;
+    if (!firstHeaders.Authorization && session.cmToken) {
+      firstHeaders.Authorization = `Bearer ${session.cmToken}`;
     }
     let response = await fetch(`${base}${path}`, {
       ...options,
@@ -71,12 +73,12 @@ export function initLeaderboardAndGuide() {
       headers: firstHeaders,
     });
     if (response.status !== 401) return response;
-    if (typeof window.refreshGameTokenFromPortal !== "function") return response;
-    const refreshed = await window.refreshGameTokenFromPortal(true);
+    if (typeof game.refreshGameTokenFromPortal !== "function") return response;
+    const refreshed = await game.refreshGameTokenFromPortal(true);
     if (!refreshed) return response;
     const retryHeaders = { ...(options.headers || {}) };
-    if (window.cmToken) {
-      retryHeaders.Authorization = `Bearer ${window.cmToken}`;
+    if (session.cmToken) {
+      retryHeaders.Authorization = `Bearer ${session.cmToken}`;
     }
     return fetch(`${base}${path}`, {
       ...options,
@@ -96,8 +98,8 @@ export function initLeaderboardAndGuide() {
       return;
     }
 
-    const currentUserId = window.cmUser
-      ? window.cmUser.user_id || window.cmUser.portal_user_id || window.cmUser.id
+    const currentUserId = session.cmUser
+      ? session.cmUser.user_id || session.cmUser.portal_user_id || session.cmUser.id
       : null;
     const currentUserIdStr = currentUserId != null ? String(currentUserId) : "";
     const isLevelMode = !!(mode && mode.startsWith("level:"));
@@ -160,22 +162,22 @@ export function initLeaderboardAndGuide() {
     if (!leaderboardList) return;
     leaderboardList.innerHTML =
       '<div class="leaderboard-loading">Loading leaderboard...</div>';
-    await (window.authReady || Promise.resolve());
+    await (session.authReady || Promise.resolve());
     try {
-      if (!window.cmUser) {
+      if (!session.cmUser) {
         leaderboardList.innerHTML =
           '<div class="leaderboard-error">Please log in to view the leaderboard</div>';
         return;
       }
 
       const headers = {};
-      if (window.cmToken) {
-        headers.Authorization = `Bearer ${window.cmToken}`;
+      if (session.cmToken) {
+        headers.Authorization = `Bearer ${session.cmToken}`;
       }
 
       const leaderboardUrl = getLeaderboardRequestUrl();
       const leaderboardPath = leaderboardUrl.replace(
-        window.API_BASE_URL || "https://chessmater-production.up.railway.app",
+        session.API_BASE_URL || "https://chessmater-production.up.railway.app",
         ""
       );
       const res = await fetchWithUnifiedAuthRetry(leaderboardPath, { headers });

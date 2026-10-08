@@ -1,0 +1,12 @@
+import * as state from './state.js';
+import * as commerce from './commerce.js';
+import * as presentation from './presentation.js';
+import * as rules from './rules.js';
+import * as render from './render.js';
+import * as effects from './effects.js';
+import * as input from './input.js';
+import * as tiles from './tiles.js';
+import * as replay from './replay.js';
+import * as sprites from './sprites.js';
+import * as moves from './moves.js';
+export const modules = [tiles, replay, sprites, moves, state, commerce, presentation, rules, render, effects, input];

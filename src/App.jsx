@@ -5,21 +5,21 @@ import StartScreen from "./components/StartScreen.jsx";
 import GameShell from "./components/GameShell.jsx";
 import GameModals from "./components/GameModals.jsx";
 import GameAudio from "./components/GameAudio.jsx";
-import { loadLegacyGameScripts } from "./boot/loadLegacyGameScripts.js";
-import { installGameUiBridge } from "./game/uiBridge.js";
+import { initializeGame } from "./game/initialize.js";
 import { initPageUi } from "./page/initPageUi.js";
 
 export default function App() {
   useEffect(() => {
-    installGameUiBridge();
+    const disposeGame = initializeGame();
+    const controller = new AbortController();
     let cancelled = false;
     let cleanupPageUi = null;
 
     (async () => {
       try {
-        await loadLegacyGameScripts();
-        if (cancelled) return;
-        cleanupPageUi = await initPageUi();
+        const cleanup = await initPageUi(controller.signal);
+        if (cancelled) cleanup();
+        else cleanupPageUi = cleanup;
       } catch (err) {
         if (!cancelled) console.error(err);
       }
@@ -27,7 +27,9 @@ export default function App() {
 
     return () => {
       cancelled = true;
+      controller.abort();
       if (typeof cleanupPageUi === "function") cleanupPageUi();
+      disposeGame();
     };
   }, []);
 

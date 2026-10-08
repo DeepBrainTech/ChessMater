@@ -1,7 +1,7 @@
 {
   "name": "chessmater",
   "version": "1.0.0",
-  "description": "ChessMater — React frontend with legacy game engine",
+  "description": "ChessMater — React interface with a modular Canvas game engine",
   "main": "server.js",
   "type": "module",
   "scripts": {
@@ -10,7 +10,9 @@
     "preview": "vite preview",
     "start": "node server.js",
     "start:static": "node server.js",
-    "test": "node --test tests/*.test.cjs"
+    "test": "node --test tests/*.test.js",
+    "test:browser": "node scripts/browser-smoke.mjs",
+    "test:browser:production": "npm run build && node scripts/browser-smoke.mjs --production"
   },
   "dependencies": {
     "express": "^4.19.0",

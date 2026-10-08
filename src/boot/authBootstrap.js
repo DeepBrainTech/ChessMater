@@ -1,8 +1,9 @@
+import { session } from '../services/session.js';
+import { game } from '../game/runtime.js';
 import { capturePortalLocale, getPortalUrl } from "./portalLocale.js";
 
 /**
- * Auth / portal bootstrap — behavior preserved from the previous index.html inline script.
- * Runs once before React mounts so window.authReady / cmToken are available early.
+ * Initialize the Portal session before React mounts the board.
  */
 
 function isPrivateLanHost(hostname) {
@@ -25,17 +26,17 @@ export function bootstrapAuth() {
     host === "0.0.0.0" ||
     host === "" ||
     isPrivateLanHost(host);
-  window.isLocalDev = isLocalDev;
-  window.API_BASE_URL = isLocalDev
+  session.isLocalDev = isLocalDev;
+  session.API_BASE_URL = isLocalDev
     ? `http://${host || "localhost"}:3000`
     : "https://chessmater-production.up.railway.app";
-  window.cmPortalApiBase = isLocalDev ? "" : "https://api.deepbraintechnology.com";
+  session.cmPortalApiBase = isLocalDev ? "" : "https://api.deepbraintechnology.com";
 
   const hashHadContent = window.location.hash.replace(/^#/, "").length > 0;
   const initialHash = new URLSearchParams(window.location.hash.slice(1));
   let gameToken = initialHash.get("token");
   capturePortalLocale();
-  window.cmPortalHashBalances = {
+  session.cmPortalHashBalances = {
     coins: Number(initialHash.get("coins") ?? 0) || 0,
     diamonds: Number(initialHash.get("diamonds") ?? 0) || 0,
     flowers: Number(initialHash.get("flowers") ?? 0) || 0,
@@ -58,20 +59,20 @@ export function bootstrapAuth() {
     localStorage.removeItem("sso_token");
   }
 
-  window.cmGetPortalLoginUrl = function () {
+  session.cmGetPortalLoginUrl = function () {
     return getPortalUrl("login") + "?next=" + encodeURIComponent(location.href);
   };
 
-  window.cmToken = null;
-  window.cmUser = null;
-  window.cmSessionReady = false;
+  session.cmToken = null;
+  session.cmUser = null;
+  session.cmSessionReady = false;
   let user = null;
 
   function updateCurrentUserName() {
     const el1 = document.getElementById("startScreenUserName");
     const el2 = document.getElementById("mainContainerUserName");
     if (!el1 && !el2) return;
-    const u = window.cmUser;
+    const u = session.cmUser;
     const text = u
       ? u.username ||
         u.user_id ||
@@ -82,7 +83,7 @@ export function bootstrapAuth() {
     if (el1) el1.textContent = display;
     if (el2) el2.textContent = display;
   }
-  window.cmUpdateCurrentUserName = updateCurrentUserName;
+  session.cmUpdateCurrentUserName = updateCurrentUserName;
 
   function verifyPortalGameToken(token) {
     try {
@@ -90,10 +91,10 @@ export function bootstrapAuth() {
       user = JSON.parse(atob(payload));
     } catch (err) {
       console.error("JWT parse error:", err);
-      window.cmSessionReady = false;
+      session.cmSessionReady = false;
       return Promise.resolve();
     }
-    return fetch(`${window.API_BASE_URL}/api/auth/verify`, {
+    return fetch(`${session.API_BASE_URL}/api/auth/verify`, {
       method: "POST",
       credentials: "include",
       headers: {
@@ -104,57 +105,57 @@ export function bootstrapAuth() {
       .then((response) => response.json())
       .then((data) => {
         if (data.success) {
-          window.cmToken = token;
-          window.cmUser = data.user;
-          window.cmSessionReady = true;
+          session.cmToken = token;
+          session.cmUser = data.user;
+          session.cmSessionReady = true;
           updateCurrentUserName();
-          if (typeof window.updateLoginPromptVisibility === "function")
-            window.updateLoginPromptVisibility();
+          if (typeof game.updateLoginPromptVisibility === "function")
+            game.updateLoginPromptVisibility();
         } else {
           console.error("Token verification failed:", data.message);
-          window.cmToken = token;
-          window.cmUser = user
+          session.cmToken = token;
+          session.cmUser = user
             ? { id: user.sub, username: user.username, portal_user_id: user.user_id }
             : null;
-          window.cmSessionReady = false;
+          session.cmSessionReady = false;
           updateCurrentUserName();
-          if (typeof window.updateLoginPromptVisibility === "function")
-            window.updateLoginPromptVisibility();
+          if (typeof game.updateLoginPromptVisibility === "function")
+            game.updateLoginPromptVisibility();
         }
         return data;
       })
       .catch((err) => {
         console.error("Token verify request failed:", err);
-        window.cmToken = token;
-        window.cmUser = user
+        session.cmToken = token;
+        session.cmUser = user
           ? { id: user.sub, username: user.username, portal_user_id: user.user_id }
           : null;
-        window.cmSessionReady = false;
+        session.cmSessionReady = false;
         updateCurrentUserName();
-        if (typeof window.updateLoginPromptVisibility === "function")
-          window.updateLoginPromptVisibility();
+        if (typeof game.updateLoginPromptVisibility === "function")
+          game.updateLoginPromptVisibility();
       });
   }
 
   if (isLocalDev && !gameToken) {
     console.log("🔧 本地开发模式：自动设置测试用户");
-    window.cmToken = "dev-token";
-    window.cmUser = {
+    session.cmToken = "dev-token";
+    session.cmUser = {
       id: 999,
       username: "dev_user",
       portal_user_id: "999",
       user_id: 999,
     };
-    window.cmSessionReady = true;
-    window.authReady = Promise.resolve();
+    session.cmSessionReady = true;
+    session.authReady = Promise.resolve();
     updateCurrentUserName();
-    if (typeof window.updateLoginPromptVisibility === "function")
-      window.updateLoginPromptVisibility();
+    if (typeof game.updateLoginPromptVisibility === "function")
+      game.updateLoginPromptVisibility();
   } else if (gameToken) {
-    window.authReady = verifyPortalGameToken(gameToken);
+    session.authReady = verifyPortalGameToken(gameToken);
   } else {
-    window.authReady = (async () => {
-      const portalBase = String(window.cmPortalApiBase || "").replace(/\/+$/, "");
+    session.authReady = (async () => {
+      const portalBase = String(session.cmPortalApiBase || "").replace(/\/+$/, "");
       let restored = false;
 
       if (portalBase) {
@@ -164,7 +165,7 @@ export function bootstrapAuth() {
             credentials: "include",
           });
           if (sessionRes.status === 401) {
-            window.location.href = window.cmGetPortalLoginUrl();
+            window.location.href = session.cmGetPortalLoginUrl();
             return null;
           }
           const sessionData = await sessionRes.json().catch(() => null);
@@ -172,11 +173,11 @@ export function bootstrapAuth() {
             sessionData?.data?.game_token || null;
           const portalUser = sessionData?.data?.user || null;
           if (sessionRes.ok && typeof freshGameToken === "string" && freshGameToken) {
-            window.cmToken = freshGameToken;
+            session.cmToken = freshGameToken;
             if (portalUser) {
-              window.cmUser = portalUser;
+              session.cmUser = portalUser;
             }
-            const verifyRes = await fetch(`${window.API_BASE_URL}/api/auth/verify`, {
+            const verifyRes = await fetch(`${session.API_BASE_URL}/api/auth/verify`, {
               method: "POST",
               credentials: "include",
               headers: {
@@ -186,11 +187,11 @@ export function bootstrapAuth() {
             });
             const verifyData = await verifyRes.json().catch(() => null);
             if (verifyData?.success && verifyData?.user) {
-              window.cmUser = verifyData.user;
-              window.cmSessionReady = true;
+              session.cmUser = verifyData.user;
+              session.cmSessionReady = true;
               restored = true;
-            } else if (window.cmUser) {
-              window.cmSessionReady = false;
+            } else if (session.cmUser) {
+              session.cmSessionReady = false;
               restored = true;
             }
           }
@@ -198,34 +199,28 @@ export function bootstrapAuth() {
       }
 
       if (!restored) {
-        const response = await fetch(`${window.API_BASE_URL}/api/auth/me`, {
+        const response = await fetch(`${session.API_BASE_URL}/api/auth/me`, {
           method: "GET",
           credentials: "include",
         }).catch(() => null);
         const data = response ? await response.json().catch(() => null) : null;
         if (data && data.success && data.user) {
-          window.cmUser = data.user;
-          window.cmSessionReady = true;
+          session.cmUser = data.user;
+          session.cmSessionReady = true;
         } else {
-          window.cmSessionReady = false;
+          session.cmSessionReady = false;
         }
         updateCurrentUserName();
-        if (typeof window.updateLoginPromptVisibility === "function")
-          window.updateLoginPromptVisibility();
+        if (typeof game.updateLoginPromptVisibility === "function")
+          game.updateLoginPromptVisibility();
         return data;
       }
 
       updateCurrentUserName();
-      if (typeof window.updateLoginPromptVisibility === "function")
-        window.updateLoginPromptVisibility();
-      return { success: true, user: window.cmUser };
+      if (typeof game.updateLoginPromptVisibility === "function")
+        game.updateLoginPromptVisibility();
+      return { success: true, user: session.cmUser };
     })();
   }
 
-  window.checkTokenStatus = function () {
-    /* debug: token status */
-  };
-  window.detectInterference = function () {
-    /* debug: extension check */
-  };
 }

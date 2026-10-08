@@ -1,4 +1,3 @@
-(function () {
 class PortalApiError extends Error {
     constructor(status, code) {
         super(code);
@@ -8,13 +7,14 @@ class PortalApiError extends Error {
     }
 }
 class PortalGameClient {
-    constructor(baseUrl, apiSlug, gameKey = apiSlug) {
+    constructor(baseUrl, apiSlug, gameKey = apiSlug, environment = globalThis) {
+        this.environment = environment;
         this.apiSlug = apiSlug;
         this.gameKey = gameKey;
         this.baseUrl = baseUrl.replace(/\/$/, "");
     }
     async request(path, init = {}) {
-        const response = await fetch(this.baseUrl + path, {
+        const response = await this.environment.fetch(this.baseUrl + path, {
             ...init,
             credentials: "include",
             cache: "no-store",
@@ -76,17 +76,10 @@ class PortalGameClient {
         });
     }
 }
-/** Generate once per user action, then keep this object when retrying a lost response. */
-function newPurchaseRequest(target) {
-    return { request_id: crypto.randomUUID(), target };
-}
-function newItemRequest(itemId) {
-    return { request_id: crypto.randomUUID(), item_id: itemId };
-}
 /** Browser-side retries are scoped to the signed-in game account. */
 class PortalInventoryClient extends PortalGameClient {
-    constructor(base, slug, accountId, gameKey = slug) {
-        super(base, slug, gameKey);
+    constructor(base, slug, accountId, gameKey = slug, environment = globalThis) {
+        super(base, slug, gameKey, environment);
         this.accountId = accountId;
         this.pending = new Map();
         this.busy = new Set();
@@ -101,7 +94,7 @@ class PortalInventoryClient extends PortalGameClient {
     }
     read(key) {
         try {
-            return sessionStorage.getItem(key) ?? this.pending.get(key) ?? null;
+            return this.environment.sessionStorage.getItem(key) ?? this.pending.get(key) ?? null;
         }
         catch {
             return this.pending.get(key) ?? null;
@@ -110,14 +103,14 @@ class PortalInventoryClient extends PortalGameClient {
     write(key, value) {
         this.pending.set(key, value);
         try {
-            sessionStorage.setItem(key, value);
+            this.environment.sessionStorage.setItem(key, value);
         }
         catch { /* In-memory retries still work. */ }
     }
     remove(key) {
         this.pending.delete(key);
         try {
-            sessionStorage.removeItem(key);
+            this.environment.sessionStorage.removeItem(key);
         }
         catch { /* Storage can be disabled. */ }
     }
@@ -137,7 +130,7 @@ class PortalInventoryClient extends PortalGameClient {
             await this.assertAccount();
             let id = this.read(key);
             if (!id) {
-                id = crypto.randomUUID();
+                id = this.environment.crypto.randomUUID();
                 this.write(key, id);
             }
             const result = await send(id);
@@ -190,7 +183,4 @@ function gameAccountId(token) {
     }
 }
 
-window.PortalInventoryClient = PortalInventoryClient;
-window.PortalApiError = PortalApiError;
-window.gameAccountId = gameAccountId;
-})();
+export { PortalInventoryClient, PortalApiError, gameAccountId };

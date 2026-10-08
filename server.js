@@ -11,12 +11,12 @@ const distDir = path.join(__dirname, "dist");
 const publicDir = path.join(__dirname, "public");
 const hasDist = fs.existsSync(path.join(distDir, "index.html"));
 
-// Prefer Vite production build; fall back to public/ for legacy assets / editor.
+// Serve both built entry points; public contains only static assets.
 if (hasDist) {
   app.use(express.static(distDir));
 } else {
   console.warn(
-    "⚠️  dist/ missing — run `npm run build`. Serving public/ only (legacy HTML if present)."
+    "⚠️  dist/ missing — run `npm run build`."
   );
 }
 app.use(express.static(publicDir));
@@ -24,11 +24,6 @@ app.use(express.static(publicDir));
 app.get("/", (req, res) => {
   if (hasDist) {
     res.sendFile(path.join(distDir, "index.html"));
-    return;
-  }
-  const legacy = path.join(publicDir, "index.legacy.html");
-  if (fs.existsSync(legacy)) {
-    res.sendFile(legacy);
     return;
   }
   res.status(503).send("Frontend not built. Run npm run build (or npm run dev).");

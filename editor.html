@@ -572,7 +572,7 @@
           <button type="button" id="downloadBtn">Download JSON backup</button>
         </div>
         <div class="editor-load-from-levels">
-          <label for="editorLevelsSelect">Load from <code>public/js/levels.js</code> (LEVELS)</label>
+          <label for="editorLevelsSelect">Load from <code>src/game/levels.js</code> (levels)</label>
           <select id="editorLevelsSelect" aria-label="Level from levels.js"></select>
           <div class="load-btns">
             <button type="button" id="editorLoadLevelsBtn">Load selected level</button>
@@ -588,7 +588,7 @@
       </div>
 
       <div class="hint-box">
-        <strong>How to add a level to <code>public/js/levels.js</code></strong>: set the number so the level name is
+        <strong>How to add a level to <code>src/game/levels.js</code></strong>: set the number so the level name is
         <code>Puzzle N</code> (same style as existing levels), optionally fill <strong>Block tip</strong>, click <strong>Copy for levels.js</strong>,
         open <code>levels.js</code> in your editor, find <code>const LEVELS = [</code>, add a comma after the
         <strong>last</strong> object if needed, then paste your new entry. If it is the new last item, you may keep or
@@ -667,19 +667,6 @@
     <source src="assets/audio/explosion.mp3" type="audio/mpeg">
   </audio>
 
-  <script>window.CM_EDITOR_PAGE = true;</script>
-  <script>
-    (function () {
-      var h = location.hostname;
-      var local = h === "localhost" || h === "127.0.0.1" || h === "" || h === "0.0.0.0";
-      window.API_BASE_URL = local
-        ? ("http://" + (h || "localhost") + ":3000")
-        : "https://chessmater-production.up.railway.app";
-      window.authReady = Promise.resolve();
-    })();
-  </script>
-  <script src="js/levels.js"></script>
-  <script src="js/game.js"></script>
-  <script src="js/editor-tools.js"></script>
+  <script type="module" src="/src/editor/main.js"></script>
 </body>
 </html>

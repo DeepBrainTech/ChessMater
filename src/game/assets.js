@@ -12,7 +12,7 @@
  *   public/assets/audio/sfx/      → move / explode / win sounds
  *   public/assets/fonts/          → custom UI fonts
  */
-window.CM_ASSETS = {
+export const assets = {
   pieces: {
     rook: "https://upload.wikimedia.org/wikipedia/commons/7/72/Chess_rlt45.svg",
     castle_rook: "https://upload.wikimedia.org/wikipedia/commons/7/72/Chess_rlt45.svg",

@@ -1,32 +1,40 @@
+import { session } from '../services/session.js';
+import { game } from '../game/runtime.js';
 import { initRotateNotice } from "./rotateNotice.js";
 import { initMusicControls } from "./musicControls.js";
 import { initLeaderboardAndGuide } from "./leaderboard.js";
 import { initLevelSelectApi } from "./levelSelect.js";
 import { initStartFlow } from "./startFlow.js";
 
-/**
- * Page chrome previously in public/js/page-ui.js — now React-bootstrapped modules.
- * Still talks to the classic game engine via window.* APIs.
- */
-export async function initPageUi() {
-  if (window.__cmPageUiInitialized) return () => {};
-  window.__cmPageUiInitialized = true;
+/** Initialize page interactions after the game mounts. */
+export async function initPageUi(signal) {
+  if (game.__cmPageUiInitialized) return () => {};
+  game.__cmPageUiInitialized = true;
+  const runtime = game;
 
   const cleanups = [];
+  const cleanup = () => {
+    cleanups.forEach((fn) => {
+      if (typeof fn === "function") fn();
+    });
+    runtime.__cmPageUiInitialized = false;
+  };
+  if (signal?.aborted) { cleanup(); return () => {}; }
   cleanups.push(initRotateNotice());
   cleanups.push(initMusicControls());
   cleanups.push(initLeaderboardAndGuide());
   initLevelSelectApi();
-  cleanups.push(await initStartFlow());
+  try {
+    cleanups.push(await initStartFlow(signal));
+  } catch (error) {
+    cleanup();
+    throw error;
+  }
+  if (signal?.aborted) { cleanup(); return () => {}; }
 
-  if (typeof window.cmUpdateCurrentUserName === "function") {
-    window.cmUpdateCurrentUserName();
+  if (typeof session.cmUpdateCurrentUserName === "function") {
+    session.cmUpdateCurrentUserName();
   }
 
-  return () => {
-    cleanups.forEach((fn) => {
-      if (typeof fn === "function") fn();
-    });
-    window.__cmPageUiInitialized = false;
-  };
+  return cleanup;
 }

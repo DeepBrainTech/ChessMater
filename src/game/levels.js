@@ -1,4 +1,4 @@
-const LEVELS = [
+export const levels = [
     {
       "version": "1.3",
       "name": "Puzzle 1",
@@ -1714,7 +1714,7 @@ const LEVELS = [
       "fog": false,
       "createdAt": "2026-05-20T03:34:18.671Z"
     },
-      
+
     //puzzle 40
 
       {
@@ -2881,7 +2881,7 @@ const LEVELS = [
       ],
       "fog": false,
       "createdAt": "2026-06-04T18:20:00.000Z",
-      
+
     },
 
     // puzzle 61
@@ -3432,7 +3432,7 @@ const LEVELS = [
       "fog": false,
       "createdAt": "2026-06-16T15:52:43.500Z"
     },
-        
+
 
     // puzzle 70
     {
@@ -6066,5 +6066,3 @@ const LEVELS = [
 
 
   ];
-
-window.LEVELS = LEVELS;

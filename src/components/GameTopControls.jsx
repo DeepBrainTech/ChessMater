@@ -1,9 +1,9 @@
+import { game } from '../game/runtime.js';
 import { useEffect, useState } from "react";
 import { subscribeGameUi } from "../game/uiBridge.js";
 
 /**
- * HUD controls — keeps stable DOM ids for the classic engine while mirroring
- * credit/move updates from the uiBridge for React-friendly future work.
+ * React owns HUD text and numbers; the engine publishes updates through uiBridge.
  */
 export default function GameTopControls() {
   const [undoCredits, setUndoCredits] = useState(null);
@@ -52,8 +52,8 @@ export default function GameTopControls() {
           id="antigravityToggle"
           type="button"
           onClick={() => {
-            if (typeof window.toggleAntigravity === "function") {
-              window.toggleAntigravity();
+            if (typeof game.toggleAntigravity === "function") {
+              game.toggleAntigravity();
             }
           }}
         >

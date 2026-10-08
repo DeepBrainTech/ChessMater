@@ -1,8 +1,9 @@
+import { game } from '../game/runtime.js';
 export function initMusicControls() {
   const bgMusic = document.getElementById("bgMusic");
   const musicToggle = document.getElementById("musicToggle");
-  window.cmAudioMuted = false;
-  window.cmMusicPlaying = false;
+  game.cmAudioMuted = false;
+  game.cmMusicPlaying = false;
 
   function isHomepageVisible() {
     const startScreen = document.getElementById("startScreen");
@@ -13,7 +14,7 @@ export function initMusicControls() {
   function syncBgMusic() {
     if (!bgMusic) return;
     const shouldPlay =
-      window.cmMusicPlaying && !window.cmAudioMuted && !isHomepageVisible();
+      game.cmMusicPlaying && !game.cmAudioMuted && !isHomepageVisible();
     if (!shouldPlay) {
       bgMusic.pause();
       return;
@@ -21,20 +22,20 @@ export function initMusicControls() {
     bgMusic.volume = 0.5;
     bgMusic.play().catch(() => {});
   }
-  window.syncBgMusic = syncBgMusic;
+  game.syncBgMusic = syncBgMusic;
 
   function applyGlobalMute(muted) {
-    window.cmAudioMuted = !!muted;
+    game.cmAudioMuted = !!muted;
     document.querySelectorAll("audio").forEach((audioEl) => {
-      audioEl.muted = window.cmAudioMuted;
+      audioEl.muted = game.cmAudioMuted;
     });
     syncBgMusic();
     if (musicToggle) {
-      musicToggle.textContent = window.cmAudioMuted ? "🔇 Muted" : "🔊 Music";
+      musicToggle.textContent = game.cmAudioMuted ? "🔇 Muted" : "🔊 Music";
     }
   }
 
-  const onToggle = () => applyGlobalMute(!window.cmAudioMuted);
+  const onToggle = () => applyGlobalMute(!game.cmAudioMuted);
   if (musicToggle) musicToggle.addEventListener("click", onToggle);
   if (bgMusic) bgMusic.pause();
   applyGlobalMute(false);

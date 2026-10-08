@@ -5,5 +5,4 @@ import { bootstrapAuth } from "./boot/authBootstrap.js";
 
 bootstrapAuth();
 
-// Avoid StrictMode double-mount in dev: legacy game.js initializes once on load.
 createRoot(document.getElementById("root")).render(<App />);

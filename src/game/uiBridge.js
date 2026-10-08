@@ -1,6 +1,5 @@
 /**
- * Thin bridge so classic game scripts can notify React without owning React state.
- * Game logic stays imperative; UI components subscribe and re-render.
+ * Event channel between the Canvas engine and React interface.
  */
 
 const listeners = new Set();
@@ -9,7 +8,6 @@ export function subscribeGameUi(listener) {
   listeners.add(listener);
   return () => listeners.delete(listener);
 }
-
 export function emitGameUi(event) {
   listeners.forEach((listener) => {
     try {
@@ -18,10 +16,4 @@ export function emitGameUi(event) {
       console.error("cmGameUi listener error", err);
     }
   });
-}
-
-/** Install globals classic scripts can call. */
-export function installGameUiBridge() {
-  window.cmEmitGameUi = emitGameUi;
-  window.cmSubscribeGameUi = subscribeGameUi;
 }

@@ -1,44 +1,44 @@
+import { session } from '../services/session.js';
+import { game } from '../game/runtime.js';
 function isLoggedIn() {
-  return !!(window.cmUser && (window.cmToken || window.cmSessionReady));
+  return !!(session.cmUser && (session.cmToken || session.cmSessionReady));
 }
 
 function getLevels() {
-  return typeof window.LEVELS !== "undefined" && Array.isArray(window.LEVELS)
-    ? window.LEVELS
-    : typeof LEVELS !== "undefined" && Array.isArray(LEVELS)
-      ? LEVELS
-      : [];
+  return typeof game.LEVELS !== "undefined" && Array.isArray(game.LEVELS)
+    ? game.LEVELS
+    : [];
 }
 
 function mergeMaxUnlocked(value) {
   const parsed = Number.parseInt(value, 10);
   const candidate = Number.isFinite(parsed) ? parsed : 1;
-  const merged = Math.max(window.currentMaxUnlocked || 1, candidate);
-  window.currentMaxUnlocked = merged;
+  const merged = Math.max(game.currentMaxUnlocked || 1, candidate);
+  game.currentMaxUnlocked = merged;
   return merged;
 }
 
 async function fetchProgress() {
   const levels = getLevels();
-  if (window.isLocalDev) {
+  if (session.isLocalDev) {
     const allLevels = levels.length > 0 ? levels.length : 999;
     return mergeMaxUnlocked(allLevels);
   }
   try {
-    await (window.authReady || Promise.resolve());
+    await (session.authReady || Promise.resolve());
     const headers = {};
-    if (window.cmToken) {
-      headers.Authorization = `Bearer ${window.cmToken}`;
+    if (session.cmToken) {
+      headers.Authorization = `Bearer ${session.cmToken}`;
     }
 
     const authFetch =
-      typeof window.apiFetchWithAuthRetry === "function"
-        ? window.apiFetchWithAuthRetry
+      typeof game.apiFetchWithAuthRetry === "function"
+        ? game.apiFetchWithAuthRetry
         : null;
     const res = authFetch
       ? await authFetch("/progress", { headers })
       : await fetch(
-          `${window.API_BASE_URL || "https://chessmater-production.up.railway.app"}/progress`,
+          `${session.API_BASE_URL || "https://chessmater-production.up.railway.app"}/progress`,
           { credentials: "include", headers }
         );
 
@@ -75,8 +75,8 @@ function highlightCurrentLevelButton() {
   const levelGrid = document.getElementById("levelGrid");
   if (!levelGrid) return;
   const current =
-    typeof window.cmGetCurrentLevelIndex === "function"
-      ? window.cmGetCurrentLevelIndex()
+    typeof game.cmGetCurrentLevelIndex === "function"
+      ? game.cmGetCurrentLevelIndex()
       : 0;
   const buttons = levelGrid.querySelectorAll(".level-button");
   buttons.forEach((btn, idx) => {
@@ -84,8 +84,8 @@ function highlightCurrentLevelButton() {
     else btn.classList.remove("current-level");
   });
   requestAnimationFrame(ensureCurrentLevelVisible);
-  if (typeof window.cmEmitGameUi === "function") {
-    window.cmEmitGameUi({ type: "currentLevel", currentLevelIndex: current });
+  if (typeof game.cmEmitGameUi === "function") {
+    game.cmEmitGameUi({ type: "currentLevel", currentLevelIndex: current });
   }
 }
 
@@ -104,14 +104,14 @@ export async function loadLevels(optionalMaxUnlocked) {
     maxUnlocked = await fetchProgress();
   }
 
-  if (window.isLocalDev) {
+  if (session.isLocalDev) {
     maxUnlocked = levels.length;
     mergeMaxUnlocked(maxUnlocked);
   }
 
   const currentIndex =
-    typeof window.cmGetCurrentLevelIndex === "function"
-      ? window.cmGetCurrentLevelIndex()
+    typeof game.cmGetCurrentLevelIndex === "function"
+      ? game.cmGetCurrentLevelIndex()
       : 0;
 
   levels.forEach((level, index) => {
@@ -131,18 +131,18 @@ export async function loadLevels(optionalMaxUnlocked) {
       button.style.opacity = "0.5";
       button.textContent += " 🔒";
       button.addEventListener("click", () => {
-        if (typeof window.updateStatus === "function") {
-          window.updateStatus("This level is locked. Complete earlier levels first!");
+        if (typeof game.updateStatus === "function") {
+          game.updateStatus("This level is locked. Complete earlier levels first!");
         }
       });
     } else {
       button.style.background = "linear-gradient(145deg, #4a90e2, #357abd)";
       button.addEventListener("click", () => {
-        if (typeof window.cmSetCurrentLevelIndex === "function") {
-          window.cmSetCurrentLevelIndex(index);
+        if (typeof game.cmSetCurrentLevelIndex === "function") {
+          game.cmSetCurrentLevelIndex(index);
         }
-        if (typeof window.setGameState === "function") window.setGameState(true);
-        if (typeof window.loadPuzzle === "function") window.loadPuzzle(level);
+        if (typeof game.setGameState === "function") game.setGameState(true);
+        if (typeof game.loadPuzzle === "function") game.loadPuzzle(level);
         highlightCurrentLevelButton();
       });
     }
@@ -162,8 +162,8 @@ export async function loadLevels(optionalMaxUnlocked) {
     });
   }
 
-  if (typeof window.cmEmitGameUi === "function") {
-    window.cmEmitGameUi({
+  if (typeof game.cmEmitGameUi === "function") {
+    game.cmEmitGameUi({
       type: "levelsLoaded",
       maxUnlocked,
       levelCount: levels.length,
@@ -173,11 +173,11 @@ export async function loadLevels(optionalMaxUnlocked) {
 }
 
 export function initLevelSelectApi() {
-  window.currentMaxUnlocked = window.currentMaxUnlocked || 1;
-  window.mergeMaxUnlocked = mergeMaxUnlocked;
-  window.loadLevels = loadLevels;
-  window.highlightCurrentLevelButton = highlightCurrentLevelButton;
-  window.ensureCurrentLevelVisible = ensureCurrentLevelVisible;
-  window.fetchProgress = fetchProgress;
-  window.isLoggedIn = isLoggedIn;
+  game.currentMaxUnlocked = game.currentMaxUnlocked || 1;
+  game.mergeMaxUnlocked = mergeMaxUnlocked;
+  game.loadLevels = loadLevels;
+  game.highlightCurrentLevelButton = highlightCurrentLevelButton;
+  game.ensureCurrentLevelVisible = ensureCurrentLevelVisible;
+  game.fetchProgress = fetchProgress;
+  game.isLoggedIn = isLoggedIn;
 }

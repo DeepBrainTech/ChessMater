@@ -1,12 +1,9 @@
-const fs = require('node:fs');
-const path = require('node:path');
-const browserCode = fs.readFileSync(path.join(__dirname, '../public/js/game/00-portal-commerce.js'), 'utf8');
 const gameKey = 'chessmater';
 const itemId = 'chess_mater_undo';
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
-const vm = require('node:vm');
-const { randomUUID } = require('node:crypto');
+import { test } from 'node:test';
+import { PortalInventoryClient } from '../src/services/portalCommerce.js';
+import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
 
 function setup(storage = new Map()) {
   let userId = 42;
@@ -46,8 +43,8 @@ function setup(storage = new Map()) {
       return { ok: true, json: async () => ({ success: true, data: completed.get(key) }) };
     },
   };
-  vm.runInNewContext(browserCode, context);
-  const client = new context.window.PortalInventoryClient('https://portal.test', gameKey, () => userId);
+
+  const client = new PortalInventoryClient('https://portal.test', gameKey, () => userId, gameKey, context);
   return { client, requests, storage, get posts() { return posts; }, get charges() { return charges; },
     lose: () => { loseResponse = true; }, fail: value => { failServer = value; },
     switchGameUser: value => { userId = value; }, switchPortalUser: value => { portalUserId = value; } };

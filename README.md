@@ -1,146 +1,89 @@
-ChessMater is a puzzle game that combines classic chess movement with platformer-style mechanics. Each chess piece moves according to its normal rules, but gravity, obstacles, and special tiles completely change how you approach the board. Guide your pieces through shifting puzzles, avoid traps, unlock objectives, and reach the goal before your moves run out.
+# ChessMater
 
-Features:
+棋类重力解谜游戏，使用 React + Vite + Canvas，后端使用 Express + PostgreSQL。源码使用 UTF-8。
 
-♟️ Authentic Chess Movement – every piece moves just like in real chess.
-
-🌍 Gravity & Physics – pieces fall and interact with the board environment.
-
-🟩 Special Blocks – transformer tiles, objectives, and counter goals add unique challenges.
-
-🎯 Puzzles & Levels – solve creative boards where strategy meets spatial reasoning.
-
-✨ Win Conditions – only one piece needs to reach the goal, but planning your path is everything.
-
----
-
-## 前端整改说明（当前版本）
-
-已将静态 HTML/JS 页面迁移为 **Vite + React**。目标是：改 UI/样式走组件；改关卡 / 玩法仍走原来的 JS。
-
-### 先看你要改什么（分工表）
-
-| 你想做的事 | 改哪里 | 不要改 |
-|---|---|---|
-| 页面布局、按钮、弹窗、颜色、字体、开始页 | `src/components/` + `src/styles/` | `public/js/game.js`、关卡逻辑 |
-| 棋子 / 砖块贴图、音效、图标 | `public/assets/` + `public/js/game/00-assets-config.js` | 整份 `game.js` |
-| **只改关卡内容**（棋盘、棋子放置、关卡名） | `public/js/levels.js` 或关卡编辑器 | React 组件、引擎分文件 |
-| 玩法规则（重力、激光、走子、胜负） | `public/js/game/01–07-*.js`（见下） | 直接手改拼接后的 `public/js/game.js` |
-| 排行榜 / 开始流程 / 关卡列表交互 | `src/page/` | 旧的 `page-ui.legacy.js` |
-
-主站运行时：**React 壳** + **分文件引擎** `public/js/game/00–07-*.js`。  
-`public/js/game.js` 是拼接产物，主要给 **`/editor.html` 编辑器** 兼容用。
-
----
-
-### 本地怎么跑
+## 开发与构建
 
 ```bash
 npm install
 npm run dev
 ```
 
-浏览器打开终端提示的地址（一般是 http://localhost:5173/ ）。
-
-本地开发会自动使用测试用户（`dev_user`），一般不用先登录 portal。
+开发服务器同时提供游戏 `/` 和关卡编辑器 `/editor.html`。本地开发使用测试用户 `dev_user`。
 
 ```bash
-npm run build    # 打生产包到 dist/
-npm start        # Express 托管 dist/（默认 8080）
+npm run build
+npm start
 ```
 
-日常改样式用 `npm run dev`，保存后热更新。
+Vite 同时构建两个 HTML 入口到 `dist/`。根目录的 `server.js` 托管构建结果，默认端口为 8080。
 
-关卡编辑器（静态页）：开发服务器下打开 http://localhost:5173/editor.html
-
----
-
-### 改关卡（levels）——最不容易和 React 冲突
-
-1. **推荐**：用编辑器 `editor.html` 设计关卡，再导出 / 拷贝进 `public/js/levels.js` 的 `LEVELS` 数组。
-2. **或直接编辑** `public/js/levels.js`（只动关卡 JSON 数据）。
-3. 文件末尾保持有：`window.LEVELS = LEVELS;`（给 React 页读取）。
-4. **不要**为了改关卡去改 `src/components/`；关卡列表 UI 会自动读 `LEVELS`。
-
-这样和 UI 重构几乎零冲突：你改数据，别人改组件，各改各的。
-
----
-
-### 改玩法引擎（game）——请改分文件，不要改大文件
-
-**源文件（请改这些）：**
-
-| 文件 | 内容 |
-|---|---|
-| `public/js/game/00-assets-config.js` | 贴图 / 音效 URL |
-| `public/js/game/01-state.js` | DOM 引用、常量、状态 |
-| `public/js/game/02-api-shop-exchange.js` | API、积分、兑换弹窗 |
-| `public/js/game/03-audio-canvas-hud-replay.js` | HUD、回放、目标等 |
-| `public/js/game/04-level-rules.js` | 加载关卡、走子、重力、胜负 |
-| `public/js/game/05-vision-render.js` | 视野 / fog、画布绘制 |
-| `public/js/game/06-effects-bombs.js` | 炸弹、鸭子、平台、激光碰撞等 |
-| `public/js/game/07-input-loop.js` | 输入、循环、启动 |
-
-改完后执行（更新编辑器用的大文件）：
+API 服务位于 `backend/`，本地默认端口为 3000：
 
 ```bash
-node scripts/concat-game.mjs
+npm --prefix backend install
+npm --prefix backend start
 ```
 
-**不要**长时间直接编辑 `public/js/game.js`：它会被上面的脚本覆盖，也容易和别人的分文件改动冲突。
+API 服务需要数据库和 Portal JWT 环境变量，具体读取位置见 `backend/db.js`、`backend/server.js` 和 `backend/portal-grants.js`。
 
-若从 `main` 拉来一整份新的 `game.js`：
+## 文件职责
 
-1. 把它存成 `public/js/game.monolith.js`
-2. `node scripts/split-game.mjs` 重新切开
-3. 再按需补 `00-assets-config.js` / UI bridge 等前端钩子
-4. `node scripts/concat-game.mjs`
+- `src/components/`：React 页面布局、HUD 和弹窗。
+- `src/styles/`：按界面区域拆分的 CSS；`app.css` 是样式入口。
+- `src/page/`：开始流程、选关、排行榜、音乐和横屏提醒。
+- `src/boot/`：登录初始化及 Portal 语言参数。
+- `src/services/session.js`：登录状态与 API 配置。
+- `src/services/portalCommerce.js`：Portal 兑换、库存与重试处理。
+- `src/game/levels.js`：关卡数据，导出 `levels` 数组。
+- `src/game/assets.js`：贴图、音频与图标地址。
+- `src/game/initialize.js`：游戏启动与资源回收。
+- `src/game/runtime.js`：当前棋盘的显式运行状态。
+- `src/game/uiBridge.js`：引擎向 React 发送 UI 更新事件。
+- `src/game/engine/`：玩法与 Canvas 引擎模块。
+- `src/editor/`：编辑器入口、编辑操作、导入和导出。
+- `editor.html`：编辑器 HTML 入口，和主游戏一起构建。
+- `public/assets/`：图片、音频和字体等静态资源。
+- `backend/routes/`：认证、进度、积分、关卡和排行榜接口。
+- `backend/server.js`：API 服务配置、认证辅助函数、数据库初始化及路由注册。
 
----
+## 修改游戏
 
-### 改设计和样式（用 React 组件）
+界面和样式从 `src/components/`、`src/styles/` 修改。React 负责 HUD 文字和数字；引擎通过 `uiBridge` 发送变化，主游戏不再由引擎重复修改这些显示内容。Canvas 绘制和编辑器保留直接操作 DOM 的方式，部分弹窗交互也仍通过明确的元素引用实现。
 
-页面结构在 `src/components/`，例如：
+引擎按职责划分：
 
-- `StartScreen.jsx` — 开始页
-- `GameShell.jsx` / `GameTopControls.jsx` / `LevelSidePanel.jsx` — 游戏内布局与 HUD
-- `modals/` — 排行榜、指南、通关、Hint、兑换等弹窗
+- `state.js`：棋盘状态、常量和 DOM 引用初始化。
+- `rules.js`：加载关卡、重力、合法移动、胜负和进度。
+- `moves.js`：撤销、传送与棋子转换。
+- `tiles.js`：特殊砖块数据、激光判断和移动平台配置。
+- `render.js`、`sprites.js`：主棋盘与元素绘制。
+- `replay.js`：走棋记录、回放绘制和导航。
+- `presentation.js`：HUD 通知、提示和通关交互。
+- `commerce.js`：积分、兑换窗口和登录重试。
+- `effects.js`：特效、炸弹与动态障碍。
+- `input.js`：输入事件、游戏循环和启动。
 
-样式在 `src/styles/`（按区块拆分，`app.css` 只做 `@import`）。
+这些模块接收显式 `game` 上下文，初始化顺序由 `engine/modules.js` 管理。新增监听器、定时器、动画帧和 MutationObserver 时使用 `game.lifecycle`，确保卸载时清理。登录状态通过导入 `session` 获取，不再挂到 `window`。
 
-约定：
+编辑器和主游戏导入同一个引擎。编辑关卡后，将导出的关卡对象加入 `src/game/levels.js` 的 `levels` 数组。不再需要拼接、拆分或维护另一份引擎文件。
 
-- 尽量保持现有 **元素 `id`**（如 `gameCanvas`、`levelGrid`、`moveCount`），引擎还在用 `getElementById`。
-- 新 UI 优先加组件 + CSS，而不是往 `index.html` 或大 `game.js` 里塞。
-- 贴图放到 `public/assets/images/...`，在 `00-assets-config.js` 改路径即可换皮。
+## 验证
 
----
-
-### 和 main 合并时怎么少冲突
-
-1. **只改关卡**：只提交 `levels.js` → 几乎不会和 frontend/React 冲突。
-2. **只改 UI**：只动 `src/`、`src/styles/`、`public/assets/` → 不要动 `game.js` 拼接大文件。
-3. **main 更新了引擎**：在 frontend 分支上 merge 后，若 `game.js` 冲突，优先采用 main 的引擎逻辑，再按上面「monolith → split → concat」流程，而不是手工揉两个巨型文件。
-4. 合并后本地跑一遍：`npm run dev`，确认选关、新机制关卡（laser / fog 等）正常。
-
----
-
-### 目录速查
-
+```bash
+npm test
+npm --prefix backend test
+npm run build
+npm run test:browser
+npm run test:browser:production
 ```
-src/                    React 页面与样式（改设计从这里）
-src/components/         UI 组件
-src/styles/             CSS
-src/page/               开始流程、关卡列表、排行榜等页面逻辑
-public/assets/          素材（pieces / blocks / ui / audio / fonts）
-public/js/levels.js     关卡数据
-public/js/game/*.js     玩法引擎分文件（改逻辑从这里）
-public/js/game.js       拼接产物（给编辑器；勿长期手改）
-public/editor.html      关卡编辑器
-scripts/concat-game.mjs 分文件 → game.js
-scripts/split-game.mjs  monolith → 分文件
-```
 
-### 从主页传入语言
+浏览器检查默认寻找 Windows 上的 Chrome 或 Edge；其他环境可设置 `CHESSMATER_BROWSER` 为 Chromium 浏览器的可执行文件路径。检查在隐藏浏览器中运行，本地 API 使用测试响应，不连接数据库、不执行真实兑换。
 
-主页打开游戏时添加 `?locale=zn` 或 `?locale=en`；已有登录链接也可以使用 `#token=...&locale=zn`。同时提供时优先使用 hash 中的有效语言。`zh` / `zh-CN` 兼容为 `zn`。游戏保存该参数，刷新后继续使用；Back to Main Portal 返回 `https://deepbraintechnology.com/zn/braingames` 或 `/en/braingames`，登录跳转也使用相同语言。未传参数沿用上次记录，首次默认 `en`。此参数不改变游戏界面语言。
+开发模式检查全部关卡加载和回放绘制，以及走棋、撤销、重启、提示、返回首页、编辑器加载与引擎重新挂载。生产模式检查构建后的游戏和编辑器入口。
+
+## Portal 语言
+
+从主页打开游戏时可传入 `?locale=zn` 或 `?locale=en`，登录链接也支持 `#token=...&locale=zn`。同时提供时优先使用 hash 中的有效语言；`zh`、`zh-CN` 兼容为 `zn`。
+
+游戏保存该参数，返回 Portal 和登录跳转时沿用语言。未传参数时沿用上次记录，首次默认 `en`。此参数不改变游戏界面语言。
