@@ -140,3 +140,7 @@ public/editor.html      关卡编辑器
 scripts/concat-game.mjs 分文件 → game.js
 scripts/split-game.mjs  monolith → 分文件
 ```
+
+### 从主页传入语言
+
+主页打开游戏时添加 `?locale=zn` 或 `?locale=en`；已有登录链接也可以使用 `#token=...&locale=zn`。同时提供时优先使用 hash 中的有效语言。`zh` / `zh-CN` 兼容为 `zn`。游戏保存该参数，刷新后继续使用；Back to Main Portal 返回 `https://deepbraintechnology.com/zn/braingames` 或 `/en/braingames`，登录跳转也使用相同语言。未传参数沿用上次记录，首次默认 `en`。此参数不改变游戏界面语言。

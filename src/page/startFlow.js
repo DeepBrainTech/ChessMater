@@ -1,3 +1,4 @@
+import { getPortalUrl } from "../boot/portalLocale.js";
 import { loadLevels } from "./levelSelect.js";
 
 function isLoggedIn() {
@@ -41,9 +42,7 @@ export async function initStartFlow() {
     if (isStartScreenVisible) {
       portalButton.textContent = "Back to Main Portal";
       portalButton.onclick = () => {
-        const locale = (localStorage.getItem("cm_locale") || "en").toLowerCase();
-        const prefix = /^(zh|zn)/.test(locale) ? "zn" : "en";
-        window.location.href = `https://deepbraintechnology.com/${prefix}/braingames`;
+        window.location.href = getPortalUrl();
       };
     } else {
       portalButton.textContent = "Back to Home";

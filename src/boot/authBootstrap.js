@@ -1,3 +1,5 @@
+import { capturePortalLocale, getPortalUrl } from "./portalLocale.js";
+
 /**
  * Auth / portal bootstrap — behavior preserved from the previous index.html inline script.
  * Runs once before React mounts so window.authReady / cmToken are available early.
@@ -32,14 +34,12 @@ export function bootstrapAuth() {
   const hashHadContent = window.location.hash.replace(/^#/, "").length > 0;
   const initialHash = new URLSearchParams(window.location.hash.slice(1));
   let gameToken = initialHash.get("token");
-  const locale =
-    initialHash.get("locale") || localStorage.getItem("cm_locale") || "en";
+  capturePortalLocale();
   window.cmPortalHashBalances = {
     coins: Number(initialHash.get("coins") ?? 0) || 0,
     diamonds: Number(initialHash.get("diamonds") ?? 0) || 0,
     flowers: Number(initialHash.get("flowers") ?? 0) || 0,
   };
-  localStorage.setItem("cm_locale", locale);
 
   if (hashHadContent) {
     history.replaceState(null, "", window.location.pathname + window.location.search);
@@ -59,14 +59,7 @@ export function bootstrapAuth() {
   }
 
   window.cmGetPortalLoginUrl = function () {
-    const loc = (localStorage.getItem("cm_locale") || "en").toLowerCase();
-    const prefix = loc.startsWith("zh") ? "zh" : "en";
-    return (
-      "https://deepbraintechnology.com/" +
-      prefix +
-      "/login?next=" +
-      encodeURIComponent(location.href)
-    );
+    return getPortalUrl("login") + "?next=" + encodeURIComponent(location.href);
   };
 
   window.cmToken = null;
