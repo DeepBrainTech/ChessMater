@@ -32,7 +32,7 @@ export default function InGameWalkthroughModal() {
             ←/→ step · ↑ first · ↓ last (keys or buttons below)
           </p>
           <p className="level-complete-replay-step" id="inGameWalkthroughStep">
-            Action: --/-- · Moves: --/--
+            Moves: --/--
           </p>
           <ReplayStepNav id="inGameReplayStepNav" ariaLabel="Walkthrough step controls" />
           <p className="level-complete-replay-event" id="inGameWalkthroughEvent"></p>

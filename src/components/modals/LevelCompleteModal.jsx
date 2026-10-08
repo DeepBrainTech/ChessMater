@@ -46,7 +46,7 @@ export default function LevelCompleteModal() {
             ←/→ step · ↑ first · ↓ last (keys or buttons below)
           </p>
           <p className="level-complete-replay-step" id="levelCompleteReplayStep">
-            Action: --/-- · Moves: --/--
+            Moves: --/--
           </p>
           <ReplayStepNav
             id="levelCompleteReplayStepNav"

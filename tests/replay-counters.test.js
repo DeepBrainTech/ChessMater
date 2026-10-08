@@ -26,7 +26,7 @@ test('antigravity records do not borrow the following move number', () => {
   for (const [index, moves] of game.fewestOtherMovesReplayMoveCounts.entries()) {
     game.drawInGameWalkthroughSnapshot(index);
     game.drawLevelCompleteReplaySnapshot(index);
-    const expected = `Action: ${index}/4 · Moves: ${moves}/2`;
+    const expected = `Moves: ${moves}/2`;
     assert.equal(game.inGameWalkthroughStep.textContent, expected);
     assert.equal(game.levelCompleteReplayStep.textContent, expected);
   }
@@ -39,25 +39,25 @@ test('antigravity records do not borrow the following move number', () => {
 test('consecutive antigravity records and an antigravity-only finish remain at zero moves', () => {
   const game = setup([null, antigravity, antigravity], 0);
   game.drawInGameWalkthroughSnapshot(2);
-  assert.equal(game.inGameWalkthroughStep.textContent, 'Action: 2/2 · Moves: 0/0');
+  assert.equal(game.inGameWalkthroughStep.textContent, 'Moves: 0/0');
 });
 
 test('existing move-only recordings and a move with antigravity keep their move counts', () => {
   const game = setup([null, move, { ...move, antigravityApplied: true }]);
   assert.deepEqual(game.fewestOtherMovesReplayMoveCounts, [0, 1, 2]);
   game.drawLevelCompleteReplaySnapshot(2);
-  assert.equal(game.levelCompleteReplayStep.textContent, 'Action: 2/2 · Moves: 2/2');
+  assert.equal(game.levelCompleteReplayStep.textContent, 'Moves: 2/2');
   assert.equal(game.levelCompleteReplayEvent.textContent, 'Antigravity applied after this move.');
   game.drawLevelCompleteReplaySnapshot(0);
-  assert.equal(game.levelCompleteReplayStep.textContent, 'Action: 0/2 · Moves: 0/2');
+  assert.equal(game.levelCompleteReplayStep.textContent, 'Moves: 0/2');
 });
 
 test('an initial-only recording and legacy records without metadata remain navigable', () => {
   const game = setup([null]);
   game.drawInGameWalkthroughSnapshot(0);
-  assert.equal(game.inGameWalkthroughStep.textContent, 'Action: 0/0 · Moves: 0/0');
+  assert.equal(game.inGameWalkthroughStep.textContent, 'Moves: 0/0');
   const legacy = setup([undefined, undefined], 1);
   legacy.drawInGameWalkthroughSnapshot(1);
-  assert.equal(legacy.inGameWalkthroughStep.textContent, 'Action: 1/1 · Moves: 0/1');
+  assert.equal(legacy.inGameWalkthroughStep.textContent, 'Moves: 0/1');
   assert.deepEqual(game.buildReplayMoveCounts(null), []);
 });

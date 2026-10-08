@@ -213,8 +213,7 @@ export function register(game) {
       const totalMoves = Number.isFinite(game.fewestOtherMovesForLevel)
         ? game.fewestOtherMovesForLevel
         : moveCounts.at(-1) || 0;
-      const totalActions = game.fewestOtherMovesReplayPath.length - 1;
-      stepEl.textContent = `Action: ${safeIndex}/${totalActions} · Moves: ${completedMoves}/${totalMoves}`;
+      stepEl.textContent = `Moves: ${completedMoves}/${totalMoves}`;
     }
     if (eventEl) {
       const moveMeta = snapshot && snapshot.move ? snapshot.move : null;
