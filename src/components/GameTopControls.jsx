@@ -1,71 +1,51 @@
 import { game } from '../game/runtime.js';
 import { useEffect, useState } from "react";
 import { subscribeGameUi } from "../game/uiBridge.js";
+import GameButton, { ButtonArtwork } from "./GameButton.jsx";
 
 /**
  * React owns HUD text and numbers; the engine publishes updates through uiBridge.
  */
 export default function GameTopControls() {
   const [undoCredits, setUndoCredits] = useState(null);
-  const [antigravityLabel, setAntigravityLabel] = useState(null);
-  const [moveCount, setMoveCount] = useState(null);
-  const [fewest, setFewest] = useState(null);
+  const [antigravity, setAntigravity] = useState({ credits: 0, enabled: false, unlocked: false });
+  const [guide, setGuide] = useState({ available: false, unlocked: false });
+  const [hintCredits, setHintCredits] = useState(null);
+  const [styleTest, setStyleTest] = useState(false);
 
   useEffect(() => {
     return subscribeGameUi((event) => {
       if (event.type === "undoCredits") setUndoCredits(event.undoCredits);
+      if (event.type === "hintCredits") setHintCredits(event.hintCredits);
+      if (event.type === "puzzleLoaded") setStyleTest(event.styleTest);
       if (event.type === "antigravity") {
-        const state = event.antigravityEnabled ? "ON" : "OFF";
-        setAntigravityLabel(
-          event.antigravityUnlockedThisRun
-            ? `Antigravity ${state}`
-            : `Antigravity(${event.antigravityCredits})`
-        );
+        setAntigravity({ credits: event.antigravityCredits, enabled: event.antigravityEnabled, unlocked: event.antigravityUnlockedThisRun });
       }
-      if (event.type === "moveCount") setMoveCount(event.levelMoveCount);
-      if (event.type === "fewestOtherMoves") {
-        setFewest(
-          Number.isFinite(event.bestMoves) ? event.bestMoves : null
-        );
-      }
+      if (event.type === "fewestOtherMoves") setGuide({ available: Number.isFinite(event.bestMoves), unlocked: !!event.hintUnlockedThisRun });
     });
   }, []);
 
+  const guideTitle = !guide.available ? "Hint — No guide available for this level"
+    : guide.unlocked ? "Hint — Free views and retries until you leave this level" : "Hint — Use 1 Hint for unlimited views and retries until you leave this level";
+
   return (
     <div id="gameTopRightControls">
-      <div className="controls-left">
-        <div className="top-stats">
-          <div className="move-count" id="moveCount">
-            Your move: {moveCount ?? 0}
-          </div>
-          <div className="fewest-other-moves" id="fewestOtherMoves">
-            Others&apos; best: {fewest == null ? "--" : fewest}
-          </div>
-        </div>
-        <button id="undoMoveBtn" type="button">
-          Undo({undoCredits ?? 0})
-        </button>
-        <button id="restartLevelBtn" type="button">
-          Restart Level
-        </button>
-        <button
-          id="antigravityToggle"
-          type="button"
-          onClick={() => {
-            if (typeof game.toggleAntigravity === "function") {
-              game.toggleAntigravity();
-            }
-          }}
-        >
-          {antigravityLabel ?? "Antigravity(0)"}
-        </button>
+      <div className="game-primary-actions">
+        <GameButton id="antigravityToggle" label="Anti-Gravity" color="purple" icon="antigravity"
+          quantity={antigravity.unlocked ? (antigravity.enabled ? "ON" : "OFF") : `x${antigravity.credits}`}
+          pressed={antigravity.enabled} disabled={styleTest} onClick={() => game.toggleAntigravity?.()} />
+        <GameButton id="blockTipToggle" label="Hint" color="gold" icon="hint" title={guideTitle} ariaLabel={guideTitle}
+          quantity={guide.unlocked ? <span className="hint-view-label">View</span> : `x${hintCredits ?? "—"}`} />
+        <GameButton id="undoMoveBtn" label="Undo" color="blue" icon="undo" quantity={`x${undoCredits ?? 0}`} disabled={styleTest} />
       </div>
-      <div className="controls-right">
-        <button type="button" id="blockTipToggle">
-          Hint
+      <div className="game-utility-actions">
+        <button id="restartLevelBtn" className="game-utility-action" type="button" title="Restart level" aria-label="Restart level">
+          <ButtonArtwork utility />
+          <span className="game-utility-icon game-utility-icon--restart" aria-hidden="true" />
         </button>
-        <button id="musicToggle" type="button">
-          Music
+        <button id="musicToggle" className="game-utility-action" type="button" title="Mute music" aria-label="Mute music" aria-pressed="false">
+          <ButtonArtwork utility />
+          <span className="game-utility-icon game-utility-icon--music" aria-hidden="true" />
         </button>
       </div>
     </div>

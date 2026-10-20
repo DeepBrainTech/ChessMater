@@ -1,3 +1,5 @@
+const { COINS_PER_LEVEL, LAST_REWARDED_LEVEL, deliverLevelReward } = require('../level-rewards');
+
 module.exports = function ({
   app,
   authenticate,
@@ -14,7 +16,7 @@ module.exports = function ({
       res.json({
         maxUnlocked,
         undoCredits: Number.isFinite(undoCredits) ? undoCredits : 0,
-        antigravityCredits: Number.isFinite(antigravityCredits) ? antigravityCredits : 2
+        antigravityCredits: Number.isFinite(antigravityCredits) ? antigravityCredits : 0
       });
     } catch (err) {
       console.error('Error fetching progress:', err);
@@ -34,9 +36,14 @@ module.exports = function ({
     const moveTrace = rawMoveTrace ? rawMoveTrace.slice(0, 500) : null;
     const moveTraceJson = moveTrace ? JSON.stringify(moveTrace) : null;
     console.log('POST /progress - user:', req.user.user_id, 'maxUnlocked:', maxUnlocked, 'level:', level, 'moves:', moves, 'moveTraceLength:', moveTrace ? moveTrace.length : 0);
+    const client = await pool.connect();
+    let released = false;
+    let rewardPending = false;
     try {
-      await pool.query('BEGIN');
-      await pool.query(`
+      await client.query('BEGIN');
+      const previousProgress = await client.query('SELECT max_unlocked FROM user_progress WHERE portal_user_id = $1', [req.user.user_id]);
+      const previousUnlocked = previousProgress.rows[0]?.max_unlocked || 1;
+      await client.query(`
       INSERT INTO user_progress (portal_user_id, max_unlocked)
       VALUES ($1, $2)
       ON CONFLICT (portal_user_id)
@@ -44,10 +51,14 @@ module.exports = function ({
       `, [req.user.user_id, maxUnlocked]);
 
       // 只要有关卡编号和moves数据(即使是0),都记录到stats表
-      let undoAwarded = false;
       if (level && level > 0 && moves !== null && moves !== undefined && moves >= 0) {
+        const previous = await client.query('SELECT level_index FROM user_level_stats WHERE portal_user_id = $1 AND level_index = $2', [req.user.user_id, level]);
+        if (!previous.rows.length && level === previousUnlocked && level <= LAST_REWARDED_LEVEL) {
+          await client.query(`INSERT INTO user_level_coin_rewards (portal_user_id, level_index)
+            VALUES ($1, $2) ON CONFLICT (portal_user_id, level_index) DO NOTHING`, [req.user.user_id, level]);
+        }
         console.log('Saving level stats for level:', level, 'with moves:', moves);
-        await pool.query(`
+        await client.query(`
         INSERT INTO user_level_stats (portal_user_id, level_index, best_moves, first_achieved_at, updated_at)
         VALUES ($1, $2, $3, NOW(), NOW())
         ON CONFLICT (portal_user_id, level_index)
@@ -61,7 +72,7 @@ module.exports = function ({
         `, [req.user.user_id, level, moves]);
 
         // Store replay path only when a new global best is achieved for this level.
-        await pool.query(`
+        await client.query(`
         INSERT INTO level_best_replays (level_index, best_moves, best_path, owner_portal_user_id, first_achieved_at, updated_at)
         VALUES ($1, $2, $3::jsonb, $4, NOW(), NOW())
         ON CONFLICT (level_index)
@@ -74,21 +85,6 @@ module.exports = function ({
         WHERE EXCLUDED.best_moves < level_best_replays.best_moves
         `, [level, moves, moveTraceJson, req.user.user_id]);
 
-        // Grant level-clear undo reward only once per user per level.
-        const rewardInsert = await pool.query(`
-        INSERT INTO user_level_undo_rewards (portal_user_id, level_index, rewarded_at)
-        VALUES ($1, $2, NOW())
-        ON CONFLICT (portal_user_id, level_index) DO NOTHING
-        RETURNING portal_user_id
-        `, [req.user.user_id, level]);
-        if (rewardInsert.rows.length > 0) {
-          undoAwarded = true;
-          await pool.query(`
-          UPDATE user_progress
-          SET undo_credits = undo_credits + 1
-          WHERE portal_user_id = $1
-          `, [req.user.user_id]);
-        }
         console.log('Level stats saved successfully');
       } else {
         console.log('Level stats not saved - insufficient data:', {
@@ -96,25 +92,39 @@ module.exports = function ({
           moves
         });
       }
-      const creditsResult = await pool.query('SELECT undo_credits, antigravity_credits FROM user_progress WHERE portal_user_id = $1', [req.user.user_id]);
+      const creditsResult = await client.query('SELECT undo_credits, antigravity_credits FROM user_progress WHERE portal_user_id = $1', [req.user.user_id]);
       const undoCredits = Number.parseInt(creditsResult.rows[0]?.undo_credits, 10);
       const antigravityCredits = Number.parseInt(creditsResult.rows[0]?.antigravity_credits, 10);
-      await pool.query('COMMIT');
+      await client.query('COMMIT');
+      client.release();
+      released = true;
+      let coinReward = 0;
+      if (level) {
+        try {
+          if (await deliverLevelReward(pool, req.user.user_id, level)) coinReward = COINS_PER_LEVEL;
+        } catch (error) {
+          rewardPending = true;
+          console.error('Level reward delivery pending:', error.message);
+        }
+      }
       console.log('Progress saved successfully');
       res.json({
         success: true,
-        undoAwarded,
+        coinReward,
+        rewardPending,
         undoCredits: Number.isFinite(undoCredits) ? undoCredits : 0,
-        antigravityCredits: Number.isFinite(antigravityCredits) ? antigravityCredits : 2
+        antigravityCredits: Number.isFinite(antigravityCredits) ? antigravityCredits : 0
       });
     } catch (err) {
       try {
-        await pool.query('ROLLBACK');
+        await client.query('ROLLBACK');
       } catch (_) {}
       console.error('Error saving progress:', err);
       res.status(500).json({
         error: 'Failed to save progress'
       });
+    } finally {
+      if (!released) client.release();
     }
   });
 };

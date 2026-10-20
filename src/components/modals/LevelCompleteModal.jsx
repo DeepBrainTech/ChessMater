@@ -1,38 +1,62 @@
 import ReplayStepNav from "./ReplayStepNav.jsx";
+import { ButtonArtwork } from "../GameButton.jsx";
+
+export function CompletionIcon({ name, className }) {
+  return (
+    <span className={`completion-icon completion-icon--${name} ${className || ""}`} aria-hidden="true">
+      <span className="completion-icon-rim" />
+      <span className="completion-icon-face">
+        <span className="completion-icon-body" />
+        <span className="completion-icon-shine" />
+        <span className="completion-icon-detail" />
+      </span>
+      {name === "lock" && <span className="completion-icon-key" />}
+    </span>
+  );
+}
 
 export default function LevelCompleteModal() {
   return (
     <div id="levelCompleteModal" className="leaderboard-modal">
-      <div className="leaderboard-content level-complete-content">
-        <div className="leaderboard-header">
-          <h2>Level Complete</h2>
-          <button className="close-leaderboard" id="closeLevelCompleteModal" type="button">
-            &times;
+      <div className="level-complete-content" role="dialog" aria-modal="true" aria-labelledby="levelCompleteHeading">
+       <div className="level-complete-inner">
+        <div className="level-complete-header">
+          <h2 id="levelCompleteHeading">Level Complete!</h2>
+          <button className="level-complete-close" id="closeLevelCompleteModal" type="button" aria-label="Close level complete">
+            <ButtonArtwork utility />
+            <CompletionIcon name="close" />
           </button>
         </div>
-        <p id="levelCompleteText">Great job!</p>
+        <p id="levelCompleteCoinReward" className="level-complete-coin-reward" role="status" hidden>
+          <img src="/assets/images/powerups/coin.svg" alt="Coins" />
+          <span>+200</span>
+        </p>
+        <p id="levelCompleteText" className="level-complete-announcement">Great job!</p>
         <div className="level-complete-stats">
-          <div id="levelCompleteMoveCount">Your move: 0</div>
-          <div id="levelCompleteFewestOtherMoves">Others&apos; best: --</div>
+          <div className="level-complete-stat"><span>Your Moves</span><strong id="levelCompleteMoveCount">0</strong></div>
+          <div className="level-complete-stat"><span>Other’s Best</span><strong id="levelCompleteFewestOtherMoves">--</strong></div>
         </div>
         <p id="levelCompleteAchievement" className="level-complete-achievement"></p>
         <div className="level-complete-replay" id="levelCompleteReplayPanel">
           <p className="level-complete-replay-title" id="levelCompleteReplayTitle">
-            Fewest move by other user walkthrough
+            Best Route By <span id="levelCompleteReplayAuthor">--</span>
           </p>
           <p className="level-complete-replay-subtitle" id="levelCompleteReplaySubtitle"></p>
           <div className="level-complete-replay-canvas-wrap">
+           <div className="level-complete-replay-board">
             <canvas
               id="levelCompleteReplayCanvas"
-              width="320"
-              height="220"
+              width="1270"
+              height="794"
               aria-label="Replay mini board"
             ></canvas>
-            <div className="level-complete-replay-lock" id="levelCompleteReplayLock">
-              <div className="level-complete-replay-lock-icon">🔒</div>
+           </div>
+            <div className="level-complete-replay-lock" id="levelCompleteReplayLock" role="button" tabIndex={0} aria-label="Use 1 Hint to view this run's guide" onKeyDown={event => {
+              if (event.key === "Enter" || event.key === " ") { event.preventDefault(); event.currentTarget.click(); }
+            }}>
+              <CompletionIcon name="lock" className="level-complete-replay-lock-icon" />
               <div className="level-complete-replay-lock-text">
-                Unlock replay for this level
-                <br />
+                <span>View Hint</span>
                 <span
                   id="levelCompleteReplayLockCost"
                   className="level-complete-replay-lock-cost"
@@ -42,17 +66,18 @@ export default function LevelCompleteModal() {
               </div>
             </div>
           </div>
-          <p className="level-complete-replay-hint" id="levelCompleteReplayHint">
-            ←/→ step · ↑ first · ↓ last (keys or buttons below)
+          <p className="level-complete-replay-hint level-complete-announcement" id="levelCompleteReplayHint">
+            ←/→ step · ↑ first · ↓ last · Scroll up/down to step
           </p>
-          <p className="level-complete-replay-step" id="levelCompleteReplayStep">
-            Moves: --/--
-          </p>
+          <p className="level-complete-replay-event" id="levelCompleteReplayEvent" role="status"></p>
+          <div className="level-complete-replay-controls">
+           <p className="level-complete-replay-step" id="levelCompleteReplayStep" data-step-label="Step">Step: -- / --</p>
           <ReplayStepNav
             id="levelCompleteReplayStepNav"
             ariaLabel="Replay step controls"
+            variant="inline"
           />
-          <p className="level-complete-replay-event" id="levelCompleteReplayEvent"></p>
+          </div>
         </div>
         <div className="level-complete-actions">
           <button id="levelCompleteRetryBtn" type="button">
@@ -62,6 +87,7 @@ export default function LevelCompleteModal() {
             Next Level
           </button>
         </div>
+       </div>
       </div>
     </div>
   );

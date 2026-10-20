@@ -19,11 +19,6 @@ function mergeMaxUnlocked(value) {
 }
 
 async function fetchProgress() {
-  const levels = getLevels();
-  if (session.isLocalDev) {
-    const allLevels = levels.length > 0 ? levels.length : 999;
-    return mergeMaxUnlocked(allLevels);
-  }
   try {
     await (session.authReady || Promise.resolve());
     const headers = {};
@@ -61,12 +56,11 @@ function ensureCurrentLevelVisible() {
   const gridRect = levelGrid.getBoundingClientRect();
   const btnRect = currentButton.getBoundingClientRect();
   const fullyVisible =
-    btnRect.top >= gridRect.top && btnRect.bottom <= gridRect.bottom;
+    btnRect.left >= gridRect.left && btnRect.right <= gridRect.right;
   if (!fullyVisible) {
-    currentButton.scrollIntoView({
-      block: "center",
-      inline: "nearest",
-      behavior: "smooth",
+    levelGrid.scrollTo({
+      left: levelGrid.scrollLeft + btnRect.left - gridRect.left - (gridRect.width - btnRect.width) / 2,
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth",
     });
   }
 }
@@ -82,6 +76,8 @@ function highlightCurrentLevelButton() {
   buttons.forEach((btn, idx) => {
     if (idx === current) btn.classList.add("current-level");
     else btn.classList.remove("current-level");
+    if (idx === current) btn.setAttribute("aria-current", "step");
+    else btn.removeAttribute("aria-current");
   });
   requestAnimationFrame(ensureCurrentLevelVisible);
   if (typeof game.cmEmitGameUi === "function") {
@@ -104,11 +100,6 @@ export async function loadLevels(optionalMaxUnlocked) {
     maxUnlocked = await fetchProgress();
   }
 
-  if (session.isLocalDev) {
-    maxUnlocked = levels.length;
-    mergeMaxUnlocked(maxUnlocked);
-  }
-
   const currentIndex =
     typeof game.cmGetCurrentLevelIndex === "function"
       ? game.cmGetCurrentLevelIndex()
@@ -119,24 +110,24 @@ export async function loadLevels(optionalMaxUnlocked) {
     const isLocked = index + 1 > maxUnlocked;
 
     button.className = "level-button";
-    button.textContent = level.name || `Level ${index + 1}`;
+    button.textContent = String(index + 1);
+    button.title = level.name || `Level ${index + 1}`;
+    button.setAttribute("aria-label", `${level.name || `Level ${index + 1}`}${isLocked ? " (locked)" : ""}`);
     button.dataset.levelIndex = String(index + 1);
     button.type = "button";
 
     if (index + 1 === maxUnlocked) maxUnlockedButton = button;
 
     if (isLocked) {
-      button.style.background = "#777";
-      button.style.cursor = "not-allowed";
-      button.style.opacity = "0.5";
-      button.textContent += " 🔒";
+      button.classList.add("locked");
+      button.setAttribute("aria-disabled", "true");
       button.addEventListener("click", () => {
         if (typeof game.updateStatus === "function") {
           game.updateStatus("This level is locked. Complete earlier levels first!");
         }
       });
     } else {
-      button.style.background = "linear-gradient(145deg, #4a90e2, #357abd)";
+      if (index + 1 < maxUnlocked) button.classList.add("completed");
       button.addEventListener("click", () => {
         if (typeof game.cmSetCurrentLevelIndex === "function") {
           game.cmSetCurrentLevelIndex(index);
@@ -149,6 +140,7 @@ export async function loadLevels(optionalMaxUnlocked) {
 
     if (index === currentIndex) {
       button.classList.add("current-level");
+      button.setAttribute("aria-current", "step");
       currentLevelButton = button;
     }
 
@@ -158,7 +150,9 @@ export async function loadLevels(optionalMaxUnlocked) {
   const scrollTargetButton = currentLevelButton || maxUnlockedButton;
   if (scrollTargetButton) {
     requestAnimationFrame(() => {
-      scrollTargetButton.scrollIntoView({ block: "center", inline: "nearest" });
+      const gridRect = levelGrid.getBoundingClientRect();
+      const buttonRect = scrollTargetButton.getBoundingClientRect();
+      levelGrid.scrollLeft += buttonRect.left - gridRect.left - (gridRect.width - buttonRect.width) / 2;
     });
   }
 
@@ -180,4 +174,70 @@ export function initLevelSelectApi() {
   game.ensureCurrentLevelVisible = ensureCurrentLevelVisible;
   game.fetchProgress = fetchProgress;
   game.isLoggedIn = isLoggedIn;
+  return initLevelRailScroll();
+}
+
+function initLevelRailScroll() {
+  const rail = document.getElementById("levelGrid");
+  if (!rail) return () => {};
+  const controller = new AbortController();
+  const { signal } = controller;
+  let drag = null;
+  let suppressClickUntil = 0;
+
+  rail.addEventListener("pointerdown", event => {
+    // Touch scrolling keeps the browser's native direction locking and inertia.
+    if (event.pointerType !== "mouse" || event.button !== 0) return;
+    suppressClickUntil = 0;
+    drag = { id: event.pointerId, x: event.clientX, y: event.clientY, scrollLeft: rail.scrollLeft, moved: false };
+  }, { signal });
+
+  window.addEventListener("pointermove", event => {
+    if (!drag || event.pointerId !== drag.id) return;
+    const dx = event.clientX - drag.x;
+    const dy = event.clientY - drag.y;
+    if (!drag.moved) {
+      if (Math.abs(dx) < 6 || Math.abs(dx) <= Math.abs(dy)) return;
+      drag.moved = true;
+      rail.classList.add("is-dragging");
+      rail.setPointerCapture(event.pointerId);
+    }
+    event.preventDefault();
+    rail.scrollLeft = drag.scrollLeft - dx;
+  }, { signal, passive: false });
+
+  const finishDrag = event => {
+    if (!drag || event.pointerId !== drag.id) return;
+    if (drag.moved) suppressClickUntil = performance.now() + 300;
+    const pointerId = drag.id;
+    drag = null;
+    rail.classList.remove("is-dragging");
+    if (rail.hasPointerCapture(pointerId)) rail.releasePointerCapture(pointerId);
+  };
+  window.addEventListener("pointerup", finishDrag, { signal });
+  window.addEventListener("pointercancel", finishDrag, { signal });
+  rail.addEventListener("lostpointercapture", finishDrag, { signal });
+  rail.addEventListener("click", event => {
+    // A horizontal drag must not open the level under the release position.
+    if (event.detail !== 0 && performance.now() < suppressClickUntil) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      suppressClickUntil = 0;
+    }
+  }, { signal, capture: true });
+
+  rail.addEventListener("wheel", event => {
+    if (event.ctrlKey || Math.abs(event.deltaX) > Math.abs(event.deltaY)) return;
+    const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? rail.clientWidth : 1;
+    const before = rail.scrollLeft;
+    rail.scrollLeft += event.deltaY * unit;
+    if (rail.scrollLeft !== before) event.preventDefault();
+  }, { signal, passive: false });
+
+  return () => {
+    controller.abort();
+    if (drag && rail.hasPointerCapture(drag.id)) rail.releasePointerCapture(drag.id);
+    drag = null;
+    rail.classList.remove("is-dragging");
+  };
 }

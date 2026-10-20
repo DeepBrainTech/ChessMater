@@ -33,7 +33,14 @@ test('antigravity records do not borrow the following move number', () => {
   game.drawInGameWalkthroughSnapshot(1);
   assert.equal(game.inGameWalkthroughEvent.textContent, 'Antigravity enabled.');
   game.drawInGameWalkthroughSnapshot(2);
-  assert.equal(game.inGameWalkthroughEvent.textContent, '');
+  assert.equal(game.inGameWalkthroughEvent.textContent, 'Antigravity enabled.');
+});
+
+test('a final disable event shows its state without counting another chess move', () => {
+  const game = setup([null, move, { systemEvent: 'toggle_antigravity', antigravityEnabled: false }], 1);
+  game.drawInGameWalkthroughSnapshot(2);
+  assert.equal(game.inGameWalkthroughEvent.textContent, 'Antigravity disabled.');
+  assert.equal(game.inGameWalkthroughStep.textContent, 'Moves: 1/1');
 });
 
 test('consecutive antigravity records and an antigravity-only finish remain at zero moves', () => {
@@ -47,9 +54,20 @@ test('existing move-only recordings and a move with antigravity keep their move 
   assert.deepEqual(game.fewestOtherMovesReplayMoveCounts, [0, 1, 2]);
   game.drawLevelCompleteReplaySnapshot(2);
   assert.equal(game.levelCompleteReplayStep.textContent, 'Moves: 2/2');
-  assert.equal(game.levelCompleteReplayEvent.textContent, 'Antigravity applied after this move.');
+  assert.equal(game.levelCompleteReplayEvent.textContent, 'Antigravity enabled.');
   game.drawLevelCompleteReplaySnapshot(0);
   assert.equal(game.levelCompleteReplayStep.textContent, 'Moves: 0/2');
+});
+
+test('antigravity state persists through moves and resolves correctly when seeking backward', () => {
+  const game = setup([null, antigravity, move, { systemEvent: 'toggle_antigravity', antigravityEnabled: false }, move], 2);
+  for (const [index, expected] of [[2, true], [4, false], [1, true], [0, null], [3, false]]) {
+    game.drawInGameWalkthroughSnapshot(index);
+    assert.equal(game.getReplayAntigravityState(index), expected);
+    assert.equal(game.inGameWalkthroughEvent.textContent, expected === null ? '' : expected ? 'Antigravity enabled.' : 'Antigravity disabled.');
+  }
+  game.fewestOtherMovesReplayPath[4].antigravityEnabled = true;
+  assert.equal(game.getReplayAntigravityState(4), true);
 });
 
 test('an initial-only recording and legacy records without metadata remain navigable', () => {

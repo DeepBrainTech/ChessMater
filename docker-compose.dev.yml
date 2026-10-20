@@ -1,0 +1,63 @@
+name: chessmater-local
+
+services:
+  game-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: chessmater
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - game-data:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U postgres -d chessmater"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  game-api:
+    build:
+      context: .
+      target: backend
+    environment:
+      CHESSMATER_JWT_SECRET: ${LOCAL_CHESSMATER_JWT_SECRET:-${CHESSMATER_JWT_SECRET:?Set CHESSMATER_JWT_SECRET to match the main portal}}
+      CHESSMATER_JWT_ALG: HS256
+      CHESSMATER_JWT_AUD: chessmater
+      CHESSMATER_JWT_ISS: main-portal
+      NODE_ENV: development
+      PORT: "3001"
+      DATABASE_URL: postgresql://postgres:postgres@game-db:5432/chessmater
+      DATABASE_SSL: "false"
+      PORTAL_API_URL: ${PORTAL_INTERNAL_API_URL:-http://host.docker.internal:8000}
+    ports:
+      - "127.0.0.1:3001:3001"
+    volumes:
+      - ./backend:/app
+      - game-api-node-modules:/app/node_modules
+    depends_on:
+      game-db:
+        condition: service_healthy
+
+  game-web:
+    build:
+      context: .
+      target: frontend
+    environment:
+      VITE_API_BASE_URL: http://localhost:3001
+      VITE_PORTAL_API_BASE_URL: ${PORTAL_API_URL:-http://localhost:8000}
+      VITE_PORTAL_URL: ${PORTAL_URL:-http://localhost:3000}
+      CHOKIDAR_USEPOLLING: "true"
+    ports:
+      - "127.0.0.1:5173:5173"
+    volumes:
+      - .:/app
+      - game-web-node-modules:/app/node_modules
+    depends_on:
+      - game-api
+
+volumes:
+  game-data:
+  game-api-node-modules:
+  game-web-node-modules:

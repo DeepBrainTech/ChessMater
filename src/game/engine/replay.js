@@ -8,6 +8,7 @@ export function register(game) {
       goal: game.cloneGameData(game.goal),
       objectives: game.cloneGameData(game.objectives),
       targetPieces: game.cloneGameData(game.targetPieces),
+      antigravityEnabled: !!game.antigravityEnabled,
       move: moveMeta ? game.cloneGameData(moveMeta) : null
     };
   };
@@ -42,9 +43,29 @@ export function register(game) {
     const cleaned = rawPath.filter(step => step && Number.isFinite(Number(step.rows)) && Number.isFinite(Number(step.cols)) && Array.isArray(step.board) && Array.isArray(step.players));
     return cleaned.length ? cleaned : null;
   };
+  game.captureWinningReplaySnapshot = function () {
+    game.tryCapturePendingMoveTrace(true);
+    const final = game.buildCurrentReplaySnapshot({ systemEvent: 'goal_reached' });
+    const previous = game.currentLevelMoveTrace.at(-1);
+    // Physics or a moving platform may reach the king without a pending chess move.
+    if (!previous || ['board', 'players', 'goal', 'objectives', 'targetPieces'].some(key => JSON.stringify(previous[key]) !== JSON.stringify(final[key]))) {
+      game.currentLevelMoveTrace.push(final);
+    }
+  };
   game.hasReplayPlayerMove = function (step) {
     const moveMeta = step && step.move ? step.move : null;
     return !!(moveMeta && moveMeta.from && Number.isFinite(Number(moveMeta.from.row)) && Number.isFinite(Number(moveMeta.from.col)) && moveMeta.to && Number.isFinite(Number(moveMeta.to.row)) && Number.isFinite(Number(moveMeta.to.col)));
+  };
+  game.getReplayAntigravityState = function (index) {
+    // Resolve from the requested frame so backward navigation and Last are accurate.
+    for (let i = index; i >= 0; i--) {
+      const step = game.fewestOtherMovesReplayPath[i];
+      if (typeof step.antigravityEnabled === 'boolean') return step.antigravityEnabled;
+      if (typeof step.move?.antigravityEnabled === 'boolean') return step.move.antigravityEnabled;
+      // Older recordings only marked activation or upward movement.
+      if (step.move?.systemEvent === 'toggle_antigravity' || step.move?.antigravityApplied) return true;
+    }
+    return null;
   };
   game.buildReplayMoveCounts = function (path) {
     if (!Array.isArray(path) || !path.length) return [];
@@ -55,23 +76,19 @@ export function register(game) {
       return moveCounter;
     });
   };
-  game.drawReplayCellDecoration = function (replayCtx, cellType, x, y, tile, row = null, col = null, targetPiecesData = []) {
+  game.drawReplayCellDecoration = function (replayCtx, cellType, x, y, tile, row = null, col = null, targetPiecesData = [], styledCompletion = false) {
     const inset = Math.max(1, Math.floor(tile * 0.08));
     const innerSize = Math.max(1, tile - inset * 2);
     const centerX = x + tile / 2;
     const centerY = y + tile / 2;
     if (cellType === game.CELL_TYPES.SOLID_BLOCK) {
+      if (styledCompletion && game.drawTileTexture?.(replayCtx, "blockOpen", x, y, tile)) return;
       replayCtx.fillStyle = "rgba(46, 204, 113, 0.7)";
       replayCtx.fillRect(x + inset, y + inset, innerSize, innerSize);
       return;
     }
-    if (cellType === game.CELL_TYPES.PHASE_BLOCK) {
-      game.drawInactivePhaseBlock(replayCtx, x, y, tile, inset);
-      return;
-    }
-    if (cellType === game.CELL_TYPES.PHASE_BLOCK_ACTIVE) {
-      replayCtx.fillStyle = "rgba(41, 128, 185, 0.8)";
-      replayCtx.fillRect(x + inset, y + inset, innerSize, innerSize);
+    if (cellType === game.CELL_TYPES.PHASE_BLOCK || cellType === game.CELL_TYPES.PHASE_BLOCK_ACTIVE) {
+      game.drawDirectionalPhaseBlock(replayCtx, x, y, tile);
       return;
     }
     if (cellType === game.CELL_TYPES.MOVING_PLATFORM) {
@@ -88,8 +105,8 @@ export function register(game) {
       replayCtx.fillText("?", centerX, centerY + 0.5);
       return;
     }
-    if (cellType === game.CELL_TYPES.OBJECTIVE || cellType === game.CELL_TYPES.OBJECTIVE_COMPLETED) {
-      replayCtx.fillStyle = cellType === game.CELL_TYPES.OBJECTIVE ? "rgba(243, 156, 18, 0.7)" : "rgba(46, 204, 113, 0.7)";
+    if (cellType === game.CELL_TYPES.OBJECTIVE) {
+      replayCtx.fillStyle = "rgba(243, 156, 18, 0.7)";
       replayCtx.beginPath();
       replayCtx.moveTo(centerX, y + inset);
       replayCtx.lineTo(x + tile - inset, centerY);
@@ -97,15 +114,6 @@ export function register(game) {
       replayCtx.lineTo(x + inset, centerY);
       replayCtx.closePath();
       replayCtx.fill();
-      if (cellType === game.CELL_TYPES.OBJECTIVE_COMPLETED) {
-        replayCtx.strokeStyle = "#ffffff";
-        replayCtx.lineWidth = Math.max(1, tile * 0.06);
-        replayCtx.beginPath();
-        replayCtx.moveTo(x + tile * 0.28, centerY);
-        replayCtx.lineTo(x + tile * 0.44, y + tile * 0.7);
-        replayCtx.lineTo(x + tile * 0.74, y + tile * 0.3);
-        replayCtx.stroke();
-      }
       return;
     }
     if ([game.CELL_TYPES.TELEPORT_PURPLE, game.CELL_TYPES.TELEPORT_GREEN, game.CELL_TYPES.TELEPORT_BLUE, game.CELL_TYPES.TELEPORT_ORANGE].includes(cellType)) {
@@ -183,7 +191,9 @@ export function register(game) {
     const cw = canvasEl.width;
     const ch = canvasEl.height;
     replayCtx.clearRect(0, 0, cw, ch);
-    replayCtx.fillStyle = "#0d1118";
+    const styledCompletion = (canvasEl === game.levelCompleteReplayCanvas && !!game.levelCompleteReplayAuthor)
+      || canvasEl === game.inGameWalkthroughCanvas;
+    replayCtx.fillStyle = styledCompletion ? "#e7dfce" : "#0d1118";
     replayCtx.fillRect(0, 0, cw, ch);
     const pad = 8;
     const tile = Math.max(4, Math.floor(Math.min((cw - pad * 2) / cols, (ch - pad * 2) / rows)));
@@ -196,11 +206,14 @@ export function register(game) {
         const cellType = Number(boardData?.[r]?.[c]);
         const x = ox + c * tile;
         const y = oy + r * tile;
-        replayCtx.fillStyle = (r + c) % 2 === 0 ? "#b6cce0ff" : "#ffffffff";
-        replayCtx.fillRect(x, y, tile, tile);
+        const texture = (r + c) % 2 === 0 ? "light" : "dark";
+        if (!styledCompletion || !game.drawTileTexture?.(replayCtx, texture, x, y, tile)) {
+          replayCtx.fillStyle = styledCompletion ? "#ded7c6" : ((r + c) % 2 === 0 ? "#b6cce0ff" : "#ffffffff");
+          replayCtx.fillRect(x, y, tile, tile);
+        }
         replayCtx.strokeStyle = "rgba(0,0,0,0.12)";
         replayCtx.strokeRect(x + 0.5, y + 0.5, tile, tile);
-        game.drawReplayCellDecoration(replayCtx, cellType, x, y, tile, r, c, targetPiecesData);
+        game.drawReplayCellDecoration(replayCtx, cellType, x, y, tile, r, c, targetPiecesData, styledCompletion);
       }
     }
     for (const p of playersData) {
@@ -213,17 +226,12 @@ export function register(game) {
       const totalMoves = Number.isFinite(game.fewestOtherMovesForLevel)
         ? game.fewestOtherMovesForLevel
         : moveCounts.at(-1) || 0;
-      stepEl.textContent = `Moves: ${completedMoves}/${totalMoves}`;
+      stepEl.textContent = stepEl.dataset?.stepLabel === "Step"
+        ? `Step: ${completedMoves} / ${totalMoves}` : `Moves: ${completedMoves}/${totalMoves}`;
     }
     if (eventEl) {
-      const moveMeta = snapshot && snapshot.move ? snapshot.move : null;
-      if (moveMeta?.systemEvent === "toggle_antigravity") {
-        eventEl.textContent = "Antigravity enabled.";
-      } else if (moveMeta?.antigravityApplied) {
-        eventEl.textContent = "Antigravity applied after this move.";
-      } else {
-        eventEl.textContent = "";
-      }
+      const enabled = game.getReplayAntigravityState(safeIndex);
+      eventEl.textContent = enabled === true ? "Antigravity enabled." : enabled === false ? "Antigravity disabled." : "";
     }
   };
   game.drawLevelCompleteReplaySnapshot = function (index) {
@@ -236,7 +244,7 @@ export function register(game) {
     const walkthroughModalActive = game.inGameWalkthroughModal && game.inGameWalkthroughModal.classList.contains("active");
     const levelCompleteModalActive = game.levelCompleteModal && game.levelCompleteModal.classList.contains("active");
     if (!game.fewestOtherMovesReplayPath || !game.fewestOtherMovesReplayPath.length) return;
-    if (levelCompleteModalActive && !game.replayUnlockedForLevel) return;
+    if (levelCompleteModalActive && !game.hintUnlockedThisRun) return;
     const maxIndex = game.fewestOtherMovesReplayPath.length - 1;
     let nextIndex = game.levelCompleteReplayIndex;
     if (action === "prev") nextIndex = game.levelCompleteReplayIndex - 1;else if (action === "next") nextIndex = game.levelCompleteReplayIndex + 1;else if (action === "first") nextIndex = 0;else if (action === "last") nextIndex = maxIndex;else return;
@@ -251,6 +259,21 @@ export function register(game) {
     navEl.style.display = visible ? "grid" : "none";
   };
   game.setupReplayStepNav = function () {
+    [game.inGameWalkthroughModal, game.levelCompleteModal].forEach(modal => {
+      const panel = modal?.querySelector(".level-complete-replay");
+      if (!panel) return;
+      let lastWheelTime = -Infinity;
+      game.lifecycle.listen(panel, "wheel", e => {
+        if (e.ctrlKey || !e.deltaY || !modal.classList.contains("active")) return;
+        if (document.getElementById("powerUpsModal")?.classList.contains("active")) return;
+        if (!game.hintUnlockedThisRun || !game.fewestOtherMovesReplayPath?.length) return;
+        e.preventDefault();
+        const now = performance.now();
+        if (now - lastWheelTime < 120) return;
+        lastWheelTime = now;
+        game.stepReplayNavigation(e.deltaY > 0 ? "next" : "prev");
+      }, { passive: false });
+    });
     document.querySelectorAll("[data-replay-step]").forEach(btn => {
       game.lifecycle.listen(btn, "click", e => {
         e.preventDefault();

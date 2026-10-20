@@ -18,6 +18,9 @@ function setGameState(inGame) {
     startScreen.style.display = inGame ? "none" : "flex";
   }
   document.body.classList.toggle("in-game", !!inGame);
+  if (inGame && game.lifecycle?.active) {
+    game.lifecycle.requestAnimationFrame(() => game.resizeCanvas?.());
+  }
   game.cmMusicPlaying = !!inGame;
   if (typeof game.syncBgMusic === "function") game.syncBgMusic();
   if (typeof game.updatePortalButton === "function") game.updatePortalButton();
@@ -44,11 +47,15 @@ export async function initStartFlow(signal) {
 
     if (isStartScreenVisible) {
       portalButton.textContent = "Back to Main Portal";
+      portalButton.setAttribute("aria-label", "Back to Main Portal");
+      portalButton.title = "Back to Main Portal";
       portalButton.onclick = () => {
         window.location.href = getPortalUrl();
       };
     } else {
       portalButton.textContent = "Back to Home";
+      portalButton.setAttribute("aria-label", "Back to Home");
+      portalButton.title = "Back to Home";
       portalButton.onclick = () => {
         setGameState(false);
         if (typeof game.loadLevels === "function") {

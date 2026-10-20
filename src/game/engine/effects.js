@@ -241,6 +241,7 @@ export function register(game) {
     }
   };
   game.updateBombs = function () {
+    if (game.gameWon) return;
     for (let i = game.bombs.length - 1; i >= 0; i--) {
       const bomb = game.bombs[i];
       const nextRow = game.isBoomBomb(bomb) ? bomb.row + bomb.rowDirection : bomb.row;
@@ -351,6 +352,7 @@ export function register(game) {
     game.scheduleAutoRestartAfterDeath("🦆 The duck knocked you out! Restarting level...");
   };
   game.updateDucks = function () {
+    if (game.gameWon) return;
     let removedSupport = false;
     for (let i = game.ducks.length - 1; i >= 0; i--) {
       const duck = game.ducks[i];
@@ -383,6 +385,7 @@ export function register(game) {
           game.visitedSquares[rider.row][rider.col] = true;
           game.checkObjectiveCompletion();
           game.checkWinCondition();
+          if (game.gameWon) return;
         }
       }
       duck.col = nextCol;
@@ -466,6 +469,7 @@ export function register(game) {
     }
   };
   game.updateMovingPlatforms = function () {
+    if (game.gameWon) return;
     for (const platform of game.movingPlatforms) {
       if (platform.axis === "horizontal") {
         game.updateHorizontalMovingPlatform(platform);

@@ -11,9 +11,9 @@ module.exports = function ({
           error: 'Invalid level parameter'
         });
       }
-      const currentUserId = String(req.user.user_id);
-      const unlockResult = await pool.query(`SELECT 1 FROM user_level_replay_unlocks WHERE portal_user_id = $1 AND level_index = $2 LIMIT 1`, [currentUserId, parsedLevel]);
-      const replayUnlocked = unlockResult.rows.length > 0;
+      // Hint access is paid from inventory once per client run, like AntiGravity.
+      // Historical permanent unlock rows no longer authorize new runs.
+      const replayUnlocked = false;
       const result = await pool.query(`SELECT lbr.owner_portal_user_id AS user_id, lbr.best_moves, lbr.best_path, u.username
        FROM level_best_replays lbr
        LEFT JOIN LATERAL (

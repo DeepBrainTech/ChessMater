@@ -1,36 +1,22 @@
 export function register(game) {
-  game.drawInactivePhaseBlock = function (renderCtx, x, y, tile, inset = 3) {
-    const innerSize = tile - inset * 2;
-    const arrowY = y + tile * 0.48;
-    const stemWidth = Math.max(2, tile * 0.06);
-    const stemHeight = Math.max(6, tile * 0.18);
-    const headWidth = Math.max(8, tile * 0.22);
-    const headHeight = Math.max(6, tile * 0.16);
-    const arrowGap = Math.max(1, (innerSize - headWidth * 3) / 4);
-    const firstArrowCenterX = x + inset + arrowGap + headWidth / 2;
+  game.drawDirectionalPhaseBlock = function (renderCtx, x, y, tile) {
+    const image = game.tileImages && game.tileImages.direction;
+    if (!image || image.complete === false || !image.naturalWidth || !image.naturalHeight) return false;
+    // Match Figma 499:3876's image crop. Its source arrow points down;
+    // existing phase cells allow upward traversal, so rotate the complete tile.
     renderCtx.save();
-    renderCtx.fillStyle = "rgba(52, 152, 219, 0.3)";
-    renderCtx.fillRect(x + inset, y + inset, innerSize, innerSize);
-    renderCtx.fillStyle = "rgba(25, 118, 210, 0.65)";
-    for (let i = 0; i < 3; i++) {
-      const centerX = firstArrowCenterX + i * (headWidth + arrowGap);
-      const stemTop = arrowY;
-      renderCtx.fillRect(centerX - stemWidth / 2, stemTop, stemWidth, stemHeight);
-      renderCtx.beginPath();
-      renderCtx.moveTo(centerX, stemTop - headHeight);
-      renderCtx.lineTo(centerX - headWidth / 2, stemTop);
-      renderCtx.lineTo(centerX + headWidth / 2, stemTop);
-      renderCtx.closePath();
-      renderCtx.fill();
-    }
-    renderCtx.strokeStyle = "rgba(25, 118, 210, 0.8)";
-    renderCtx.lineWidth = Math.max(2, tile * 0.04);
-    renderCtx.setLineDash([Math.max(4, tile * 0.1), Math.max(3, tile * 0.07)]);
-    renderCtx.beginPath();
-    renderCtx.moveTo(x + inset, y + tile - inset);
-    renderCtx.lineTo(x + tile - inset, y + tile - inset);
-    renderCtx.stroke();
+    renderCtx.translate(x + tile / 2, y + tile / 2);
+    renderCtx.rotate(Math.PI);
+    renderCtx.drawImage(
+      image,
+      image.naturalWidth * (12.5 / 125),
+      image.naturalHeight * (7.72 / 115.83),
+      image.naturalWidth * (100 / 125),
+      image.naturalHeight * (100 / 115.83),
+      -tile / 2, -tile / 2, tile, tile
+    );
     renderCtx.restore();
+    return true;
   };
   game.drawSomersaultCloudPlatform = function (renderCtx, x, y, tile) {
     const centerX = x + tile / 2;
@@ -300,6 +286,7 @@ export function register(game) {
     renderCtx.arc(x + tile / 2, y + tile / 2, tile * 0.42, 0, Math.PI * 2);
     renderCtx.fill();
     if (img && img.complete) {
+      if (pieceType !== "king") renderCtx.filter = "brightness(0.28) saturate(0.7)";
       renderCtx.drawImage(img, x + pad, y + pad, tile - pad * 2, tile - pad * 2);
     } else {
       renderCtx.fillStyle = "#111827";

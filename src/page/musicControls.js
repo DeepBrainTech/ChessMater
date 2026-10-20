@@ -31,7 +31,13 @@ export function initMusicControls() {
     });
     syncBgMusic();
     if (musicToggle) {
-      musicToggle.textContent = game.cmAudioMuted ? "🔇 Muted" : "🔊 Music";
+      const label = game.cmAudioMuted ? "Unmute music" : "Mute music";
+      musicToggle.setAttribute("aria-label", label);
+      musicToggle.setAttribute("aria-pressed", String(game.cmAudioMuted));
+      musicToggle.title = label;
+      if (!musicToggle.classList.contains("game-utility-action")) {
+        musicToggle.textContent = game.cmAudioMuted ? "🔇 Muted" : "🔊 Music";
+      }
     }
   }
 

@@ -14,6 +14,14 @@ export function register(game) {
     let col = Math.floor(x / game.TILE_SIZE);
     let row = Math.floor(y / game.TILE_SIZE);
     if (row < 0 || row >= game.ROWS || col < 0 || col >= game.COLS) return;
+    if (game.mode === "style-test") {
+      const sample = game.currentPuzzleData.samples.find(item => item.row === row && item.col === col);
+      const label = sample?.label || (game.isCellInActiveLaser(row, col) ? "激光光束" : (row + col) % 2 === 0 ? "浅色底格" : "深色底格");
+      game.styleTestSelectedCell = { row, col };
+      game.cmEmitGameUi?.({ type: "styleTestSelection", row, col, label });
+      game.drawBoard();
+      return;
+    }
     if (game.CM_EDITOR_PAGE && game.mode === "edit") {
       if (typeof game.cmEditorOnEditCell === "function") {
         game.cmEditorOnEditCell(row, col, x - col * game.TILE_SIZE, y - row * game.TILE_SIZE);
@@ -62,6 +70,7 @@ export function register(game) {
     }
   };
   game.applyAntigravity = function () {
+    if (game.gameWon) return false;
     game.risingPieces = [];
 
     // First, collect all pieces that need to rise
@@ -70,7 +79,7 @@ export function register(game) {
       let targetRow = player.row;
 
       // Find how high this piece can rise
-      while (targetRow > 0 && game.board[targetRow - 1][player.col] === game.CELL_TYPES.EMPTY) {
+      while (targetRow > 0 && [game.CELL_TYPES.EMPTY, game.CELL_TYPES.OBJECTIVE, game.CELL_TYPES.OBJECTIVE_COMPLETED].includes(game.board[targetRow - 1][player.col])) {
         targetRow--;
       }
       if (targetRow !== player.row) {
@@ -100,6 +109,7 @@ export function register(game) {
     return false; // Return false if no pieces will rise
   };
   game.updateRisingPieces = function (timestamp) {
+    if (game.gameWon) return;
     if (game.risingPieces.length === 0) return;
     const deltaTime = timestamp - game.lastRiseTime;
     game.lastRiseTime = timestamp;
@@ -109,7 +119,21 @@ export function register(game) {
       const piece = game.risingPieces[i];
 
       // Move piece up
-      piece.currentY -= distanceToMove;
+      const previousRow = Math.floor(piece.currentY / game.TILE_SIZE);
+      piece.currentY = Math.max(piece.targetY, piece.currentY - distanceToMove);
+      const currentRow = Math.floor(piece.currentY / game.TILE_SIZE);
+      let hitBomb = false;
+      for (let row = previousRow - 1; row >= currentRow; row--) {
+        if (game.board[row][piece.col] === game.CELL_TYPES.BOMB) {
+          const player = game.players[piece.playerIndex];
+          game.handleBombCollision(player, piece.playerIndex, row, piece.col);
+          game.risingPieces.splice(i, 1);
+          hitBomb = true;
+          break;
+        }
+        game.completeObjective(row, piece.col);
+      }
+      if (hitBomb) continue;
 
       // Check if we've reached or passed the target
       if (piece.currentY <= piece.targetY) {
@@ -125,22 +149,9 @@ export function register(game) {
           game.board[player.row][player.col] = game.CELL_TYPES.PLAYER;
           game.checkObjectiveCompletion();
           game.checkWinCondition();
+          if (game.gameWon) return;
         }
         game.risingPieces.splice(i, 1);
-      } else {
-        // Check for mid-rise bomb collisions
-        const currentRow = Math.floor(piece.currentY / game.TILE_SIZE);
-        const prevRow = Math.floor((piece.currentY + distanceToMove) / game.TILE_SIZE);
-        if (currentRow !== prevRow) {
-          for (let r = prevRow; r >= currentRow; r--) {
-            if (game.board[r][piece.col] === game.CELL_TYPES.BOMB) {
-              const player = game.players[piece.playerIndex];
-              game.handleBombCollision(player, piece.playerIndex, r, piece.col);
-              game.risingPieces.splice(i, 1);
-              break;
-            }
-          }
-        }
       }
     }
 
@@ -171,6 +182,7 @@ export function register(game) {
   };
   game.toggleAntigravity = async function () {
     if (game.gameWon) return;
+    if (game.fallingPieces.length || game.risingPieces.length || game.pendingMoveCounter) return;
     if (!game.antigravityUnlockedThisRun) {
       if (game.antigravityCredits <= 0) {
         game.openAntigravityExchangeModal();
@@ -183,20 +195,19 @@ export function register(game) {
       }
       game.antigravityUnlockedThisRun = true;
     }
+    game.tryCapturePendingMoveTrace(false);
     game.antigravityEnabled = !game.antigravityEnabled;
+    // Record the switch before physics, which can immediately complete the level.
+    game.queueSystemTraceCapture({
+      systemEvent: "toggle_antigravity",
+      antigravityEnabled: game.antigravityEnabled,
+      antigravityApplied: game.antigravityEnabled
+    });
     game.updateAntigravityButtonLabel();
     if (game.antigravityEnabled) {
       game.updateStatus("🔼 Antigravity enabled - pieces rise upward!");
       game.fallingPieces = [];
-      game.lifecycle.setTimeout(() => {
-        const didRise = game.applyAntigravity();
-        if (didRise) {
-          game.queueSystemTraceCapture({
-            systemEvent: "toggle_antigravity",
-            antigravityApplied: true
-          });
-        }
-      }, 100);
+      game.applyAntigravity();
     } else {
       game.updateStatus("🔽 Gravity enabled - pieces fall downward!");
       game.applyGravity();
@@ -208,7 +219,7 @@ export function register(game) {
       return;
     }
     game.autoRestartScheduled = false;
-    game.loadPuzzle(game.currentPuzzleData);
+    game.loadPuzzle(game.currentPuzzleData, { preserveHint: true });
   };
   game.initializeCanvas = // Initialize the canvas size on load
   function () {
@@ -226,7 +237,17 @@ export function register(game) {
     }
     game.ctx.setTransform(1, 0, 0, 1, game.shakeX, game.shakeY);
     game.ctx.clearRect(-game.shakeX, -game.shakeY, game.canvas.width, game.canvas.height);
+    if (game.mode === "style-test" || game.gameWon) {
+      game.drawBoard();
+      game.lifecycle.requestAnimationFrame(game.gameLoop);
+      return;
+    }
     game.updateFallingPieces();
+    if (game.gameWon) {
+      game.drawBoard();
+      game.lifecycle.requestAnimationFrame(game.gameLoop);
+      return;
+    }
     game.updateExplodingPlayers(); // 💣 Animate dead players
     game.checkActiveLaserCollisions();
     game.tryCapturePendingMoveTrace(false);
@@ -241,7 +262,6 @@ export function register(game) {
     game.drawBoard();
     if (game.mode === "play") {
       game.drawPossibleMoves();
-      game.drawSelectionIndicator();
     }
     if (game.showTransformerMenu && game.transformerPosition) {
       game.drawPieceSelectionMenu();
@@ -278,7 +298,7 @@ export function register(game) {
     }
   };
   game.initModalScrollLock = function () {
-    document.querySelectorAll(".leaderboard-modal, .block-tip-modal, .undo-exchange-modal").forEach(modal => {
+    document.querySelectorAll(".leaderboard-modal, .block-tip-modal, .undo-exchange-modal, .power-ups-modal").forEach(modal => {
       const observer = new game.lifecycle.MutationObserver(() => game.syncPageScrollLock());
       observer.observe(modal, {
         attributes: true,
@@ -321,9 +341,10 @@ export function initialize(game) {
 
   // --- Keyboard controls ---
   game.lifecycle.listen(document, "keydown", e => {
+    if (document.getElementById('powerUpsModal')?.classList.contains('active')) return;
     const walkthroughModalActive = game.inGameWalkthroughModal && game.inGameWalkthroughModal.classList.contains("active");
     const levelCompleteModalActive = game.levelCompleteModal && game.levelCompleteModal.classList.contains("active");
-    const replayViewerActive = game.replayUnlockedForLevel && game.fewestOtherMovesReplayPath && game.fewestOtherMovesReplayPath.length && (walkthroughModalActive || levelCompleteModalActive);
+    const replayViewerActive = game.hintUnlockedThisRun && game.fewestOtherMovesReplayPath && game.fewestOtherMovesReplayPath.length && (walkthroughModalActive || levelCompleteModalActive);
     if (replayViewerActive) {
       if (e.key === "ArrowLeft") {
         e.preventDefault();
@@ -347,15 +368,9 @@ export function initialize(game) {
       }
     }
     if (e.key === "Escape") {
-      const hintModalActive = game.blockTipModal && game.blockTipModal.classList.contains("active");
       if (walkthroughModalActive) {
         e.preventDefault();
         game.closeInGameWalkthroughModal();
-        return;
-      }
-      if (hintModalActive) {
-        e.preventDefault();
-        game.closeHintModal();
         return;
       }
     }
@@ -393,8 +408,8 @@ export function initialize(game) {
     game.lifecycle.listen(window.visualViewport, "resize", game.resizeCanvas);
   }
   game.pageScrollLockY = 0;
-  game.MODAL_SCROLL_LOCK_SELECTOR = ".leaderboard-modal.active, .block-tip-modal.active, .undo-exchange-modal.active";
-  game.MODAL_SCROLLABLE_SELECTOR = ".leaderboard-content, .guide-content, .level-complete-content, .block-tip-content, .undo-exchange-panel";
+  game.MODAL_SCROLL_LOCK_SELECTOR = ".leaderboard-modal.active, .block-tip-modal.active, .undo-exchange-modal.active, .power-ups-modal.active";
+  game.MODAL_SCROLLABLE_SELECTOR = ".leaderboard-content, .guide-content, .level-complete-content, .block-tip-content, .undo-exchange-panel, .power-ups-inner";
   game.initModalScrollLock();
 
   // Initialize the game
@@ -403,14 +418,22 @@ export function initialize(game) {
   game.updateStatus(game.CM_EDITOR_PAGE ? "Level editor: place pieces and goal, then copy or download." : "Welcome! Choose a level from the list to play.");
   game.updateUndoButtonLabel();
   game.updateAntigravityButtonLabel();
+  const syncInitialResources = async () => {
+    if (!game.CM_EDITOR_PAGE) {
+      await game.claimStarterPack();
+      await game.recoverInventoryDeliveries();
+      await game.recoverLevelCoinRewards();
+    }
+    await game.syncGameInventory();
+  };
+  game.lifecycle.listen(window, 'focus', () => {
+    void game.recoverInventoryDeliveries().then(() => game.syncGameInventory());
+    if (!game.CM_EDITOR_PAGE) void game.recoverLevelCoinRewards();
+  });
   if (session.authReady && typeof session.authReady.finally === "function") {
-    session.authReady.finally(() => {
-      game.syncUndoCreditsFromServer();
-      game.syncAntigravityCreditsFromServer();
-    });
+    session.authReady.finally(syncInitialResources);
   } else {
-    game.syncUndoCreditsFromServer();
-    game.syncAntigravityCreditsFromServer();
+    syncInitialResources();
   }
   game.updatePlayerCount();
   game.updateObjectiveCount();

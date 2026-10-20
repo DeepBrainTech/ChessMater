@@ -80,6 +80,7 @@ export function register(game) {
     game.drawBoard();
   };
   game.handleTeleport = function (player) {
+    if (game.gameWon) return;
     // Get the teleporter type the player is standing on
     const currentTeleportType = game.board[player.row][player.col];
 
@@ -125,6 +126,7 @@ export function register(game) {
 
     // ✅ RESTORE TELEPORTERS AFTER COOLDOWN
     game.lifecycle.setTimeout(() => {
+      if (game.gameWon) return;
       game.board[player.row][player.col] = destType; // Player's current position
       // Find and restore the source teleporter
       const sourceTeleporter = sameColorTeleports.find(tp => tp.row === parseInt(sourcePos.split(',')[0]) && tp.col === parseInt(sourcePos.split(',')[1]));
@@ -143,6 +145,7 @@ export function register(game) {
     } else {
       // If gravity is disabled, place the player on the board
       game.lifecycle.setTimeout(() => {
+        if (game.gameWon) return;
         game.board[player.row][player.col] = game.CELL_TYPES.PLAYER;
         game.checkWinCondition();
       }, 50);

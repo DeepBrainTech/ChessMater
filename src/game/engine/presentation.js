@@ -1,4 +1,5 @@
 import { session } from '../../services/session.js';
+import { showModal, hideModal } from '../modalFocus.js';
 export function register(game) {
   game.isAudioMuted = function () {
     return !!game.cmAudioMuted;
@@ -116,14 +117,44 @@ export function register(game) {
       }
     }
 
+    let fitDesignFrame = false;
+    if (canvasContainer?.classList.contains("game-board-frame")) {
+      const slot = canvasContainer.parentElement;
+      const slotStyle = window.getComputedStyle(slot);
+      const availableWidth = slot.clientWidth - (parseFloat(slotStyle.paddingLeft) || 0) - (parseFloat(slotStyle.paddingRight) || 0);
+      const availableHeight = slot.clientHeight - (parseFloat(slotStyle.paddingTop) || 0) - (parseFloat(slotStyle.paddingBottom) || 0);
+      if (availableWidth > 0 && availableHeight > 0) {
+        // The 1134 x 779 frame's rails end at x=37 and y=44.
+        // Fit the whole grid with one scale, then wrap the artwork around it.
+        const openingWidth = (1134 - 2 * 37) / 1134;
+        const openingHeight = (779 - 2 * 44) / 779;
+        const boardScale = Math.min(
+          availableWidth * openingWidth / game.canvas.width,
+          availableHeight * openingHeight / game.canvas.height
+        );
+        maxWidth = game.canvas.width * boardScale;
+        maxHeight = game.canvas.height * boardScale;
+        canvasContainer.style.width = `${maxWidth / openingWidth}px`;
+        canvasContainer.style.height = `${maxHeight / openingHeight}px`;
+        fitDesignFrame = true;
+      }
+    }
+
     // Calculate the best scale to fit BOTH width and height
     const scaleX = maxWidth / game.canvas.width;
     const scaleY = maxHeight / game.canvas.height;
-    const scaleFactor = Math.min(scaleX, scaleY, 1); // Never scale up past 100%
+    const scaleFactor = Math.min(scaleX, scaleY, 1);
 
     // Apply the scale
-    game.canvas.style.width = game.canvas.width * scaleFactor + "px";
-    game.canvas.style.height = game.canvas.height * scaleFactor + "px";
+    game.canvas.style.width = (fitDesignFrame ? maxWidth : game.canvas.width * scaleFactor) + "px";
+    game.canvas.style.height = (fitDesignFrame ? maxHeight : game.canvas.height * scaleFactor) + "px";
+    if (game.lifecycle?.active && typeof game.drawBoard === "function") {
+      if (game.canvasResizeFrame) game.lifecycle.cancelAnimationFrame(game.canvasResizeFrame);
+      game.canvasResizeFrame = game.lifecycle.requestAnimationFrame(() => {
+        game.canvasResizeFrame = 0;
+        game.drawBoard();
+      });
+    }
   };
   game.updateStatus = function (message) {
     const editorBanner = document.getElementById("editorStatusBanner");
@@ -167,10 +198,12 @@ export function register(game) {
   };
   game.updateLevelCompleteStatsDisplay = function () {
     if (game.levelCompleteMoveCountDisplay) {
-      game.levelCompleteMoveCountDisplay.textContent = `Your move: ${game.levelMoveCount}`;
+      game.levelCompleteMoveCountDisplay.textContent = game.levelCompleteReplayAuthor
+        ? String(game.levelMoveCount) : `Your move: ${game.levelMoveCount}`;
     }
     if (game.levelCompleteFewestOtherMovesDisplay) {
-      game.levelCompleteFewestOtherMovesDisplay.textContent = Number.isFinite(game.fewestOtherMovesForLevel) ? `Others' best: ${game.fewestOtherMovesForLevel}` : "Others' best: --";
+      const best = Number.isFinite(game.fewestOtherMovesForLevel) ? String(game.fewestOtherMovesForLevel) : "--";
+      game.levelCompleteFewestOtherMovesDisplay.textContent = game.levelCompleteReplayAuthor ? best : `Others' best: ${best}`;
     }
     game.updateLevelCompleteAchievementDisplay();
   };
@@ -195,83 +228,37 @@ export function register(game) {
     }
     game.levelCompleteAchievement.textContent = "";
   };
-  game.updateHintSolutionSection = function () {
+  game.updateHintButton = function () {
     const hasBenchmark = Number.isFinite(game.fewestOtherMovesForLevel);
-    const hasReplay = !!(game.fewestOtherMovesReplayPath && game.fewestOtherMovesReplayPath.length >= 2);
-    const shopAvailable = game.portalUndoShopAvailable();
     if (game.fewestOtherMovesDisplay) {
       if (game.CM_EDITOR_PAGE) game.fewestOtherMovesDisplay.textContent = hasBenchmark ? `Others' best: ${game.fewestOtherMovesForLevel}` : "Others' best: --";
     }
     if (game.blockTipToggle) {
-      game.blockTipToggle.classList.toggle("hint-toggle--notify", hasBenchmark && !game.replayUnlockedForLevel);
-      game.blockTipToggle.title = hasBenchmark && !game.replayUnlockedForLevel ? "Hint — solution guide available to unlock" : "Level tips and solution guide";
-    }
-    if (!game.hintSolutionSummary || !game.hintSolutionActionBtn) return;
-    if (!hasBenchmark) {
-      game.hintSolutionSummary.textContent = "No other player has cleared this level yet.";
-      game.hintSolutionActionBtn.style.display = "none";
-      game.hintSolutionActionBtn.disabled = true;
-      if (game.hintSolutionNote) game.hintSolutionNote.textContent = "Check back after someone else completes this level.";
-      return;
-    }
-    const shownName = game.fewestOtherMovesUserName && String(game.fewestOtherMovesUserName).trim() ? String(game.fewestOtherMovesUserName).trim() : "another player";
-    game.hintSolutionSummary.textContent = `Best route by ${shownName}: ${game.fewestOtherMovesForLevel} moves`;
-    if (!game.replayUnlockedForLevel) {
-      game.hintSolutionActionBtn.style.display = "inline-block";
-      game.hintSolutionActionBtn.textContent = "Unlock guide";
-      game.hintSolutionActionBtn.disabled = !shopAvailable;
-      if (game.hintSolutionNote) {
-        game.hintSolutionNote.textContent = shopAvailable ? "Watch their route step by step after unlocking." : "Unlock is not available in this environment (Portal shop required).";
-      }
-      return;
-    }
-    game.hintSolutionActionBtn.style.display = "inline-block";
-    game.hintSolutionActionBtn.textContent = "View guide";
-    game.hintSolutionActionBtn.disabled = !hasReplay;
-    if (game.hintSolutionNote) {
-      game.hintSolutionNote.textContent = hasReplay ? "Opens an interactive walkthrough you can step through." : "Route data is not available yet for this level.";
+      game.blockTipToggle.classList.toggle("hint-toggle--notify", hasBenchmark && !game.hintUnlockedThisRun);
+      const hintTitle = !hasBenchmark ? "Hint — No guide available for this level"
+        : game.hintUnlockedThisRun ? "Hint — Free views and retries until you leave this level" : "Hint — Use 1 Hint for unlimited views and retries until you leave this level";
+      game.blockTipToggle.title = hintTitle;
+      game.blockTipToggle.setAttribute("aria-label", hintTitle);
     }
   };
   game.refreshFewestOtherMovesAffordance = function () {
-    if (game.CM_EDITOR_PAGE) return;
-    game.updateHintSolutionSection();
-  };
-  game.closeHintModal = function () {
-    if (!game.blockTipModal) return;
-    game.blockTipModal.classList.remove("active");
-    game.blockTipModal.setAttribute("aria-hidden", "true");
+    if (!game.CM_EDITOR_PAGE) game.updateHintButton();
   };
   game.openHintModal = function () {
-    if (!game.blockTipModal) return;
-    game.updateHintSolutionSection();
-    game.blockTipModal.classList.add("active");
-    game.blockTipModal.setAttribute("aria-hidden", "false");
-  };
-  game.handleSolutionGuideAction = function () {
-    if (game.CM_EDITOR_PAGE) return;
-    if (!Number.isFinite(game.fewestOtherMovesForLevel)) {
-      return;
-    }
-    if (!game.replayUnlockedForLevel) {
-      game.closeHintModal();
-      game.openReplayExchangeModal();
-      return;
-    }
-    if (!game.fewestOtherMovesReplayPath || game.fewestOtherMovesReplayPath.length < 2) {
-      return;
-    }
-    game.closeHintModal();
-    game.openInGameWalkthroughModal();
+    return game.useHintForCurrentRun();
   };
   game.updateInGameWalkthroughPanel = function () {
+    const hasRecord = Number.isFinite(game.fewestOtherMovesForLevel);
+    const hasGuide = hasRecord && game.fewestOtherMovesReplayPath?.length >= 2;
+    game.inGameWalkthroughModal?.classList.toggle('hint-empty', !hasGuide);
+    const emptyTitle = game.inGameWalkthroughModal?.querySelector('#inGameWalkthroughEmptyTitle');
+    if (emptyTitle) emptyTitle.textContent = hasRecord
+      ? 'The best route is not available to view yet.'
+      : 'No other player has completed this level yet.';
     const hasName = !!(game.fewestOtherMovesUserName && String(game.fewestOtherMovesUserName).trim());
     const shownName = hasName ? String(game.fewestOtherMovesUserName).trim() : "Unknown";
-    if (game.inGameWalkthroughTitle) {
-      game.inGameWalkthroughTitle.textContent = `Best Route by ${shownName}`;
-    }
-    if (game.inGameWalkthroughSubtitle && Number.isFinite(game.fewestOtherMovesForLevel)) {
-      game.inGameWalkthroughSubtitle.textContent = `Fewest moves: ${game.fewestOtherMovesForLevel}`;
-    }
+    if (game.inGameWalkthroughAuthor) game.inGameWalkthroughAuthor.textContent = shownName;
+    if (game.inGameWalkthroughBestMoves) game.inGameWalkthroughBestMoves.textContent = hasRecord ? String(game.fewestOtherMovesForLevel) : "-";
     if (game.inGameWalkthroughCanvas) game.inGameWalkthroughCanvas.style.display = "block";
     if (game.inGameWalkthroughHint) game.inGameWalkthroughHint.style.display = "block";
     if (game.inGameWalkthroughStep) game.inGameWalkthroughStep.style.display = "block";
@@ -280,32 +267,35 @@ export function register(game) {
   };
   game.openInGameWalkthroughModal = function () {
     if (!game.inGameWalkthroughModal) return;
-    if (!game.fewestOtherMovesReplayPath || game.fewestOtherMovesReplayPath.length < 2) {
-      game.updateStatus("Walkthrough path is not available yet for this level.");
-      return;
-    }
     game.levelCompleteReplayIndex = 0;
     game.updateInGameWalkthroughPanel();
-    game.drawInGameWalkthroughSnapshot(0);
-    game.inGameWalkthroughModal.classList.add("active");
-    game.inGameWalkthroughModal.setAttribute("aria-hidden", "false");
+    if (Number.isFinite(game.fewestOtherMovesForLevel) && game.fewestOtherMovesReplayPath?.length >= 2) {
+      game.drawInGameWalkthroughSnapshot(0);
+    }
+    showModal(game.inGameWalkthroughModal);
   };
   game.closeInGameWalkthroughModal = function () {
     if (!game.inGameWalkthroughModal) return;
-    game.inGameWalkthroughModal.classList.remove("active");
-    game.inGameWalkthroughModal.setAttribute("aria-hidden", "true");
+    hideModal(game.inGameWalkthroughModal);
   };
   game.updateLevelCompleteReplayDisplay = function () {
     if (!game.levelCompleteReplayPanel) return;
     game.levelCompleteReplayPanel.style.display = "block";
     const hasReplay = !!(game.fewestOtherMovesReplayPath && game.fewestOtherMovesReplayPath.length >= 2);
     const hasName = !!(game.fewestOtherMovesUserName && String(game.fewestOtherMovesUserName).trim());
-    const showLocked = Number.isFinite(game.fewestOtherMovesForLevel) && !game.replayUnlockedForLevel;
+    const showLocked = Number.isFinite(game.fewestOtherMovesForLevel) && !game.hintUnlockedThisRun;
+    if (game.levelCompleteReplayAuthor) {
+      game.levelCompleteReplayAuthor.textContent = Number.isFinite(game.fewestOtherMovesForLevel)
+        ? (hasName ? String(game.fewestOtherMovesUserName).trim() : "Unknown") : "--";
+    }
     if (game.levelCompleteReplayPanel) {
       game.levelCompleteReplayPanel.classList.toggle("locked", !!showLocked);
     }
+    game.levelCompleteReplayStepNav?.querySelectorAll("button").forEach(button => {
+      button.disabled = showLocked;
+    });
     if (!Number.isFinite(game.fewestOtherMovesForLevel)) {
-      if (game.levelCompleteReplayTitle) {
+      if (game.levelCompleteReplayTitle && !game.levelCompleteReplayAuthor) {
         game.levelCompleteReplayTitle.textContent = "Best Route by --";
       }
       if (game.levelCompleteReplaySubtitle) {
@@ -324,7 +314,7 @@ export function register(game) {
       return;
     }
     if (showLocked) {
-      if (game.levelCompleteReplayTitle) {
+      if (game.levelCompleteReplayTitle && !game.levelCompleteReplayAuthor) {
         const shownName = hasName ? String(game.fewestOtherMovesUserName).trim() : "Unknown";
         game.levelCompleteReplayTitle.textContent = `Best Route by ${shownName}`;
       }
@@ -334,7 +324,7 @@ export function register(game) {
       if (game.levelCompleteReplayCanvas) game.levelCompleteReplayCanvas.style.display = "block";
       if (game.levelCompleteReplayHint) game.levelCompleteReplayHint.style.display = "block";
       if (game.levelCompleteReplayStep) game.levelCompleteReplayStep.style.display = "block";
-      game.setReplayStepNavVisible(game.levelCompleteReplayStepNav, false);
+      game.setReplayStepNavVisible(game.levelCompleteReplayStepNav, !!game.levelCompleteReplayAuthor);
       if (game.levelCompleteReplayEvent) game.levelCompleteReplayEvent.style.display = "block";
       if (game.levelCompleteReplayLock) game.levelCompleteReplayLock.style.display = "flex";
       game.refreshLevelCompleteReplayLockCostEl();
@@ -344,7 +334,7 @@ export function register(game) {
       return;
     }
     if (!hasReplay) {
-      if (game.levelCompleteReplayTitle) {
+      if (game.levelCompleteReplayTitle && !game.levelCompleteReplayAuthor) {
         const shownName = hasName ? String(game.fewestOtherMovesUserName).trim() : "Unknown";
         game.levelCompleteReplayTitle.textContent = `Best Route by ${shownName}`;
       }
@@ -363,7 +353,7 @@ export function register(game) {
       return;
     }
     if (game.levelCompleteReplayLock) game.levelCompleteReplayLock.style.display = "none";
-    if (game.levelCompleteReplayTitle) {
+    if (game.levelCompleteReplayTitle && !game.levelCompleteReplayAuthor) {
       const shownName = hasName ? String(game.fewestOtherMovesUserName).trim() : "Unknown";
       game.levelCompleteReplayTitle.textContent = `Best Route by ${shownName}`;
     }
@@ -377,10 +367,9 @@ export function register(game) {
     if (game.levelCompleteReplayEvent) game.levelCompleteReplayEvent.style.display = "block";
     game.drawLevelCompleteReplaySnapshot(game.levelCompleteReplayIndex);
   };
-  game.updateFewestOtherMovesDisplay = function (bestMoves, replayPath, userName, replayUnlocked) {
+  game.updateFewestOtherMovesDisplay = function (bestMoves, replayPath, userName) {
     game.fewestOtherMovesForLevel = Number.isFinite(bestMoves) ? bestMoves : null;
     game.fewestOtherMovesUserName = typeof userName === "string" ? userName.trim() : "";
-    game.replayUnlockedForLevel = !!replayUnlocked;
     game.fewestOtherMovesReplayPath = game.sanitizeReplayPath(replayPath);
     game.fewestOtherMovesReplayMoveCounts = game.buildReplayMoveCounts(game.fewestOtherMovesReplayPath || []);
     if (game.fewestOtherMovesReplayPath) {
@@ -394,11 +383,12 @@ export function register(game) {
         type: "fewestOtherMoves",
         bestMoves: game.fewestOtherMovesForLevel,
         userName: game.fewestOtherMovesUserName,
-        replayUnlocked: game.replayUnlockedForLevel
+        hintUnlockedThisRun: game.hintUnlockedThisRun
       });
     }
   };
   game.fetchFewestOtherMovesForCurrentLevel = async function () {
+    const runId = game.hintRunId;
     const levelNumber = game.currentLevelIndex + 1;
     if (!Number.isFinite(levelNumber) || levelNumber <= 0) {
       game.updateFewestOtherMovesDisplay(null, null, "", false);
@@ -415,15 +405,18 @@ export function register(game) {
         credentials: "include",
         headers
       });
+      if (game.hintRunId !== runId) return;
       if (!res.ok) {
         game.updateFewestOtherMovesDisplay(null, null, "", false);
         return;
       }
       const data = await res.json();
+      if (game.hintRunId !== runId) return;
       const bestMoves = Number.parseInt(data?.best_moves, 10);
       const bestName = typeof data?.username === "string" && data.username.trim() ? data.username : "";
-      game.updateFewestOtherMovesDisplay(bestMoves, data?.best_path, bestName, !!data?.replay_unlocked);
+      game.updateFewestOtherMovesDisplay(bestMoves, data?.best_path, bestName);
     } catch (_) {
+      if (game.hintRunId !== runId) return;
       game.updateFewestOtherMovesDisplay(null, null, "", false);
     }
   };
@@ -465,7 +458,12 @@ export function register(game) {
     if (objective && !objective.completed) {
       objective.completed = true;
       game.objectivesCompleted++;
-      game.board[row][col] = game.CELL_TYPES.OBJECTIVE_COMPLETED;
+      // Remove only the collectible, preserving pieces and moving hazards.
+      if (game.players.some(player => player.row === row && player.col === col)) {
+        game.board[row][col] = game.CELL_TYPES.PLAYER;
+      } else if ([game.CELL_TYPES.OBJECTIVE, game.CELL_TYPES.OBJECTIVE_COMPLETED].includes(game.board[row][col])) {
+        game.board[row][col] = game.CELL_TYPES.EMPTY;
+      }
       game.updateObjectiveCount();
       game.updateStatus(`Objective completed! ${game.objectivesCompleted}/${game.totalObjectives}`);
       return true;
@@ -475,7 +473,13 @@ export function register(game) {
   game.getObjectiveCellTypeAt = function (row, col) {
     const objective = game.objectives.find(obj => obj.row === row && obj.col === col);
     if (!objective) return game.CELL_TYPES.EMPTY;
-    return objective.completed ? game.CELL_TYPES.OBJECTIVE_COMPLETED : game.CELL_TYPES.OBJECTIVE;
+    return objective.completed ? game.CELL_TYPES.EMPTY : game.CELL_TYPES.OBJECTIVE;
+  };
+  game.collectObjectivesAlongMove = function (fromRow, fromCol, toRow, toCol, stopBefore = null) {
+    for (const cell of game.getMoveTraversalCells(fromRow, fromCol, toRow, toCol)) {
+      if (stopBefore && cell.row === stopBefore.row && cell.col === stopBefore.col) break;
+      game.completeObjective(cell.row, cell.col);
+    }
   };
   game.checkObjectiveCompletion = // Check for objective completion when players move
   function () {
@@ -509,7 +513,7 @@ export function register(game) {
     game.updateStatus(`Target piece captured! ${game.targetPiecesCaptured}/${game.totalTargetPieces}`);
     return true;
   };
-  game.resetPhaseBlocks = // Reset all phase blocks to inactive state
+  game.resetPhaseBlocks = // Normalize legacy phase-cell values in editor data
   function () {
     game.phaseBlockStates = {};
     for (let r = 0; r < game.ROWS; r++) {
@@ -559,10 +563,10 @@ export function initialize(game) {
     game.bindLevelCompleteUi();
   }
   game.setupAntigravityExchangeModal();
-  game.setupReplayExchangeModal();
+  game.setupLevelCompleteHint();
   game.setupInGameWalkthrough();
   game.setupReplayStepNav();
-  game.setupHintModal();
+  game.setupHintButton();
 
 
 

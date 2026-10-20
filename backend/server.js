@@ -3,9 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
 const pool = require('./db');
-const {
-  verifyReplayGrant
-} = require('./portal-grants');
+const { runStartupMigrations } = require('./startup-migrations');
 const app = express();
 
 // ChessMater JWT config — must match main portal (same secret, aud, iss) or verify returns 401 invalid signature
@@ -185,23 +183,6 @@ function setSessionCookie(req, res, token) {
  * Authenticate ChessMater JWT (same secret/audience/issuer as main portal)
  */
 function authenticate(req, res, next) {
-  // 开发模式：如果是本地开发环境，自动设置测试用户
-  const isLocalDev = isLocalDevHost(req.headers.host);
-  if (isLocalDev && process.env.NODE_ENV !== 'production') {
-    // 开发模式：检查是否有dev-token或直接允许
-    const authHeader = req.headers.authorization;
-    const bearerToken = authHeader?.split(' ')[1];
-    if (bearerToken === 'dev-token' || !bearerToken) {
-      // 设置测试用户
-      req.user = {
-        user_id: 999,
-        username: 'dev_user',
-        sub: 'dev_user'
-      };
-      console.log('🔧 开发模式：使用测试用户', req.user);
-      return next();
-    }
-  }
   const authHeader = req.headers.authorization;
   const bearerToken = authHeader?.split(' ')[1];
   const sessionToken = parseCookies(req.headers.cookie)[SESSION_COOKIE_NAME];
@@ -243,7 +224,6 @@ function authenticate(req, res, next) {
  */
 require("./routes/auth")({
   app,
-  isLocalDevHost,
   pool,
   issueSessionToken,
   setSessionCookie,
@@ -273,7 +253,8 @@ const initTablesSql = `
     portal_user_id TEXT PRIMARY KEY,
     max_unlocked INT,
     undo_credits INT NOT NULL DEFAULT 0,
-    antigravity_credits INT NOT NULL DEFAULT 2
+    antigravity_credits INT NOT NULL DEFAULT 0,
+    hint_credits INT NOT NULL DEFAULT 0
   );
   CREATE TABLE IF NOT EXISTS levels (
     id SERIAL PRIMARY KEY,
@@ -299,17 +280,18 @@ const initTablesSql = `
     first_achieved_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW()
   );
-  CREATE TABLE IF NOT EXISTS user_level_undo_rewards (
+  CREATE TABLE IF NOT EXISTS user_hint_credit_uses (
     portal_user_id TEXT NOT NULL,
-    level_index INT NOT NULL,
-    rewarded_at TIMESTAMP DEFAULT NOW(),
-    PRIMARY KEY (portal_user_id, level_index)
+    request_id TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT NOW(),
+    PRIMARY KEY (portal_user_id, request_id)
   );
-  CREATE TABLE IF NOT EXISTS user_level_replay_unlocks (
+  CREATE TABLE IF NOT EXISTS inventory_deliveries (
     portal_user_id TEXT NOT NULL,
-    level_index INT NOT NULL,
-    unlocked_at TIMESTAMP DEFAULT NOW(),
-    PRIMARY KEY (portal_user_id, level_index)
+    purchase_id UUID NOT NULL,
+    grants JSONB NOT NULL,
+    delivered_at TIMESTAMP DEFAULT NOW(),
+    PRIMARY KEY (portal_user_id, purchase_id)
   );
 `;
 async function ensurePortalUserIdUniqueIndex() {
@@ -346,8 +328,6 @@ async function ensurePortalUserIdColumnNames() {
     await renameColumnIfExists('user_progress', 'user_id', 'portal_user_id');
     await renameColumnIfExists('levels', 'user_id', 'portal_user_id');
     await renameColumnIfExists('user_level_stats', 'user_id', 'portal_user_id');
-    await renameColumnIfExists('user_level_undo_rewards', 'user_id', 'portal_user_id');
-    await renameColumnIfExists('user_level_replay_unlocks', 'user_id', 'portal_user_id');
     await renameColumnIfExists('level_best_replays', 'owner_user_id', 'owner_portal_user_id');
   } catch (err) {
     console.warn('⚠️ Could not normalize portal_user_id column names:', err.message);
@@ -360,7 +340,9 @@ async function ensureTables() {
     await dropUsernameUniqueness();
     await ensurePortalUserIdUniqueIndex();
     await pool.query('ALTER TABLE user_progress ADD COLUMN IF NOT EXISTS undo_credits INT NOT NULL DEFAULT 0');
-    await pool.query('ALTER TABLE user_progress ADD COLUMN IF NOT EXISTS antigravity_credits INT NOT NULL DEFAULT 2');
+    await pool.query('ALTER TABLE user_progress ADD COLUMN IF NOT EXISTS antigravity_credits INT NOT NULL DEFAULT 0');
+    await pool.query('ALTER TABLE user_progress ALTER COLUMN antigravity_credits SET DEFAULT 0');
+    await pool.query('ALTER TABLE user_progress ADD COLUMN IF NOT EXISTS hint_credits INT NOT NULL DEFAULT 0');
     await pool.query('ALTER TABLE user_level_stats ADD COLUMN IF NOT EXISTS best_path JSONB');
     await pool.query('ALTER TABLE user_level_stats ADD COLUMN IF NOT EXISTS first_achieved_at TIMESTAMP');
     await pool.query('UPDATE user_level_stats SET first_achieved_at = COALESCE(first_achieved_at, updated_at, NOW()) WHERE first_achieved_at IS NULL');
@@ -395,7 +377,9 @@ app.get('/init', async (req, res) => {
     await dropUsernameUniqueness();
     await ensurePortalUserIdUniqueIndex();
     await pool.query('ALTER TABLE user_progress ADD COLUMN IF NOT EXISTS undo_credits INT NOT NULL DEFAULT 0');
-    await pool.query('ALTER TABLE user_progress ADD COLUMN IF NOT EXISTS antigravity_credits INT NOT NULL DEFAULT 2');
+    await pool.query('ALTER TABLE user_progress ADD COLUMN IF NOT EXISTS antigravity_credits INT NOT NULL DEFAULT 0');
+    await pool.query('ALTER TABLE user_progress ALTER COLUMN antigravity_credits SET DEFAULT 0');
+    await pool.query('ALTER TABLE user_progress ADD COLUMN IF NOT EXISTS hint_credits INT NOT NULL DEFAULT 0');
     await pool.query('ALTER TABLE user_level_stats ADD COLUMN IF NOT EXISTS best_path JSONB');
     await pool.query('ALTER TABLE user_level_stats ADD COLUMN IF NOT EXISTS first_achieved_at TIMESTAMP');
     await pool.query('UPDATE user_level_stats SET first_achieved_at = COALESCE(first_achieved_at, updated_at, NOW()) WHERE first_achieved_at IS NULL');
@@ -429,12 +413,13 @@ require("./routes/progress")({
   authenticate,
   pool
 });
+require('./level-rewards').registerLevelRewards({ app, authenticate, pool });
 require("./routes/credits")({
   app,
   authenticate,
-  pool,
-  verifyReplayGrant
+  pool
 });
+require('./routes/inventory')({ app, authenticate, pool });
 require("./routes/levels")({
   app,
   authenticate,
@@ -449,10 +434,16 @@ const PORT = process.env.PORT || 3000;
 if (require.main === module) {
   (async () => {
     await ensureTables();
+    await runStartupMigrations(pool);
+    console.log('✅ Startup migrations completed');
     app.listen(PORT, () => {
       console.log('Server running on port ' + PORT);
     });
-  })();
+  })().catch(async error => {
+    console.error('❌ Startup migration failed:', error.message);
+    await pool.end().catch(() => undefined);
+    process.exitCode = 1;
+  });
 }
 module.exports = {
   app,

@@ -20,5 +20,15 @@ export function capturePortalLocale() {
 }
 
 export function getPortalUrl(page = "braingames") {
-  return `https://deepbraintechnology.com/${getPortalLocale()}/${page}`;
+  const host = window.location.hostname;
+  const localHost = ["localhost", "127.0.0.1", "0.0.0.0", "[::1]", ""].includes(host) ||
+    /^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(host) ||
+    /^192\.168\.\d{1,3}\.\d{1,3}$/.test(host) ||
+    /^172\.(?:1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}$/.test(host);
+  const defaultBase = localHost
+    ? `http://${host || "localhost"}:3000`
+    : "https://deepbraintechnology.com";
+  const base = (import.meta.env?.VITE_PORTAL_URL || defaultBase).replace(/\/+$/, "");
+  const locale = getPortalLocale();
+  return `${base}/${locale === "zn" ? "zh" : locale}/${page}`;
 }

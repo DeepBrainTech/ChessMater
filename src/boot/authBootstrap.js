@@ -20,17 +20,17 @@ function isPrivateLanHost(hostname) {
 
 export function bootstrapAuth() {
   const host = window.location.hostname;
-  const isLocalDev =
+  const isLocalHost =
     host === "localhost" ||
     host === "127.0.0.1" ||
     host === "0.0.0.0" ||
     host === "" ||
     isPrivateLanHost(host);
-  session.isLocalDev = isLocalDev;
-  session.API_BASE_URL = isLocalDev
-    ? `http://${host || "localhost"}:3000`
-    : "https://chessmater-production.up.railway.app";
-  session.cmPortalApiBase = isLocalDev ? "" : "https://api.deepbraintechnology.com";
+  session.API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (isLocalHost
+    ? `http://${host || "localhost"}:3001`
+    : "https://chessmater-production.up.railway.app");
+  session.cmPortalApiBase = import.meta.env.VITE_PORTAL_API_BASE_URL ||
+    (isLocalHost ? `http://${host || "localhost"}:8000` : "https://api.deepbraintechnology.com");
 
   const hashHadContent = window.location.hash.replace(/^#/, "").length > 0;
   const initialHash = new URLSearchParams(window.location.hash.slice(1));
@@ -137,21 +137,7 @@ export function bootstrapAuth() {
       });
   }
 
-  if (isLocalDev && !gameToken) {
-    console.log("🔧 本地开发模式：自动设置测试用户");
-    session.cmToken = "dev-token";
-    session.cmUser = {
-      id: 999,
-      username: "dev_user",
-      portal_user_id: "999",
-      user_id: 999,
-    };
-    session.cmSessionReady = true;
-    session.authReady = Promise.resolve();
-    updateCurrentUserName();
-    if (typeof game.updateLoginPromptVisibility === "function")
-      game.updateLoginPromptVisibility();
-  } else if (gameToken) {
+  if (gameToken) {
     session.authReady = verifyPortalGameToken(gameToken);
   } else {
     session.authReady = (async () => {

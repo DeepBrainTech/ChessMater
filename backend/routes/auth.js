@@ -1,6 +1,5 @@
 module.exports = function ({
   app,
-  isLocalDevHost,
   pool,
   issueSessionToken,
   setSessionCookie,
@@ -15,50 +14,6 @@ module.exports = function ({
    * Token verify endpoint: validate token and create/find user (QuantumGo-style flow)
    */
   app.post('/api/auth/verify', async (req, res) => {
-    // 开发模式：如果是本地开发环境，直接返回测试用户
-    const isLocalDev = isLocalDevHost(req.headers.host);
-    if (isLocalDev && process.env.NODE_ENV !== 'production') {
-      const token = req.headers.authorization?.split(' ')[1];
-      if (token === 'dev-token' || !token) {
-        console.log('🔧 开发模式：返回测试用户');
-        // 尝试查找或创建测试用户
-        let user;
-        try {
-          const userResult = await pool.query('SELECT * FROM users WHERE username = $1', ['dev_user']);
-          if (userResult.rows.length > 0) {
-            user = userResult.rows[0];
-          } else {
-            const createResult = await pool.query(`INSERT INTO users (username, password, portal_user_id)
-             VALUES ($1, $2, $3)
-             RETURNING *`, ['dev_user', 'dev_password', '999']);
-            user = createResult.rows[0];
-          }
-        } catch (dbErr) {
-          console.warn('开发模式：数据库操作失败，使用模拟用户', dbErr.message);
-          user = {
-            id: 999,
-            username: 'dev_user',
-            portal_user_id: '999'
-          };
-        }
-        const sessionToken = issueSessionToken({
-          user_id: 999,
-          username: 'dev_user',
-          sub: 'dev_user'
-        });
-        setSessionCookie(req, res, sessionToken);
-        return res.json({
-          success: true,
-          sessionExpiresIn: CHESSMATER_SESSION_EXPIRE_SECONDS,
-          user: {
-            id: user.id,
-            username: user.username,
-            portal_user_id: user.portal_user_id,
-            user_id: 999
-          }
-        });
-      }
-    }
     const token = req.headers.authorization?.split(' ')[1];
     if (!token) {
       return res.status(401).json({

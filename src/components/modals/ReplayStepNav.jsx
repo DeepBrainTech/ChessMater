@@ -1,4 +1,16 @@
-export default function ReplayStepNav({ id, ariaLabel }) {
+export default function ReplayStepNav({ id, ariaLabel, variant }) {
+  if (variant === "inline") {
+    return (
+      <div className="replay-step-nav replay-step-nav--inline" id={id} role="group" aria-label={ariaLabel}>
+        {[["prev", "previous", "Previous"], ["next", "next", "Next"], ["first", "first", "First"], ["last", "last", "Last"]].map(([action, icon, label]) => (
+          <button key={action} type="button" className="replay-step-nav-btn" data-replay-step={action} aria-label={`${label} step`}>
+            <span aria-hidden="true" className="level-complete-nav-icon" style={{ backgroundImage: `url(/assets/images/level-complete/${icon}.svg)` }} />
+            {label}
+          </button>
+        ))}
+      </div>
+    );
+  }
   return (
     <div className="replay-step-nav" id={id} role="group" aria-label={ariaLabel}>
       <button

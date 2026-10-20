@@ -1,0 +1,360 @@
+:is(#levelCompleteModal, #inGameWalkthroughModal) {
+  --lc: min(1px, calc(100vw / 1920), calc(100dvh / 1080));
+  background: rgb(40 40 40 / 35%);
+  padding: 12px;
+  box-sizing: border-box;
+}
+:is(#levelCompleteModal, #inGameWalkthroughModal) .level-complete-content {
+  box-sizing: border-box;
+  width: calc(884.8 * var(--lc));
+  max-width: none;
+  max-height: calc(100dvh - 24px);
+  padding: calc(6.4 * var(--lc));
+  border: 0;
+  border-radius: calc(48 * var(--lc));
+  background: conic-gradient(from 90deg, #fdb702, #ffe9af 13%, #fec332 43.5%, #fdb702);
+  color: #3e1203;
+  text-align: left;
+  overflow: auto;
+  font: calc(22.4 * var(--lc))/1.15 "Game ADLaM Display", sans-serif;
+  box-shadow: inset 0 0 0 calc(3.2 * var(--lc)) #3e1203;
+}
+.level-complete-inner {
+  box-sizing: border-box;
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  gap: calc(16 * var(--lc));
+  padding: calc(16 * var(--lc));
+  border-radius: calc(40 * var(--lc));
+  overflow: hidden;
+  background: #fcf8f1;
+}
+.level-complete-inner::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  width: 147.18%;
+  height: 141.93%;
+  left: -20.57%;
+  top: -20.96%;
+  background: url("/assets/images/level-complete/paper.png") center / 100% 100% no-repeat;
+  pointer-events: none;
+}
+.level-complete-coin-reward {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: calc(8 * var(--lc));
+  margin: calc(-12 * var(--lc)) 0 0;
+  color: #d97706;
+  font: calc(24 * var(--lc))/1.2 "Game ADLaM Display", sans-serif;
+}
+.level-complete-coin-reward[hidden] { display: none; }
+.level-complete-coin-reward img { width: calc(30 * var(--lc)); height: calc(30 * var(--lc)); }
+:is(#levelCompleteModal, #inGameWalkthroughModal) .level-complete-header {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: calc(59.2 * var(--lc));
+  flex: 0 0 auto;
+}
+#levelCompleteHeading {
+  margin: 0;
+  color: #3e1203;
+  font: 700 calc(32 * var(--lc))/1.2 "Game Alegreya", Georgia, serif;
+}
+:is(#levelCompleteModal, #inGameWalkthroughModal) .level-complete-close {
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: calc(67.2 * var(--lc));
+  height: calc(59.2 * var(--lc));
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  cursor: pointer;
+  filter: drop-shadow(0 calc(3.2 * var(--lc)) calc(.4 * var(--lc)) rgb(0 0 0 / 25%));
+}
+.completion-icon { position: relative; display: block; flex: 0 0 auto; }
+.completion-icon span { position: absolute; display: block; background: center / 100% 100% no-repeat; }
+.completion-icon--close {
+  width: calc(32 * var(--lc));
+  height: calc(32 * var(--lc));
+  margin: auto;
+  --icon-rim: url("/assets/images/level-complete/close-rim.svg");
+  --icon-mask: url("/assets/images/level-complete/close-mask.svg");
+  --icon-body: url("/assets/images/level-complete/close-body.svg");
+  --icon-shine: url("/assets/images/level-complete/close-shine.svg");
+  --icon-detail: url("/assets/images/level-complete/close-detail.svg");
+}
+.completion-icon--lock {
+  --icon-rim: url("/assets/images/level-complete/lock-rim.svg");
+  --icon-mask: url("/assets/images/level-complete/lock-mask.svg");
+  --icon-body: url("/assets/images/level-complete/lock-body.svg");
+  --icon-shine: url("/assets/images/level-complete/lock-shine.svg");
+  --icon-detail: url("/assets/images/level-complete/lock-detail.svg");
+}
+.completion-icon .completion-icon-rim { inset: 8.24%; background-image: var(--icon-rim); }
+.completion-icon .completion-icon-face { inset: 11.18%; mask: var(--icon-mask) center / 100% 100% no-repeat; }
+.completion-icon .completion-icon-body { inset: 0; background-image: var(--icon-body); }
+.completion-icon .completion-icon-shine { inset: -4.17% 0 4.17%; background-image: var(--icon-shine); }
+.completion-icon .completion-icon-detail { inset: -4.17% 0 4.17%; background-image: var(--icon-detail); }
+.completion-icon--lock .completion-icon-rim { inset: 6.18% 11.76%; }
+.completion-icon--lock .completion-icon-face { inset: 9.12% 14.71%; }
+.completion-icon--lock .completion-icon-key { inset: 54.4% 43.35% 21.19% 43.33%; background-image: url("/assets/images/level-complete/lock-key.svg"); }
+:is(#levelCompleteModal, #inGameWalkthroughModal) .level-complete-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: calc(24 * var(--lc));
+  margin: 0;
+  color: #3e1203;
+  font-weight: 400;
+}
+.level-complete-stat {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: calc(16 * var(--lc));
+  height: calc(80 * var(--lc));
+  padding: 0 calc(32 * var(--lc));
+  border: calc(.8 * var(--lc)) solid #fdb702;
+  border-radius: calc(16 * var(--lc));
+  background: #fef6ee;
+  box-sizing: border-box;
+}
+.level-complete-stat strong { color: #d97706; font-size: calc(25.6 * var(--lc)); font-weight: 400; }
+:is(#levelCompleteModal, #inGameWalkthroughModal) .level-complete-announcement {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+:is(#levelCompleteModal, #inGameWalkthroughModal) .level-complete-achievement:empty { display: none; }
+:is(#levelCompleteModal, #inGameWalkthroughModal) .level-complete-achievement {
+  margin: 0;
+  min-height: 0;
+  color: #a65705;
+  font: inherit;
+  text-align: center;
+}
+:is(#levelCompleteModal, #inGameWalkthroughModal) .level-complete-replay {
+  position: relative;
+  margin: 0;
+  padding: calc(16 * var(--lc)) calc(32 * var(--lc));
+  border: calc(.8 * var(--lc)) solid #fdb702;
+  border-radius: calc(24 * var(--lc));
+  background: rgb(253 183 2 / 20%);
+}
+:is(#levelCompleteModal, #inGameWalkthroughModal) .level-complete-replay-title {
+  margin: 0 0 calc(16 * var(--lc));
+  color: #3e1203;
+  font: inherit;
+  line-height: calc(25.6 * var(--lc));
+}
+:is(#levelCompleteReplayAuthor, #inGameWalkthroughAuthor) { color: #d97706; }
+:is(#levelCompleteModal, #inGameWalkthroughModal) .level-complete-replay-subtitle {
+  margin: 0;
+  color: #3e1203;
+  font: inherit;
+}
+:is(#levelCompleteModal, #inGameWalkthroughModal) .level-complete-replay-subtitle:not(:empty) { margin-bottom: calc(16 * var(--lc)); }
+:is(#levelCompleteModal, #inGameWalkthroughModal) .level-complete-replay:has(canvas[style*="block"]) .level-complete-replay-subtitle { display: none; }
+:is(#levelCompleteModal, #inGameWalkthroughModal) .level-complete-replay-canvas-wrap {
+  max-width: none;
+  position: relative;
+  height: calc(402 * var(--lc));
+  margin: 0;
+}
+:is(#levelCompleteModal, #inGameWalkthroughModal) .level-complete-replay-canvas-wrap:has(canvas[style*="none"]) { display: none; }
+.level-complete-replay-board {
+  position: relative;
+  width: calc(635 * var(--lc));
+  max-width: 100%;
+  height: calc(397 * var(--lc));
+  padding: calc(20 * var(--lc));
+  box-sizing: border-box;
+  margin: 0 auto;
+}
+.hint-empty-state { display: none; }
+#inGameWalkthroughModal.hint-empty .hint-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: calc(16 * var(--lc));
+  height: 100%;
+  padding: calc(24 * var(--lc));
+  box-sizing: border-box;
+  text-align: center;
+  color: #3e1203;
+}
+.hint-empty-state p { margin: 0; font-size: .8em; color: #a65705; }
+#inGameWalkthroughModal.hint-empty .level-complete-replay-board { display: none; }
+#inGameWalkthroughModal.hint-empty .level-complete-replay-title,
+#inGameWalkthroughModal.hint-empty .level-complete-replay-event,
+#inGameWalkthroughModal.hint-empty .level-complete-replay-controls { visibility: hidden; }
+.level-complete-replay-board::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: url("/assets/images/game/board-frame.webp") center / 100% 100% no-repeat;
+}
+:is(#levelCompleteModal, #inGameWalkthroughModal) .level-complete-replay canvas {
+  display: block;
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  border: 0;
+  border-radius: 0;
+  margin: 0;
+  background: #e7dfce;
+}
+:is(#levelCompleteModal, #inGameWalkthroughModal) .locked .level-complete-replay-board { filter: blur(calc(4 * var(--lc))); }
+:is(#levelCompleteModal, #inGameWalkthroughModal) .level-complete-replay-lock {
+  position: absolute;
+  inset: 0;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: calc(20 * var(--lc));
+  border: 0;
+  border-radius: 0;
+  background: none;
+  backdrop-filter: none;
+  cursor: pointer;
+}
+:is(#levelCompleteModal, #inGameWalkthroughModal) .level-complete-replay-lock-icon {
+  display: block;
+  width: calc(58 * var(--lc));
+  height: calc(58 * var(--lc));
+  border: 0;
+  background: none;
+  object-fit: contain;
+  box-shadow: none;
+}
+:is(#levelCompleteModal, #inGameWalkthroughModal) .level-complete-replay-lock-text {
+  display: flex;
+  align-items: center;
+  gap: calc(20 * var(--lc));
+  color: white;
+  font: inherit;
+  -webkit-text-stroke: calc(1.4 * var(--lc)) #3e1203;
+  paint-order: stroke fill;
+}
+:is(#levelCompleteModal, #inGameWalkthroughModal) .level-complete-replay-lock-cost {
+  position: relative;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  min-width: calc(145.6 * var(--lc));
+  min-height: calc(60 * var(--lc));
+  padding: 0 calc(12 * var(--lc));
+  box-sizing: border-box;
+  border: 0;
+  border-radius: 0;
+  color: #3e1203;
+  font: 700 calc(25.6 * var(--lc))/1 "Game Alegreya", Georgia, serif;
+  -webkit-text-stroke: 0;
+  background:
+    url("/assets/images/level-complete/unlock-shine.svg") center / 90% 82% no-repeat,
+    url("/assets/images/level-complete/unlock-fill.svg") center / 93% 83% no-repeat,
+    url("/assets/images/level-complete/unlock-border.png") center / 100% 100% no-repeat;
+}
+.level-complete-replay-lock-cost::before,
+.level-complete-replay-lock-cost::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: calc(17.315 * var(--lc));
+  height: calc(20.566 * var(--lc));
+  transform: translateY(-50%);
+  background: url("/assets/images/game/ui-button-diamond.svg") center / contain no-repeat;
+}
+.level-complete-replay-lock-cost::before { left: calc(-4.8 * var(--lc)); }
+.level-complete-replay-lock-cost::after { right: calc(-4.8 * var(--lc)); }
+:is(#levelCompleteModal, #inGameWalkthroughModal) .undo-exchange-cost-part { gap: calc(8 * var(--lc)); }
+:is(#levelCompleteModal, #inGameWalkthroughModal) .undo-exchange-currency-icon { width: calc(32 * var(--lc)); height: calc(29.537 * var(--lc)); }
+:is(#levelCompleteModal, #inGameWalkthroughModal) .level-complete-replay-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: calc(30 * var(--lc));
+  margin-top: calc(16 * var(--lc));
+  min-height: calc(25.6 * var(--lc));
+}
+:is(#levelCompleteModal, #inGameWalkthroughModal) .level-complete-replay-step {
+  margin: 0;
+  white-space: nowrap;
+  color: #3e1203;
+  font: calc(18 * var(--lc))/1.42 "Game ADLaM Display", sans-serif;
+}
+:is(#levelCompleteModal, #inGameWalkthroughModal) .replay-step-nav--inline {
+  grid-template-columns: repeat(4, auto);
+  grid-template-rows: auto;
+  gap: calc(12 * var(--lc));
+  margin: 0;
+  max-width: none;
+}
+:is(#levelCompleteModal, #inGameWalkthroughModal) .replay-step-nav-btn {
+  display: flex;
+  align-items: center;
+  gap: calc(4 * var(--lc));
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  color: #3e1203;
+  font: 700 calc(16 * var(--lc))/1.6 "Game Alegreya", Georgia, serif;
+}
+:is(#levelCompleteModal, #inGameWalkthroughModal) .replay-step-nav-btn:disabled { opacity: 1; cursor: default; }
+.level-complete-nav-icon { width: calc(20 * var(--lc)); height: calc(20 * var(--lc)); background: center / contain no-repeat; }
+:is(#levelCompleteModal, #inGameWalkthroughModal) .level-complete-replay-event {
+  display: block;
+  height: calc(24 * var(--lc));
+  margin: calc(8 * var(--lc)) 0 0;
+  color: #a65705;
+  font-size: calc(16 * var(--lc));
+  line-height: calc(24 * var(--lc));
+  text-align: center;
+}
+:is(#levelCompleteModal, #inGameWalkthroughModal) .level-complete-actions {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: calc(30 * var(--lc));
+  flex-wrap: nowrap;
+  margin: 0;
+  padding: calc(8 * var(--lc)) 0;
+}
+:is(#levelCompleteModal, #inGameWalkthroughModal) .level-complete-actions button {
+  width: calc(235 * var(--lc));
+  height: calc(65 * var(--lc));
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  font: calc(20.161 * var(--lc))/1 "Game ADLaM Display", sans-serif;
+  color: white;
+  -webkit-text-stroke: calc(2 * var(--lc)) #3e1203;
+  paint-order: stroke fill;
+  box-shadow: none;
+  background-color: transparent;
+  background-repeat: no-repeat;
+}
+:is(#levelCompleteModal, #inGameWalkthroughModal) :is(#levelCompleteRetryBtn, #inGameWalkthroughCloseBtn) { background-image: url("/assets/images/level-complete/retry.png"); background-size: 154.71% 291.18%; background-position: 50.26% 45.62%; }
+:is(#levelCompleteModal, #inGameWalkthroughModal) #levelCompleteNextBtn { background-image: url("/assets/images/level-complete/next.png"); background-size: 153.91% 329.26%; background-position: 50.18% 45.16%; }
+:is(#levelCompleteModal, #inGameWalkthroughModal) button:hover { filter: brightness(1.06); }
+:is(#levelCompleteModal, #inGameWalkthroughModal) button:disabled { cursor: default; }
+:is(#levelCompleteModal, #inGameWalkthroughModal) button:focus-visible,
+:is(#levelCompleteModal, #inGameWalkthroughModal) [role="button"]:focus-visible { outline: 2px solid #7e31b3; outline-offset: 3px; }
+@media (max-width: 760px) and (orientation: portrait) {
+  :is(#levelCompleteModal, #inGameWalkthroughModal) { --lc: min(.8px, calc((100vw - 24px) / 884.8), calc((100dvh - 24px) / 832.6)); }
+}

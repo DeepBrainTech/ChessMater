@@ -23,7 +23,7 @@ export async function initPageUi(signal) {
   cleanups.push(initRotateNotice());
   cleanups.push(initMusicControls());
   cleanups.push(initLeaderboardAndGuide());
-  initLevelSelectApi();
+  cleanups.push(initLevelSelectApi());
   try {
     cleanups.push(await initStartFlow(signal));
   } catch (error) {

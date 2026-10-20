@@ -1,4 +1,59 @@
 export function register(game) {
+  game.removeTransparentGrid = image => {
+    const width = image.naturalWidth;
+    const height = image.naturalHeight;
+    if (!width || !height) return image;
+    try {
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const context = canvas.getContext("2d", { willReadFrequently: true });
+      context.drawImage(image, 0, 0);
+      const pixels = context.getImageData(0, 0, width, height);
+      const { data } = pixels;
+      const queue = new Uint32Array(width * height);
+      let head = 0;
+      let tail = 0;
+
+      const enqueueBackground = index => {
+        const offset = index * 4;
+        if (data[offset + 3] === 0) return;
+        const red = data[offset];
+        const green = data[offset + 1];
+        const blue = data[offset + 2];
+        const brightness = Math.min(red, green, blue);
+        const spread = Math.max(red, green, blue) - brightness;
+        if (brightness < 205 || spread > 34) return;
+        data[offset + 3] = 0;
+        queue[tail++] = index;
+      };
+
+      for (let x = 0; x < width; x++) {
+        enqueueBackground(x);
+        enqueueBackground((height - 1) * width + x);
+      }
+      for (let y = 1; y < height - 1; y++) {
+        enqueueBackground(y * width);
+        enqueueBackground(y * width + width - 1);
+      }
+
+      while (head < tail) {
+        const index = queue[head++];
+        const x = index % width;
+        const y = (index - x) / width;
+        if (x > 0) enqueueBackground(index - 1);
+        if (x + 1 < width) enqueueBackground(index + 1);
+        if (y > 0) enqueueBackground(index - width);
+        if (y + 1 < height) enqueueBackground(index + width);
+      }
+
+      context.putImageData(pixels, 0, 0);
+      return canvas;
+    } catch {
+      return image;
+    }
+  };
+
   game.syncVisitedSquaresSize = function () {
     while (game.visitedSquares.length < game.ROWS) {
       game.visitedSquares.push(Array(game.COLS).fill(false));
@@ -38,12 +93,10 @@ export function initialize(game) {
   game.moveCountDisplay = document.getElementById("moveCount");
   game.fewestOtherMovesDisplay = document.getElementById("fewestOtherMoves");
   game.blockTipToggle = document.getElementById("blockTipToggle");
-  game.blockTipModal = document.getElementById("blockTipModal");
-  game.hintSolutionSummary = document.getElementById("hintSolutionSummary");
-  game.hintSolutionActionBtn = document.getElementById("hintSolutionActionBtn");
-  game.hintSolutionNote = document.getElementById("hintSolutionNote");
   game.inGameWalkthroughModal = document.getElementById("inGameWalkthroughModal");
   game.inGameWalkthroughTitle = document.getElementById("inGameWalkthroughTitle");
+  game.inGameWalkthroughAuthor = document.getElementById("inGameWalkthroughAuthor");
+  game.inGameWalkthroughBestMoves = document.getElementById("inGameWalkthroughBestMoves");
   game.inGameWalkthroughSubtitle = document.getElementById("inGameWalkthroughSubtitle");
   game.inGameWalkthroughCanvas = document.getElementById("inGameWalkthroughCanvas");
   game.inGameWalkthroughHint = document.getElementById("inGameWalkthroughHint");
@@ -57,12 +110,14 @@ export function initialize(game) {
   game.antigravityToggleButton = document.getElementById("antigravityToggle");
   game.levelCompleteModal = document.getElementById("levelCompleteModal");
   game.levelCompleteText = document.getElementById("levelCompleteText");
+  game.levelCompleteCoinReward = document.getElementById("levelCompleteCoinReward");
   game.levelCompleteMoveCountDisplay = document.getElementById("levelCompleteMoveCount");
   game.levelCompleteFewestOtherMovesDisplay = document.getElementById("levelCompleteFewestOtherMoves");
   game.levelCompleteAchievement = document.getElementById("levelCompleteAchievement");
   game.levelCompleteReplayPanel = document.getElementById("levelCompleteReplayPanel");
   game.levelCompleteReplayLock = document.getElementById("levelCompleteReplayLock");
   game.levelCompleteReplayTitle = document.getElementById("levelCompleteReplayTitle");
+  game.levelCompleteReplayAuthor = document.getElementById("levelCompleteReplayAuthor");
   game.levelCompleteReplayCanvas = document.getElementById("levelCompleteReplayCanvas");
   game.levelCompleteReplaySubtitle = document.getElementById("levelCompleteReplaySubtitle");
   game.levelCompleteReplayHint = document.getElementById("levelCompleteReplayHint");
@@ -98,9 +153,9 @@ export function initialize(game) {
     GOAL: 3,
     // Goal (red king)
     PHASE_BLOCK: 4,
-    // Phase-through block (blue)
+    // One-way phase block (upward arrow)
     PHASE_BLOCK_ACTIVE: 5,
-    // Phase block that has been activated (solid)
+    // Legacy saved value; treated as the same one-way phase block
     TRANSFORMER: 6,
     // Transformer block (changes piece type)
     OBJECTIVE: 7,
@@ -190,6 +245,7 @@ export function initialize(game) {
     king: new Image(),
     pawn: new Image()
   };
+  game.tileImages = {};
   (function loadPieceImagesFromAssets() {
     const pieces = game.CM_ASSETS && game.CM_ASSETS.pieces || {};
     const targets = game.CM_ASSETS && game.CM_ASSETS.targetPieces || {};
@@ -210,6 +266,18 @@ export function initialize(game) {
     game.targetPieceImages.knight.src = targets.knight || "";
     game.targetPieceImages.king.src = targets.king || pieces.target || "";
     game.targetPieceImages.pawn.src = targets.pawn || "";
+    const tileAssets = game.CM_ASSETS && game.CM_ASSETS.tiles || {};
+    Object.entries(tileAssets).forEach(([name, source]) => {
+      const image = new Image();
+      game.tileImages[name] = image;
+      if (game.lifecycle) {
+        game.lifecycle.setHandler(image, "onload", () => {
+          if (name === "bomb") game.tileImages[name] = game.removeTransparentGrid(image);
+          if (game.lifecycle.active) game.drawBoard?.();
+        });
+      }
+      image.src = source || "";
+    });
   })();
 
   // tracker for players, goals, and objectives
@@ -275,7 +343,7 @@ export function initialize(game) {
   game.moveHistorySnapshots = [];
   game.undoCredits = 0;
   game.antigravityCredits = 0;
-  game.replayUnlockedForLevel = false;
+  game.hintUnlockedThisRun = false;
   game.antigravityUnlockedThisRun = false;
   game.autoRestartScheduled = false;
 }

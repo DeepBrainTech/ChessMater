@@ -1,5 +1,9 @@
 import { session } from '../../services/session.js';
+import { showModal, hideModal } from '../modalFocus.js';
 export function register(game) {
+  game.openPowerUpsShop = function (asset) {
+    game.cmEmitGameUi?.({ type: 'openPowerUps', asset, game });
+  };
   game.updateUndoButtonLabel = function () {
     if (!game.undoMoveButton) return;
     if (game.CM_EDITOR_PAGE) game.undoMoveButton.textContent = `Undo(${game.undoCredits})`;
@@ -124,41 +128,83 @@ export function register(game) {
     });
     return response;
   };
-  game.syncUndoCreditsFromServer = async function () {
-    try {
-      const res = await game.apiFetchWithAuthRetry("/undo-credits", {
-        method: "GET",
-        headers: game.buildAuthHeaders()
-      });
-      if (!res.ok) return false;
-      const data = await res.json();
-      const credits = Number.parseInt(data?.undoCredits, 10);
-      game.localUndoCredits = Number.isFinite(credits) ? credits : 0;
-      await game.syncPortalInventory();
-      game.undoCredits = game.localUndoCredits + (game.portalQuantities[game.PORTAL_UNDO_ITEM_ID] || 0);
-      game.updateUndoButtonLabel();
-      return true;
-    } catch (_) {
-      return false;
-    }
+  game.applyInventoryBalances = function (data) {
+    game.localHintCredits = game.hintCredits = Number(data.hintCredits) || 0;
+    game.localUndoCredits = game.undoCredits = Number(data.undoCredits) || 0;
+    game.localAntigravityCredits = game.antigravityCredits = Number(data.antigravityCredits) || 0;
+    game.updateUndoButtonLabel();
+    game.updateAntigravityButtonLabel();
+    game.cmEmitGameUi?.({ type: 'hintCredits', hintCredits: game.hintCredits });
+    game.updateHintButton?.();
   };
-  game.syncAntigravityCreditsFromServer = async function () {
+  game.syncGameInventory = async function () {
     try {
-      const res = await game.apiFetchWithAuthRetry("/antigravity-credits", {
-        method: "GET",
-        headers: game.buildAuthHeaders()
-      });
-      if (!res.ok) return false;
+      const res = await game.apiFetchWithAuthRetry('/inventory', { method: 'GET', headers: game.buildAuthHeaders() });
       const data = await res.json();
-      const credits = Number.parseInt(data?.antigravityCredits, 10);
-      game.localAntigravityCredits = Number.isFinite(credits) ? credits : 0;
-      await game.syncPortalInventory();
-      game.antigravityCredits = game.localAntigravityCredits + (game.portalQuantities[game.PORTAL_ANTIGRAVITY_ITEM_ID] || 0);
-      game.updateAntigravityButtonLabel();
+      if (!res.ok || !data.success) return false;
+      game.applyInventoryBalances(data);
       return true;
-    } catch (_) {
-      return false;
-    }
+    } catch (_) { return false; }
+  };
+  game.syncUndoCreditsFromServer = () => game.syncGameInventory();
+  game.syncAntigravityCreditsFromServer = () => game.syncGameInventory();
+  game.syncLocalHintCreditsFromServer = () => game.syncGameInventory();
+  game.recoverLevelCoinRewards = async function () {
+    const runId = game.hintRunId;
+    try {
+      const response = await game.apiFetchWithAuthRetry('/level-rewards/claim', {
+        method: 'POST', headers: game.buildAuthHeaders(),
+      });
+      const data = await response.json();
+      if (response.ok && data.success && game.hintRunId === runId && game.gameWon &&
+          data.awardedLevels?.includes(game.currentLevelIndex + 1) && game.levelCompleteCoinReward) {
+        game.levelCompleteCoinReward.hidden = false;
+      }
+    } catch (_) { /* The server keeps pending rewards for the next visit. */ }
+  };
+  game.claimStarterPack = async function () {
+    try {
+      const res = await game.apiFetchWithAuthRetry('/starter-pack/claim', {
+        method: 'POST', headers: game.buildAuthHeaders(), body: JSON.stringify({})
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) return false;
+      game.applyInventoryBalances(data);
+      return true;
+    } catch (_) { return false; }
+  };
+  game.claimInventoryDelivery = async function (delivery) {
+    const res = await game.apiFetchWithAuthRetry('/inventory/claim', {
+      method: 'POST', headers: game.buildAuthHeaders(), body: JSON.stringify({ grant_token: delivery.grant_token })
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error('Inventory delivery pending. Please retry.');
+    game.applyInventoryBalances(data);
+    return data;
+  };
+  game.recoverInventoryDeliveries = function () {
+    if (game.CM_EDITOR_PAGE) return Promise.resolve(true);
+    if (game.inventoryRecoveryPromise) return game.inventoryRecoveryPromise;
+    const recovery = (async () => {
+      try {
+        const portal = game.getPortalCommerce();
+        await portal.assertAccount();
+        await portal.migrateInventory();
+        for (let batch = 0; batch < 20; batch++) {
+          const { deliveries } = await portal.pendingDeliveries();
+          if (!deliveries.length) return true;
+          for (const delivery of deliveries) {
+            await game.claimInventoryDelivery(delivery);
+            portal.finishLocalItem(delivery.item_id, delivery.purchase_id);
+            await portal.acknowledgeDelivery(delivery.purchase_id);
+          }
+        }
+        return false;
+      } catch (_) { return false; }
+      finally { game.inventoryRecoveryPromise = null; }
+    })();
+    game.inventoryRecoveryPromise = recovery;
+    return recovery;
   };
   game.consumeUndoCredit = async function (amount = 1) {
     return game.consumeGameCredit(game.PORTAL_UNDO_ITEM_ID, '/undo-credits/use', amount);
@@ -171,32 +217,14 @@ export function register(game) {
     if (!base) throw new Error('Portal session not available.');
     if (!game.cmCommerceClient || game.cmCommerceBase !== base) {
       game.cmCommerceBase = base;
-      game.cmCommerceClient = new game.PortalInventoryClient(base, 'chessmater', () => game.gameAccountId(session.cmToken) || Number(session.cmUser?.portal_user_id || session.cmUser?.user_id || session.cmUser?.id) || null);
+      game.cmCommerceClient = new game.PortalCommerceClient(base, 'chessmater', () => game.gameAccountId(session.cmToken) || Number(session.cmUser?.portal_user_id || session.cmUser?.user_id || session.cmUser?.id) || null);
     }
     return game.cmCommerceClient;
-  };
-  game.syncPortalInventory = async function () {
-    try {
-      const portal = game.getPortalCommerce();
-      await portal.assertAccount();
-      const inventory = await portal.inventory();
-      game.portalQuantities = Object.fromEntries(inventory.items.map(item => [item.item_id, item.quantity]));
-    } catch (_) {/* Unavailable inventory cannot authorize a game action. */}
-    game.undoCredits = game.localUndoCredits + (game.portalQuantities[game.PORTAL_UNDO_ITEM_ID] || 0);
-    game.antigravityCredits = game.localAntigravityCredits + (game.portalQuantities[game.PORTAL_ANTIGRAVITY_ITEM_ID] || 0);
-    game.updateUndoButtonLabel();
-    game.updateAntigravityButtonLabel();
   };
   game.consumeGameCredit = async function (itemId, localPath, amount) {
     if (!Number.isSafeInteger(amount) || amount <= 0 || game.creditUsesBusy.has(itemId)) return false;
     game.creditUsesBusy.add(itemId);
     try {
-      if ((game.portalQuantities[itemId] || 0) >= amount || game.portalUndoShopAvailable() && game.getPortalCommerce().hasPendingUse(itemId, amount)) {
-        const used = await game.getPortalCommerce().useItem(itemId, amount);
-        game.portalQuantities[itemId] = used.inventory_quantity;
-        await game.syncPortalInventory();
-        return true;
-      }
       const res = await game.apiFetchWithAuthRetry(localPath, {
         method: 'POST',
         headers: game.buildAuthHeaders(),
@@ -207,14 +235,36 @@ export function register(game) {
       if (!res.ok) return false;
       const data = await res.json();
       if (!data.success) return false;
-      if (itemId === game.PORTAL_UNDO_ITEM_ID) game.localUndoCredits = data.undoCredits;else game.localAntigravityCredits = data.antigravityCredits;
-      await game.syncPortalInventory();
+      if (itemId === game.PORTAL_UNDO_ITEM_ID) {
+        game.localUndoCredits = game.undoCredits = data.undoCredits;
+        game.updateUndoButtonLabel();
+      } else {
+        game.localAntigravityCredits = game.antigravityCredits = data.antigravityCredits;
+        game.updateAntigravityButtonLabel();
+      }
+      await game.syncGameInventory();
       return true;
     } catch (_) {
       return false;
     } finally {
       game.creditUsesBusy.delete(itemId);
     }
+  };
+  game.consumeLocalHintCredit = async function (runId) {
+    const res = await game.apiFetchWithAuthRetry('/hint-credits/use', {
+      method: 'POST', headers: game.buildAuthHeaders(),
+      body: JSON.stringify({ request_id: runId })
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data?.success) {
+      const error = new Error(data?.error || 'Could not use Hint credit');
+      if (res.status === 400) error.code = 'insufficient_inventory';
+      throw error;
+    }
+    game.localHintCredits = Number.parseInt(data.hintCredits, 10) || 0;
+    game.hintCredits = game.localHintCredits;
+    game.cmEmitGameUi?.({ type: 'hintCredits', hintCredits: game.hintCredits });
+    return data;
   };
   game.portalUndoShopAvailable = function () {
     const base = game.normalizePortalApiBase(session.cmPortalApiBase || "");
@@ -243,11 +293,7 @@ export function register(game) {
   };
   game.refreshLevelCompleteReplayLockCostEl = function () {
     if (!game.levelCompleteReplayLockCostEl) return;
-    game.levelCompleteReplayLockCostEl.textContent = "…";
-    void (async () => {
-      const cost = await game.ensureShopCostCached(game.PORTAL_REPLAY_ITEM_ID);
-      game.levelCompleteReplayLockCostEl.innerHTML = game.formatShopCostForExchangeLineHtml(cost);
-    })();
+    game.levelCompleteReplayLockCostEl.innerHTML = '<span class="undo-exchange-cost-part"><img class="undo-exchange-currency-icon" src="/assets/images/game/ui-icon-hint.svg" alt="Hint ticket" width="22" height="22"><span>1</span></span>';
   };
   game.warmShopPriceCache = async function () {
     const base = game.normalizePortalApiBase(session.cmPortalApiBase || "");
@@ -275,12 +321,7 @@ export function register(game) {
   game.ensureShopCostCached = async function (itemId) {
     try {
       const portal = game.getPortalCommerce();
-      let cost;
-      if (itemId === game.PORTAL_REPLAY_ITEM_ID) {
-        cost = (await portal.quote('replay')).cost;
-      } else {
-        cost = (await portal.catalog()).items[itemId]?.cost;
-      }
+      const cost = (await portal.catalog()).items[itemId]?.cost;
       if (!cost || Object.values(cost).some(value => !Number.isSafeInteger(value) || value < 0)) throw new Error('invalid_shop_cost');
       game.shopPriceCache[itemId] = game.normalizePortalShopCost(cost);
       return game.shopPriceCache[itemId];
@@ -291,8 +332,9 @@ export function register(game) {
   };
   game.getPortalAssets = async function () {
     const base = game.normalizePortalApiBase(session.cmPortalApiBase || "");
-    if (!base) return null;
-    try {
+    let assets = null;
+    game.cmEmitGameUi?.({ type: "portalAssetsLoading" });
+    if (base) try {
       const res = await fetch(`${base}/api/user/assets`, {
         credentials: "include",
         headers: {
@@ -303,35 +345,30 @@ export function register(game) {
       const coins = data?.data?.coins;
       const diamonds = data?.data?.diamonds;
       const flowers = data?.data?.flowers;
-      if (typeof coins !== "number" || typeof diamonds !== "number" || typeof flowers !== "number") {
-        return null;
+      if (res.ok && data?.success && [coins, diamonds, flowers].every(Number.isFinite)) {
+        assets = {
+          coins: Math.max(0, Math.floor(coins)),
+          diamonds: Math.max(0, Math.floor(diamonds)),
+          flowers: Math.max(0, Math.floor(flowers))
+        };
       }
-      return {
-        coins: Math.max(0, Math.floor(coins)),
-        diamonds: Math.max(0, Math.floor(diamonds)),
-        flowers: Math.max(0, Math.floor(flowers))
-      };
-    } catch (_) {
-      return null;
-    }
+    } catch (_) { /* The balance stays unavailable until the next successful refresh. */ }
+    game.cmEmitGameUi?.({ type: "portalAssets", assets });
+    return assets;
   };
   game.postPortalRedeemUndo = async function () {
     return game.postPortalRedeemItem(game.PORTAL_UNDO_ITEM_ID);
   };
   game.postPortalRedeemItem = async function (itemId) {
     try {
-      const result = await game.getPortalCommerce().buyItem(itemId);
-      game.portalQuantities[itemId] = result.inventory_quantity;
-      await game.syncPortalInventory();
-      return {
-        ok: true,
-        data: result
-      };
+      const portal = game.getPortalCommerce();
+      const delivery = await portal.buyLocalItem(itemId);
+      const data = await game.claimInventoryDelivery(delivery);
+      portal.finishLocalItem(itemId);
+      await portal.acknowledgeDelivery(delivery.purchase_id).catch(() => {});
+      return { ok: true, data };
     } catch (err) {
-      return {
-        ok: false,
-        message: err?.message || 'Redeem failed.'
-      };
+      return { ok: false, message: err?.message || 'Redeem failed.' };
     }
   };
   game.setUndoExchangeBalanceCells = function (coinsText, diamondsText, flowersText) {
@@ -353,8 +390,7 @@ export function register(game) {
   };
   game.closeUndoExchangeModal = function () {
     if (!game.undoExchangeModal) return;
-    game.undoExchangeModal.classList.remove("active");
-    game.undoExchangeModal.setAttribute("aria-hidden", "true");
+    hideModal(game.undoExchangeModal);
   };
   game.refreshUndoExchangeAssetsDisplay = async function () {
     if (!game.portalUndoShopAvailable()) {
@@ -373,11 +409,11 @@ export function register(game) {
     game.setUndoExchangeBalanceCells(String(assets.coins), String(assets.diamonds), String(assets.flowers));
   };
   game.openUndoExchangeModal = async function () {
+    if (!game.CM_EDITOR_PAGE) return game.openPowerUpsShop('undo');
     if (!game.undoExchangeModal) return;
     if (game.undoExchangeCostTextEl) game.undoExchangeCostTextEl.textContent = "…";
     game.setUndoExchangeMessage("");
-    game.undoExchangeModal.classList.add("active");
-    game.undoExchangeModal.setAttribute("aria-hidden", "false");
+    showModal(game.undoExchangeModal);
     game.setUndoExchangeBusy(true);
     const [, cost] = await Promise.all([game.refreshUndoExchangeAssetsDisplay(), game.ensureShopCostCached(game.PORTAL_UNDO_ITEM_ID)]);
     if (game.undoExchangeCostTextEl) game.undoExchangeCostTextEl.innerHTML = game.formatShopCostForExchangeLineHtml(cost);
@@ -427,44 +463,9 @@ export function register(game) {
     if (kind === "success") messageEl.classList.add("success");
     if (kind === "hint") messageEl.classList.add("hint");
   };
-  game.fetchReplayUnlockStatusForLevel = async function (levelNumber) {
-    const lvl = Number.parseInt(levelNumber, 10);
-    if (!Number.isFinite(lvl) || lvl <= 0) return false;
-    try {
-      const res = await game.apiFetchWithAuthRetry(`/replay-unlocks/status?level=${encodeURIComponent(lvl)}`, {
-        method: "GET",
-        headers: game.buildAuthHeaders()
-      });
-      if (!res.ok) return false;
-      const data = await res.json();
-      return !!data?.unlocked;
-    } catch (_) {
-      return false;
-    }
-  };
-  game.activateReplayUnlockForLevel = async function (levelNumber, grantToken) {
-    const lvl = Number.parseInt(levelNumber, 10);
-    if (!Number.isFinite(lvl) || lvl <= 0) return false;
-    try {
-      const res = await game.apiFetchWithAuthRetry("/replay-unlocks/activate", {
-        method: "POST",
-        headers: {
-          ...game.buildAuthHeaders(),
-          "X-Grant-Token": grantToken
-        },
-        body: JSON.stringify({
-          level: lvl
-        })
-      });
-      return res.ok;
-    } catch (_) {
-      return false;
-    }
-  };
   game.closeAntigravityExchangeModal = function () {
     if (!game.antigravityExchangeModal) return;
-    game.antigravityExchangeModal.classList.remove("active");
-    game.antigravityExchangeModal.setAttribute("aria-hidden", "true");
+    hideModal(game.antigravityExchangeModal);
   };
   game.refreshAntigravityExchangeAssetsDisplay = async function () {
     if (!game.portalUndoShopAvailable()) {
@@ -487,11 +488,11 @@ export function register(game) {
     game.antigravityExchangeRedeemBtn.disabled = !!busy || !game.portalUndoShopAvailable() || !game.shopPriceCache[game.PORTAL_ANTIGRAVITY_ITEM_ID];
   };
   game.openAntigravityExchangeModal = async function () {
+    if (!game.CM_EDITOR_PAGE) return game.openPowerUpsShop('antigravity');
     if (!game.antigravityExchangeModal) return;
     if (game.antigravityExchangeCostTextEl) game.antigravityExchangeCostTextEl.textContent = "…";
     game.setGenericExchangeMessage(game.antigravityExchangeMessageEl, "");
-    game.antigravityExchangeModal.classList.add("active");
-    game.antigravityExchangeModal.setAttribute("aria-hidden", "false");
+    showModal(game.antigravityExchangeModal);
     game.setAntigravityExchangeBusy(true);
     const [, cost] = await Promise.all([game.refreshAntigravityExchangeAssetsDisplay(), game.ensureShopCostCached(game.PORTAL_ANTIGRAVITY_ITEM_ID)]);
     if (game.antigravityExchangeCostTextEl) game.antigravityExchangeCostTextEl.innerHTML = game.formatShopCostForExchangeLineHtml(cost);
@@ -526,116 +527,78 @@ export function register(game) {
       });
     }
   };
-  game.closeReplayExchangeModal = function () {
-    if (!game.replayExchangeModal) return;
-    game.replayExchangeModal.classList.remove("active");
-    game.replayExchangeModal.setAttribute("aria-hidden", "true");
+  game.resetHintForRun = function ({ preserve = false } = {}) {
+    game.closeInGameWalkthroughModal?.();
+    if (preserve) return;
+    game.hintRunId = globalThis.crypto.randomUUID();
+    game.hintUnlockedThisRun = false;
+    game.hintUsePromise = null;
+    game.hintPendingRunId = null;
   };
-  game.refreshReplayExchangeAssetsDisplay = async function () {
-    if (!game.portalUndoShopAvailable()) {
-      game.setGenericExchangeBalanceCells(game.replayExchangeCoinsEl, game.replayExchangeDiamondsEl, game.replayExchangeFlowersEl, "—", "—", "—");
-      game.setGenericExchangeMessage(game.replayExchangeMessageEl, "Open from the main portal to load your coins, diamonds, and flowers.", "hint");
-      return;
-    }
-    game.setGenericExchangeMessage(game.replayExchangeMessageEl, "");
-    game.setGenericExchangeBalanceCells(game.replayExchangeCoinsEl, game.replayExchangeDiamondsEl, game.replayExchangeFlowersEl, "…", "…", "…");
-    const assets = await game.getPortalAssets();
-    if (!assets) {
-      game.setGenericExchangeBalanceCells(game.replayExchangeCoinsEl, game.replayExchangeDiamondsEl, game.replayExchangeFlowersEl, "—", "—", "—");
-      game.setGenericExchangeMessage(game.replayExchangeMessageEl, "Could not load assets. Check portal session.", "error");
-      return;
-    }
-    game.setGenericExchangeBalanceCells(game.replayExchangeCoinsEl, game.replayExchangeDiamondsEl, game.replayExchangeFlowersEl, String(assets.coins), String(assets.diamonds), String(assets.flowers));
-  };
-  game.setReplayExchangeBusy = function (busy) {
-    if (!game.replayExchangeRedeemBtn) return;
-    game.replayExchangeRedeemBtn.disabled = !!busy || !game.portalUndoShopAvailable() || !game.shopPriceCache[game.PORTAL_REPLAY_ITEM_ID];
-  };
-  game.openReplayExchangeModal = async function () {
-    if (!game.replayExchangeModal) return;
-    if (game.replayExchangeCostTextEl) game.replayExchangeCostTextEl.textContent = "…";
-    game.setGenericExchangeMessage(game.replayExchangeMessageEl, "");
-    game.replayExchangeModal.classList.add("active");
-    game.replayExchangeModal.setAttribute("aria-hidden", "false");
-    game.setReplayExchangeBusy(true);
-    const [, cost] = await Promise.all([game.refreshReplayExchangeAssetsDisplay(), game.ensureShopCostCached(game.PORTAL_REPLAY_ITEM_ID)]);
-    if (game.replayExchangeCostTextEl) game.replayExchangeCostTextEl.innerHTML = game.formatShopCostForExchangeLineHtml(cost);
-    game.setReplayExchangeBusy(false);
-  };
-  game.handleReplayExchangeRedeem = async function () {
-    if (!game.portalUndoShopAvailable()) return;
+  game.useHintForCurrentRun = function () {
+    if (game.CM_EDITOR_PAGE) return Promise.resolve(false);
+    if (game.hintUsePromise) return game.hintUsePromise;
+    const runId = game.hintRunId;
     const levelNumber = game.currentLevelIndex + 1;
-    if (!Number.isFinite(levelNumber) || levelNumber <= 0) return;
-    game.setGenericExchangeMessage(game.replayExchangeMessageEl, "");
-    game.setReplayExchangeBusy(true);
-    let grant;
-    try {
-      const portal = game.getPortalCommerce();
-      if (await game.fetchReplayUnlockStatusForLevel(levelNumber)) {
-        portal.finishGrant('replay', 'level:' + levelNumber);
-        game.replayUnlockedForLevel = true;
-        await game.fetchFewestOtherMovesForCurrentLevel();
-        game.updateLevelCompleteReplayDisplay();
-        game.setReplayExchangeBusy(false);
-        game.closeReplayExchangeModal();
-        return;
+    const current = () => game.hintRunId === runId && game.currentLevelIndex + 1 === levelNumber;
+    const view = () => {
+      const completed = game.levelCompleteModal?.classList.contains('active');
+      if (!completed) game.openInGameWalkthroughModal();
+      game.updateLevelCompleteReplayDisplay();
+    };
+    if (game.hintUnlockedThisRun) {
+      view();
+      return Promise.resolve(true);
+    }
+    if (game.hintCredits === 0 && (!runId || game.hintPendingRunId !== runId)) {
+      game.openPowerUpsShop('hint');
+      return Promise.resolve(false);
+    }
+    if (!Number.isFinite(game.fewestOtherMovesForLevel) || !(game.fewestOtherMovesReplayPath?.length >= 2)) {
+      game.updateStatus('No Hint guide is available for this level yet. No Hint was used.');
+      view();
+      return Promise.resolve(false);
+    }
+    const pending = (async () => {
+      try {
+        game.hintPendingRunId = runId;
+        await game.consumeLocalHintCredit(runId);
+        if (!current()) return false;
+        game.hintPendingRunId = null;
+        game.hintUnlockedThisRun = true;
+        game.refreshFewestOtherMovesAffordance();
+        game.updateFewestOtherMovesDisplay(game.fewestOtherMovesForLevel, game.fewestOtherMovesReplayPath, game.fewestOtherMovesUserName);
+        view();
+        return true;
+      } catch (error) {
+        if (!current()) return false;
+        if (error?.code === 'insufficient_inventory') {
+          game.hintPendingRunId = null;
+          game.openPowerUpsShop('hint');
+        }
+        else game.updateStatus('Could not use Hint. Please retry; this run will not be charged twice.');
+        return false;
+      } finally {
+        await game.syncGameInventory();
+        if (current()) game.hintUsePromise = null;
       }
-      grant = await portal.buyGrant('replay', 'level:' + levelNumber);
-    } catch (err) {
-      game.setGenericExchangeMessage(game.replayExchangeMessageEl, err?.message || 'Redeem failed.', 'error');
-      game.setReplayExchangeBusy(false);
-      return;
-    }
-    const activated = await game.activateReplayUnlockForLevel(levelNumber, grant.grant_token);
-    if (!activated) {
-      game.setGenericExchangeMessage(game.replayExchangeMessageEl, "Redeem succeeded, but replay unlock sync failed. Please refresh.", "error");
-      game.setReplayExchangeBusy(false);
-      await game.refreshReplayExchangeAssetsDisplay();
-      return;
-    }
-    game.getPortalCommerce().finishGrant('replay', 'level:' + levelNumber);
-    game.replayUnlockedForLevel = true;
-    await game.fetchFewestOtherMovesForCurrentLevel();
-    game.updateLevelCompleteReplayDisplay();
-    await game.refreshReplayExchangeAssetsDisplay();
-    game.setReplayExchangeBusy(false);
-    game.closeReplayExchangeModal();
-    game.closeHintModal();
-    const onLevelComplete = game.levelCompleteModal && game.levelCompleteModal.classList.contains("active");
-    if (!onLevelComplete) {
-      game.openInGameWalkthroughModal();
-    }
+    })();
+    game.hintUsePromise = pending;
+    return pending;
   };
-  game.setupReplayExchangeModal = function () {
-    if (game.replayExchangeCloseBtn) game.lifecycle.listen(game.replayExchangeCloseBtn, "click", game.closeReplayExchangeModal);
-    if (game.replayExchangeModal) {
-      game.lifecycle.listen(game.replayExchangeModal, "click", e => {
-        if (e.target === game.replayExchangeModal) game.closeReplayExchangeModal();
-      });
-    }
-    if (game.replayExchangeRedeemBtn) {
-      game.lifecycle.listen(game.replayExchangeRedeemBtn, "click", () => {
-        game.handleReplayExchangeRedeem();
-      });
-    }
-    if (game.levelCompleteReplayLock) {
-      game.lifecycle.listen(game.levelCompleteReplayLock, "click", () => {
-        game.openReplayExchangeModal();
-      });
-    }
+  game.setupLevelCompleteHint = function () {
+    if (game.levelCompleteReplayLock) game.lifecycle.listen(game.levelCompleteReplayLock, 'click', () => game.useHintForCurrentRun());
   };
   game.setupInGameWalkthrough = function () {
-    if (game.hintSolutionActionBtn) {
-      game.lifecycle.listen(game.hintSolutionActionBtn, "click", () => {
-        game.handleSolutionGuideAction();
-      });
-    }
     const closeWalkthrough = () => game.closeInGameWalkthroughModal();
     if (game.closeInGameWalkthroughModalBtn) {
       game.lifecycle.listen(game.closeInGameWalkthroughModalBtn, "click", closeWalkthrough);
     }
     if (game.inGameWalkthroughCloseBtn) {
-      game.lifecycle.listen(game.inGameWalkthroughCloseBtn, "click", closeWalkthrough);
+      game.lifecycle.listen(game.inGameWalkthroughCloseBtn, "click", () => {
+        closeWalkthrough();
+        game.restartLevel();
+      });
     }
     if (game.inGameWalkthroughModal) {
       game.lifecycle.listen(game.inGameWalkthroughModal, "click", e => {
@@ -643,18 +606,9 @@ export function register(game) {
       });
     }
   };
-  game.setupHintModal = function () {
-    if (game.blockTipToggle && game.blockTipModal) {
-      game.lifecycle.listen(game.blockTipToggle, "click", () => {
-        game.openHintModal();
-      });
-    }
-    const closeBtn = document.getElementById("closeBlockTip");
-    if (game.blockTipModal && closeBtn) {
-      game.lifecycle.listen(closeBtn, "click", game.closeHintModal);
-      game.lifecycle.listen(game.blockTipModal, "click", e => {
-        if (e.target === game.blockTipModal) game.closeHintModal();
-      });
+  game.setupHintButton = function () {
+    if (game.blockTipToggle && !game.CM_EDITOR_PAGE) {
+      game.lifecycle.listen(game.blockTipToggle, "click", () => game.openHintModal());
     }
   };
 }
@@ -675,25 +629,23 @@ export function initialize(game) {
   game.antigravityExchangeFlowersEl = document.getElementById('antigravityExchangeFlowers');
   game.antigravityExchangeMessageEl = document.getElementById('antigravityExchangeMessage');
   game.antigravityExchangeCostTextEl = document.getElementById('antigravityExchangeCostText');
-  game.replayExchangeModal = document.getElementById('replayExchangeModal');
-  game.replayExchangeCloseBtn = document.getElementById('replayExchangeCloseBtn');
-  game.replayExchangeRedeemBtn = document.getElementById('replayExchangeRedeemBtn');
-  game.replayExchangeCoinsEl = document.getElementById('replayExchangeCoins');
-  game.replayExchangeDiamondsEl = document.getElementById('replayExchangeDiamonds');
-  game.replayExchangeFlowersEl = document.getElementById('replayExchangeFlowers');
-  game.replayExchangeMessageEl = document.getElementById('replayExchangeMessage');
-  game.replayExchangeCostTextEl = document.getElementById('replayExchangeCostText');
-
+  game.hintCredits = null;
+  game.hintPendingRunId = null;
+  game.localHintCredits = 0;
+  game.hintRunId = globalThis.crypto.randomUUID();
+  game.hintUnlockedThisRun = false;
+  game.hintUsePromise = null;
 
   game.localUndoCredits = 0;
   game.localAntigravityCredits = 0;
-  game.portalQuantities = {};
+  game.inventoryRecoveryPromise = null;
   game.creditUsesBusy = new Set();
   game.cmCommerceClient = null;
   game.cmCommerceBase = '';
   game.PORTAL_UNDO_ITEM_ID = "chess_mater_undo";
   game.PORTAL_ANTIGRAVITY_ITEM_ID = "chess_mater_antigravity";
-  game.PORTAL_REPLAY_ITEM_ID = "replay";
+  // Keep the product ID stable for purchases and legacy inventory migration.
+  game.PORTAL_HINT_ITEM_ID = "chess_mater_reply";
   game.PORTAL_UNDO_GAME_MODE = "chessmater";
   game.shopPriceCache = {};
   game.shopCatalogWarmPromise = null;

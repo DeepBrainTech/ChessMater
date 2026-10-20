@@ -1,12 +1,22 @@
 import { session } from '../../services/session.js';
 export function register(game) {
   game.loadPuzzle = // --- Load puzzle from JSON file ---
-  function (puzzleData) {
+  function (puzzleData, { preserveHint = false } = {}) {
     game.currentPuzzleData = JSON.parse(JSON.stringify(puzzleData)); // Deep copy
     game.moveHistorySnapshots = [];
     game.showTransformerMenu = false;
     game.transformerPosition = null;
     game.transformerPlayerIndex = -1;
+    game.styleTestSelectedCell = null;
+    if (puzzleData.styleTest) {
+      game.fallingPieces = [];
+      game.risingPieces = [];
+      game.explodingPlayers = [];
+      game.selectedPlayerIndex = -1;
+      game.pendingMoveTraceEntry = null;
+      game.pendingMoveCounter = false;
+      game.shakeAmount = 0;
+    }
     if (game.levelCompleteModal) {
       game.levelCompleteModal.classList.remove("active");
     }
@@ -33,7 +43,8 @@ export function register(game) {
       const copyCols = Math.min(loadedCols, puzzleData.board[0].length);
       for (let r = 0; r < copyRows; r++) {
         for (let c = 0; c < copyCols; c++) {
-          game.board[r][c] = puzzleData.board[r][c];
+          const cellType = puzzleData.board[r][c];
+          game.board[r][c] = cellType === game.CELL_TYPES.PHASE_BLOCK_ACTIVE ? game.CELL_TYPES.PHASE_BLOCK : cellType;
         }
       }
       game.bombs = [];
@@ -158,12 +169,13 @@ export function register(game) {
       game.updateTargetPieceCount();
       game.updateStatus(`Puzzle "${puzzleData.name}" loaded successfully! Size: ${loadedRows}x${loadedCols}`);
       // ✅ Reset state so pieces can move again
-      game.mode = "play";
+      game.mode = puzzleData.styleTest ? "style-test" : "play";
       game.gameWon = false;
       game.antigravityEnabled = false;
       game.antigravityUnlockedThisRun = false;
+      game.resetHintForRun({ preserve: preserveHint });
       game.frameCount = 0;
-      game.levelMoveCount = 0;
+      game.levelMoveCount = puzzleData.styleTest ? 2 : 0;
       game.updateMoveCountDisplay();
       game.updateAntigravityButtonLabel();
       game.updateFewestOtherMovesDisplay(null, null, "", false);
@@ -177,10 +189,8 @@ export function register(game) {
       if (typeof game.highlightCurrentLevelButton === "function") {
         game.highlightCurrentLevelButton();
       }
-      if (descText) {
-        const rawTip = puzzleData.blockTip != null ? String(puzzleData.blockTip).trim() : "";
-        descText.textContent = rawTip || "No tip for this level.";
-      }
+      const rawTip = puzzleData.blockTip != null ? String(puzzleData.blockTip).trim() : "";
+      if (descText) descText.textContent = rawTip || "No tip for this level.";
       if (session.authReady && typeof session.authReady.finally === "function") {
         session.authReady.finally(() => {
           game.fetchFewestOtherMovesForCurrentLevel();
@@ -188,6 +198,7 @@ export function register(game) {
       } else {
         game.fetchFewestOtherMovesForCurrentLevel();
       }
+      game.cmEmitGameUi?.({ type: "puzzleLoaded", styleTest: !!puzzleData.styleTest, blockTip: rawTip });
       game.drawBoard();
     } catch (error) {
       game.updateStatus("Error loading puzzle: " + error.message);
@@ -231,11 +242,8 @@ export function register(game) {
       }
     }
 
-    // Check if cell has an active phase block (always solid)
-    if (game.board[row][col] === game.CELL_TYPES.PHASE_BLOCK_ACTIVE) return true;
-
-    // Check if cell has an inactive phase block
-    if (game.board[row][col] === game.CELL_TYPES.PHASE_BLOCK) {
+    // A phase cell is directional, with no activation or consumed state.
+    if (game.isPhaseCell(game.board[row][col])) {
       // Allow passing through phase blocks from below, but block from above/sides
       if (fromDirection === "below") {
         return false; // Can pass through from below
@@ -253,13 +261,6 @@ export function register(game) {
       }
     }
     return false;
-  };
-  game.activatePhaseBlock = // Activate a phase block (make it solid)
-  function (row, col) {
-    if (game.board[row][col] === game.CELL_TYPES.PHASE_BLOCK) {
-      game.board[row][col] = game.CELL_TYPES.PHASE_BLOCK_ACTIVE;
-      game.phaseBlockStates[`${row},${col}`] = true;
-    }
   };
   game.applyGravity = // --- Apply gravity to all pieces ---
   function () {
@@ -301,6 +302,7 @@ export function register(game) {
     }
   };
   game.updateFallingPieces = function () {
+    if (game.gameWon) return;
     const fallSpeed = 3;
     for (let i = game.fallingPieces.length - 1; i >= 0; i--) {
       const piece = game.fallingPieces[i];
@@ -314,7 +316,7 @@ export function register(game) {
       const prevRow = Math.floor(prevY / game.TILE_SIZE);
       const currentRow = Math.floor(piece.y / game.TILE_SIZE);
       if (currentRow !== prevRow) {
-        for (let r = prevRow + 1; r <= Math.min(currentRow, game.ROWS - 1); r++) {
+        for (let r = prevRow + 1; r <= Math.min(currentRow, piece.targetRow, game.ROWS - 1); r++) {
           // A falling piece can land on a duck that moves into the same column.
           // The duck itself occupies row r, so the piece lands one cell above it.
           if (game.getDuckAt(r, piece.col) !== -1 && r > 0) {
@@ -342,6 +344,7 @@ export function register(game) {
             }
             return; // Skip rest of loop for this frame
           }
+          if (piece.playerIndex !== "goal") game.completeObjective(r, piece.col);
         }
       }
 
@@ -399,6 +402,7 @@ export function register(game) {
             game.playerTeleportCooldowns.delete(player);
             game.checkObjectiveCompletion();
             game.checkWinCondition();
+            if (game.gameWon) return;
           }
         }
         game.fallingPieces.splice(i, 1);
@@ -413,6 +417,7 @@ export function register(game) {
   };
   game.showLevelCompleteModal = function () {
     if (!game.levelCompleteModal) return;
+    if (game.levelCompleteCoinReward) game.levelCompleteCoinReward.hidden = true;
     const hasNext = game.currentLevelIndex < game.LEVELS.length - 1;
     game.levelCompleteReplayIndex = 0;
     game.updateLevelCompleteStatsDisplay();
@@ -427,6 +432,7 @@ export function register(game) {
     void game.fetchFewestOtherMovesForCurrentLevel();
   };
   game.handleGravityTeleport = function (player, teleportType) {
+    if (game.gameWon) return;
     // Get all teleport blocks of the same color
     const sameColorTeleports = game.teleportBlocks.filter(tp => tp.type === teleportType);
     if (sameColorTeleports.length !== 2) {
@@ -461,6 +467,7 @@ export function register(game) {
     game.checkWinCondition();
 
     // Apply gravity again after teleporting
+    if (game.gameWon) return;
     if (game.gravityEnabled) {
       game.lifecycle.setTimeout(() => {
         game.applyGravity();
@@ -468,6 +475,7 @@ export function register(game) {
     } else {
       // If gravity is disabled, still place the player on the board after teleport
       game.lifecycle.setTimeout(() => {
+        if (game.gameWon) return;
         game.board[player.row][player.col] = game.CELL_TYPES.PLAYER;
       }, 50);
     }
@@ -506,7 +514,8 @@ export function register(game) {
     }
   };
   game.syncProgressAfterWin = function () {
-    game.tryCapturePendingMoveTrace(true);
+    if (game.currentPuzzleData?.styleTest) return;
+    game.captureWinningReplaySnapshot();
     let actualLevelIndex = game.currentLevelIndex;
     if (actualLevelIndex < 0 && typeof game.LEVELS !== "undefined" && game.currentPuzzleData && game.currentPuzzleData.name) {
       actualLevelIndex = game.LEVELS.findIndex(lvl => lvl.name === game.currentPuzzleData.name);
@@ -516,6 +525,7 @@ export function register(game) {
     }
     const solvedIndex = actualLevelIndex;
     const solvedLevel = solvedIndex + 1;
+    const completedRunId = game.hintRunId;
     const nextLevel = solvedIndex + 2;
     const mergedUnlocked = typeof game.mergeMaxUnlocked === "function" ? game.mergeMaxUnlocked(nextLevel) : Math.max(game.currentMaxUnlocked || 1, nextLevel);
     game.currentMaxUnlocked = mergedUnlocked;
@@ -536,7 +546,7 @@ export function register(game) {
     if (session.cmToken) {
       headers.Authorization = `Bearer ${session.cmToken}`;
     }
-    game.apiFetchWithAuthRetry("/progress", {
+    return game.apiFetchWithAuthRetry("/progress", {
       method: "POST",
       headers,
       body: jsonBody
@@ -545,21 +555,28 @@ export function register(game) {
       return res.json().catch(() => null);
     }).then(data => {
       if (!data) return;
+      if (data.coinReward === 200 && game.hintRunId === completedRunId && game.levelCompleteCoinReward) {
+        game.levelCompleteCoinReward.hidden = false;
+      }
+      if (data.rewardPending) {
+        game.lifecycle.setTimeout(() => { void game.recoverLevelCoinRewards?.(); }, 3000);
+      }
       const credits = Number.parseInt(data?.undoCredits, 10);
       if (Number.isFinite(credits)) {
         game.localUndoCredits = credits;
-        game.undoCredits = game.localUndoCredits + (game.portalQuantities[game.PORTAL_UNDO_ITEM_ID] || 0);
+        game.undoCredits = game.localUndoCredits;
         game.updateUndoButtonLabel();
       }
       const antiCredits = Number.parseInt(data?.antigravityCredits, 10);
       if (Number.isFinite(antiCredits)) {
         game.localAntigravityCredits = antiCredits;
-        game.antigravityCredits = game.localAntigravityCredits + (game.portalQuantities[game.PORTAL_ANTIGRAVITY_ITEM_ID] || 0);
+        game.antigravityCredits = game.localAntigravityCredits;
         game.updateAntigravityButtonLabel();
       }
     }).catch(() => {});
   };
   game.checkWinCondition = function () {
+    if (game.currentPuzzleData?.styleTest) return;
     if (game.isCheckingWinCondition) {
       return;
     }
@@ -577,6 +594,11 @@ export function register(game) {
       for (const player of game.players) {
         if (player.row === game.goal.row && player.col === game.goal.col) {
           game.gameWon = true;
+          game.fallingPieces = [];
+          game.risingPieces = [];
+          game.pendingMoveCounter = false;
+          game.showTransformerMenu = false;
+          game.captureWinningReplaySnapshot();
           game.updateStatus("Puzzle solved! All requirements completed and goal reached!");
           game.triggerConfetti();
           game.showLevelCompleteModal();
@@ -623,7 +645,7 @@ export function register(game) {
     return true;
   };
   game.isPawnForwardDestinationCell = function (row, col, movingPlayer) {
-    return game.board[row][col] !== game.CELL_TYPES.PHASE_BLOCK && !game.isCellBlocked(row, col, movingPlayer, "below");
+    return !game.isPhaseCell(game.board[row][col]) && !game.isCellBlocked(row, col, movingPlayer, "below");
   };
   game.isPawnForwardPathCell = function (row, col, movingPlayer) {
     if (game.board[row][col] === game.CELL_TYPES.MOVING_PLATFORM) {
@@ -640,6 +662,7 @@ export function register(game) {
     if (playerIndex < 0 || playerIndex >= game.players.length) return false;
     if (newRow < 0 || newRow >= game.ROWS || newCol < 0 || newCol >= game.COLS) return false;
     const player = game.players[playerIndex];
+    if (newRow === player.row && newCol === player.col) return false;
     let r = player.row;
     let c = player.col;
 
@@ -649,7 +672,7 @@ export function register(game) {
     const fromDirection = movingDown ? "above" : "below";
 
     // Prevent moving directly onto a phase block
-    if (game.board[newRow][newCol] === game.CELL_TYPES.PHASE_BLOCK) {
+    if (game.isPhaseCell(game.board[newRow][newCol])) {
       return false;
     }
 
@@ -809,6 +832,9 @@ export function register(game) {
 
     // Check the full movement path against active lasers before moving.
     const laserHit = game.getActiveLaserHitOnMove(player, newRow, newCol);
+    // Reuse the movement path: straight/diagonal moves traverse every square,
+    // while knight jumps only visit their destination. Never collect beyond a hit.
+    game.collectObjectivesAlongMove(fromRow, fromCol, newRow, newCol, laserHit);
     if (laserHit) {
       game.handleLaserCollision(playerIndex, laserHit.row, laserHit.col);
       return;
@@ -859,18 +885,10 @@ export function register(game) {
     // Rest of the function remains the same...
     game.checkObjectiveCompletion();
 
-    // Check if player moved through a phase block from below and activate it
-    if (newRow < fromRow) {
-      // Moving upward
-      for (let r = newRow + 1; r < fromRow; r++) {
-        if (game.board[r][newCol] === game.CELL_TYPES.PHASE_BLOCK) {
-          game.activatePhaseBlock(r, newCol);
-        }
-      }
-    }
     game.checkWinCondition();
 
     // Apply gravity or antigravity after moving
+    if (game.gameWon) return;
     if (game.gravityEnabled && !game.antigravityEnabled) {
       const before = game.fallingPieces.length;
       game.applyGravity(); // may enqueue falls
@@ -930,6 +948,7 @@ export function initialize(game) {
       game.isCheckingWinCondition = false;
       game.antigravityEnabled = false;
       game.antigravityUnlockedThisRun = false;
+      game.resetHintForRun();
       if (game.levelCompleteModal) game.levelCompleteModal.classList.remove("active");
       game.gameWon = false;
       game.updateMoveCountDisplay();

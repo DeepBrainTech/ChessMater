@@ -1,36 +1,102 @@
 export function register(game) {
+  game.drawTileTexture = function (renderCtx, name, x, y, size, { alpha = 1, rotation = 0 } = {}) {
+    const image = game.tileImages && game.tileImages[name];
+    const imageWidth = image && (image.naturalWidth || image.width);
+    const imageHeight = image && (image.naturalHeight || image.height);
+    if (!image || image.complete === false || !imageWidth || !imageHeight) return false;
+    renderCtx.save();
+    renderCtx.globalAlpha *= alpha;
+    if (rotation) {
+      renderCtx.translate(x + size / 2, y + size / 2);
+      renderCtx.rotate(rotation);
+      renderCtx.drawImage(image, -size / 2, -size / 2, size, size);
+    } else if (name === "bomb") {
+      const scale = Math.min(size / imageWidth, size / imageHeight);
+      const width = imageWidth * scale;
+      const height = imageHeight * scale;
+      renderCtx.drawImage(image, x + (size - width) / 2, y + (size - height) / 2, width, height);
+    } else {
+      renderCtx.drawImage(image, x, y, size, size);
+    }
+    renderCtx.restore();
+    return true;
+  };
+
+  game.drawBoardTile = function (renderCtx, x, y, row, col) {
+    const texture = (row + col) % 2 === 0 ? "light" : "dark";
+    if (!game.drawTileTexture(renderCtx, texture, x, y, game.TILE_SIZE)) {
+      renderCtx.fillStyle = texture === "light" ? "#f3eee4" : "#a5a5a2";
+      renderCtx.fillRect(x, y, game.TILE_SIZE, game.TILE_SIZE);
+    }
+  };
+
+  game.drawPossibleMoveMarker = function (x, y) {
+    game.ctx.save();
+    game.ctx.fillStyle = "rgba(41, 128, 185, 0.5)";
+    game.ctx.beginPath();
+    game.ctx.arc(x + game.TILE_SIZE / 2, y + game.TILE_SIZE / 2, game.TILE_SIZE / 5, 0, Math.PI * 2);
+    game.ctx.fill();
+    game.ctx.strokeStyle = "rgba(21, 67, 96, 0.8)";
+    game.ctx.lineWidth = 2;
+    game.ctx.stroke();
+    game.ctx.restore();
+  };
+  game.drawFogOverlay = function (x, y, row, col) {
+    game.ctx.save();
+    game.ctx.fillStyle = "rgba(0,0,0,0.7)";
+    game.ctx.fillRect(x, y, game.TILE_SIZE, game.TILE_SIZE);
+    game.ctx.globalAlpha = 0.3;
+    game.ctx.fillStyle = (row + col) % 2 === 0 ? "#EEE" : "#CCC";
+    game.ctx.fillRect(x, y, game.TILE_SIZE, game.TILE_SIZE);
+    game.ctx.restore();
+  };
+  game.drawGoalStyle = function (x, y, { locked = false, counter = null } = {}) {
+    game.ctx.save();
+    game.ctx.drawImage(game.pieceImages.target, x + 8, y + 8, game.TILE_SIZE - 16, game.TILE_SIZE - 16);
+    if (counter !== null && !locked) game.drawCounterGoalBadge(x, y, counter);
+    if (locked) {
+      game.ctx.fillStyle = "rgba(0,0,0,0.7)";
+      game.ctx.beginPath();
+      game.ctx.arc(x + game.TILE_SIZE / 2, y + game.TILE_SIZE / 2, 12, 0, Math.PI * 2);
+      game.ctx.fill();
+      game.ctx.fillStyle = "white";
+      game.ctx.font = "bold 16px Arial";
+      game.ctx.textAlign = "center";
+      game.ctx.textBaseline = "middle";
+      game.ctx.fillText("🔒", x + game.TILE_SIZE / 2, y + game.TILE_SIZE / 2);
+      if (counter !== null) game.drawCounterGoalBadge(x, y, counter, y + 10);
+    }
+    game.ctx.restore();
+  };
+  game.drawStyleTestSamples = function () {
+    for (const sample of game.currentPuzzleData.samples) {
+      const x = sample.col * game.TILE_SIZE;
+      const y = sample.row * game.TILE_SIZE;
+      if (sample.variant === "goal") game.drawGoalStyle(x, y, sample);
+      if (sample.variant === "transformer-active") game.drawTileTexture(game.ctx, "swapActive", x, y, game.TILE_SIZE);
+      if (sample.variant === "fog") game.drawFogOverlay(x, y, sample.row, sample.col);
+      if (sample.variant === "possible-move") game.drawPossibleMoveMarker(x, y);
+    }
+    if (game.styleTestSelectedCell) {
+      const { row, col } = game.styleTestSelectedCell;
+      game.ctx.save();
+      game.ctx.strokeStyle = "#7020a0";
+      game.ctx.lineWidth = 3;
+      game.ctx.strokeRect(col * game.TILE_SIZE + 2, row * game.TILE_SIZE + 2, game.TILE_SIZE - 4, game.TILE_SIZE - 4);
+      game.ctx.restore();
+    }
+  };
   game.drawPossibleMoves = function () {
     if (game.mode !== "play" || game.selectedPlayerIndex === -1 || game.gameWon) return;
-    const player = game.players[game.selectedPlayerIndex];
     for (let r = 0; r < game.ROWS; r++) {
       for (let c = 0; c < game.COLS; c++) {
         if (game.isValidMove(game.selectedPlayerIndex, r, c)) {
           let x = c * game.TILE_SIZE;
           let y = r * game.TILE_SIZE;
-          game.ctx.fillStyle = "rgba(41, 128, 185, 0.5)";
-          game.ctx.beginPath();
-          game.ctx.arc(x + game.TILE_SIZE / 2, y + game.TILE_SIZE / 2, game.TILE_SIZE / 5, 0, Math.PI * 2); // Smaller circles
-          game.ctx.fill();
-
-          // Add a border to make it more visible
-          game.ctx.strokeStyle = "rgba(21, 67, 96, 0.8)";
-          game.ctx.lineWidth = 2;
-          game.ctx.stroke();
+          game.drawPossibleMoveMarker(x, y);
         }
       }
     }
-  };
-  game.drawSelectionIndicator = // --- Draw selection indicator around selected player ---
-  function () {
-    if (game.mode !== "play" || game.selectedPlayerIndex === -1 || game.gameWon) return;
-    const player = game.players[game.selectedPlayerIndex];
-    let x = player.col * game.TILE_SIZE;
-    let y = player.row * game.TILE_SIZE;
-    game.ctx.strokeStyle = "rgba(231, 76, 60, 0.8)";
-    game.ctx.lineWidth = 2; // Thinner line
-    game.ctx.beginPath();
-    game.ctx.arc(x + game.TILE_SIZE / 2, y + game.TILE_SIZE / 2, game.TILE_SIZE / 2 - 4, 0, Math.PI * 2); // Smaller circle
-    game.ctx.stroke();
   };
   game.drawPieceSelectionMenu = // Draw the piece selection menu
   function () {
@@ -159,89 +225,52 @@ export function register(game) {
     }
     return visionSquares;
   };
-  game.drawCellContent = // Add this function to draw the content of a cell
-  function (cellType, x, y, row, col) {
-    // Draw solid block (green square)
+  game.drawCellContent = function (cellType, x, y, row, col) {
+    const tile = game.TILE_SIZE;
+    const ctx = game.ctx;
     if (cellType === game.CELL_TYPES.SOLID_BLOCK) {
-      game.ctx.fillStyle = "rgba(46, 204, 113, 0.7)";
-      game.ctx.fillRect(x + 3, y + 3, game.TILE_SIZE - 6, game.TILE_SIZE - 6);
+      if (!game.drawTileTexture(ctx, "blockOpen", x, y, tile)) {
+        ctx.fillStyle = "#89c924";
+        ctx.fillRect(x, y, tile, tile);
+      }
     }
 
-    // Draw inactive phase block (blue semi-transparent)
-    if (cellType === game.CELL_TYPES.PHASE_BLOCK) {
-      game.drawInactivePhaseBlock(game.ctx, x, y, game.TILE_SIZE);
+    if (game.isPhaseCell(cellType)) {
+      game.drawDirectionalPhaseBlock(ctx, x, y, tile);
     }
 
-    // Draw active phase block (solid blue)
-    if (cellType === game.CELL_TYPES.PHASE_BLOCK_ACTIVE) {
-      game.ctx.fillStyle = "rgba(41, 128, 185, 0.8)";
-      game.ctx.fillRect(x + 3, y + 3, game.TILE_SIZE - 6, game.TILE_SIZE - 6);
-    }
     if (cellType === game.CELL_TYPES.MOVING_PLATFORM) {
-      game.drawMovingPlatform(game.ctx, x, y, game.TILE_SIZE, game.getMovingPlatformAxisAt(row, col));
+      const axis = game.getMovingPlatformAxisAt(row, col);
+      game.drawMovingPlatform(ctx, x, y, tile, axis);
     }
 
-    // Draw transformer block (purple with question mark)
     if (cellType === game.CELL_TYPES.TRANSFORMER) {
-      game.ctx.fillStyle = "rgba(155, 89, 182, 0.7)";
-      game.ctx.fillRect(x + 3, y + 3, game.TILE_SIZE - 6, game.TILE_SIZE - 6);
-
-      // Draw question mark
-      game.ctx.fillStyle = "white";
-      game.ctx.font = "bold 30px Arial";
-      game.ctx.textAlign = "center";
-      game.ctx.textBaseline = "middle";
-      game.ctx.fillText("?", x + game.TILE_SIZE / 2, y + game.TILE_SIZE / 2);
-      game.ctx.textAlign = "left";
-      game.ctx.textBaseline = "alphabetic";
+      const isActive = game.transformerPosition?.row === row && game.transformerPosition?.col === col;
+      game.drawTileTexture(ctx, isActive ? "swapActive" : "swap", x, y, tile);
     }
 
-    // Draw objective block (orange diamond)
     if (cellType === game.CELL_TYPES.OBJECTIVE) {
-      game.ctx.fillStyle = "rgba(243, 156, 18, 0.7)";
-      game.ctx.beginPath();
-      game.ctx.moveTo(x + game.TILE_SIZE / 2, y + 3);
-      game.ctx.lineTo(x + game.TILE_SIZE - 3, y + game.TILE_SIZE / 2);
-      game.ctx.lineTo(x + game.TILE_SIZE / 2, y + game.TILE_SIZE - 3);
-      game.ctx.lineTo(x + 3, y + game.TILE_SIZE / 2);
-      game.ctx.closePath();
-      game.ctx.fill();
+      const inset = tile * 0.14;
+      if (!game.drawTileTexture(ctx, "checkpoint", x + inset, y + inset, tile - inset * 2)) {
+        ctx.fillStyle = "#fdb702";
+        ctx.beginPath();
+        ctx.moveTo(x + tile / 2, y + tile * 0.14);
+        ctx.lineTo(x + tile * 0.86, y + tile / 2);
+        ctx.lineTo(x + tile / 2, y + tile * 0.86);
+        ctx.lineTo(x + tile * 0.14, y + tile / 2);
+        ctx.closePath();
+        ctx.fill();
+      }
     }
 
-    // Draw completed objective block (green diamond)
-    if (cellType === game.CELL_TYPES.OBJECTIVE_COMPleted) {
-      game.ctx.fillStyle = "rgba(46, 204, 113, 0.7)";
-      game.ctx.beginPath();
-      game.ctx.moveTo(x + game.TILE_SIZE / 2, y + 3);
-      game.ctx.lineTo(x + game.TILE_SIZE - 3, y + game.TILE_SIZE / 2);
-      game.ctx.lineTo(x + game.TILE_SIZE / 2, y + game.TILE_SIZE - 3);
-      game.ctx.lineTo(x + 3, y + game.TILE_SIZE / 2);
-      game.ctx.closePath();
-      game.ctx.fill();
-
-      // Draw checkmark
-      game.ctx.strokeStyle = "white";
-      game.ctx.lineWidth = 2;
-      game.ctx.beginPath();
-      game.ctx.moveTo(x + 15, y + game.TILE_SIZE / 2);
-      game.ctx.lineTo(x + game.TILE_SIZE / 2 - 4, y + game.TILE_SIZE - 15);
-      game.ctx.lineTo(x + game.TILE_SIZE - 15, y + 15);
-      game.ctx.stroke();
+    if ((cellType === game.CELL_TYPES.GOAL || cellType === game.CELL_TYPES.COUNTER_GOAL) && game.goal && game.goal.row === row && game.goal.col === col) {
+      ctx.drawImage(game.pieceImages.target, x + tile * 0.12, y + tile * 0.12, tile * 0.76, tile * 0.76);
     }
 
-    // Draw goal (red king)
-    if (cellType === game.CELL_TYPES.GOAL && game.goal && game.goal.row === row && game.goal.col === col) {
-      game.ctx.drawImage(game.pieceImages.target, x + 8, y + 8, game.TILE_SIZE - 16, game.TILE_SIZE - 16);
-    }
-
-    // Draw counter goal
-    if (cellType === game.CELL_TYPES.COUNTER_GOAL && game.goal && game.goal.row === row && game.goal.col === col) {
-      game.ctx.drawImage(game.pieceImages.target, x + 8, y + 8, game.TILE_SIZE - 16, game.TILE_SIZE - 16);
-    }
     if (cellType === game.CELL_TYPES.BLACK_TARGET_PIECE) {
       const targetIndex = game.getTargetPieceAt(row, col);
       const targetPiece = targetIndex !== -1 ? game.targetPieces[targetIndex] : null;
-      game.drawBlackTargetPiece(game.ctx, x, y, game.TILE_SIZE, targetPiece ? targetPiece.pieceType : "pawn");
+      game.drawBlackTargetPiece(ctx, x, y, tile, targetPiece ? targetPiece.pieceType : "pawn");
     }
   };
   game.drawCounterGoalBadge = // --- Drawing ---
@@ -346,9 +375,7 @@ export function register(game) {
         let x = c * game.TILE_SIZE;
         let y = r * game.TILE_SIZE;
 
-        // Draw checkerboard pattern
-        game.ctx.fillStyle = (r + c) % 2 === 0 ? "#b6cce0ff" : "#ffffffff"; // light pink and sky blue
-        game.ctx.fillRect(x, y, game.TILE_SIZE, game.TILE_SIZE);
+        game.drawBoardTile(game.ctx, x, y, r, c);
 
         // If fog is off, draw everything normally
         if (game.fogEnabled) {
@@ -356,107 +383,17 @@ export function register(game) {
           if (visible[r][c]) {
             game.drawCellContent(game.board[r][c], x, y, r, c);
           } else {
-            // Overlay fog (dark square) but don't completely hide the cell
-            game.ctx.fillStyle = "rgba(0,0,0,0.7)";
-            game.ctx.fillRect(x, y, game.TILE_SIZE, game.TILE_SIZE);
-
-            // Still show the basic checkerboard pattern underneath
-            game.ctx.globalAlpha = 0.3;
-            game.ctx.fillStyle = (r + c) % 2 === 0 ? "#EEE" : "#CCC";
-            game.ctx.fillRect(x, y, game.TILE_SIZE, game.TILE_SIZE);
-            game.ctx.globalAlpha = 1.0;
+            game.drawFogOverlay(x, y, r, c);
           }
         } else {
           // If fog is off, draw everything normally
           game.drawCellContent(game.board[r][c], x, y, r, c);
         }
 
-        // Draw solid block (green square) - adjust size for smaller tiles
-        if (game.board[r][c] === game.CELL_TYPES.SOLID_BLOCK) {
-          if (!game.fogEnabled || visible[r][c]) {
-            game.ctx.fillStyle = "rgba(46, 204, 113, 0.7)";
-            game.ctx.fillRect(x + 3, y + 3, game.TILE_SIZE - 6, game.TILE_SIZE - 6);
-          }
-        }
-
-        // Draw inactive phase block (blue semi-transparent) - adjust size
-        if (game.board[r][c] === game.CELL_TYPES.PHASE_BLOCK) {
-          if (!game.fogEnabled || visible[r][c]) {
-            game.drawInactivePhaseBlock(game.ctx, x, y, game.TILE_SIZE);
-          }
-        }
-
-        // Draw active phase block (solid blue) - adjust size
-        if (game.board[r][c] === game.CELL_TYPES.PHASE_BLOCK_ACTIVE) {
-          if (!game.fogEnabled || visible[r][c]) {
-            game.ctx.fillStyle = "rgba(41, 128, 185, 0.8)";
-            game.ctx.fillRect(x + 3, y + 3, game.TILE_SIZE - 6, game.TILE_SIZE - 6);
-          }
-        }
-        if (game.board[r][c] === game.CELL_TYPES.MOVING_PLATFORM) {
-          if (!game.fogEnabled || visible[r][c]) {
-            game.drawMovingPlatform(game.ctx, x, y, game.TILE_SIZE, game.getMovingPlatformAxisAt(r, c));
-          }
-        }
-
-        // Draw transformer block (purple with question mark) - adjust size
-        if (game.board[r][c] === game.CELL_TYPES.TRANSFORMER) {
-          if (!game.fogEnabled || visible[r][c]) {
-            game.ctx.fillStyle = "rgba(155, 89, 182, 0.7)";
-            game.ctx.fillRect(x + 3, y + 3, game.TILE_SIZE - 6, game.TILE_SIZE - 6);
-
-            // Draw question mark
-            game.ctx.fillStyle = "white";
-            game.ctx.font = "bold 30px Arial"; // Smaller font
-            game.ctx.textAlign = "center";
-            game.ctx.textBaseline = "middle";
-            game.ctx.fillText("?", x + game.TILE_SIZE / 2, y + game.TILE_SIZE / 2);
-            game.ctx.textAlign = "left";
-            game.ctx.textBaseline = "alphabetic";
-          }
-        }
-
-        // Draw objective block (orange diamond) - adjust size
-        if (game.board[r][c] === game.CELL_TYPES.OBJECTIVE) {
-          if (!game.fogEnabled || visible[r][c]) {
-            game.ctx.fillStyle = "rgba(243, 156, 18, 0.7)";
-            game.ctx.beginPath();
-            game.ctx.moveTo(x + game.TILE_SIZE / 2, y + 3);
-            game.ctx.lineTo(x + game.TILE_SIZE - 3, y + game.TILE_SIZE / 2);
-            game.ctx.lineTo(x + game.TILE_SIZE / 2, y + game.TILE_SIZE - 3);
-            game.ctx.lineTo(x + 3, y + game.TILE_SIZE / 2);
-            game.ctx.closePath();
-            game.ctx.fill();
-          }
-        }
-
         // Draw teleport blocks with their respective colors
         if ([game.CELL_TYPES.TELEPORT_PURPLE, game.CELL_TYPES.TELEPORT_GREEN, game.CELL_TYPES.TELEPORT_BLUE, game.CELL_TYPES.TELEPORT_ORANGE].includes(game.board[r][c])) {
           if (!game.fogEnabled || visible[r][c]) {
             game.drawTeleporterDoor(game.ctx, x, y, game.TILE_SIZE, game.board[r][c], game.getTeleporterDoorRole(r, c, game.board[r][c]));
-          }
-        }
-
-        // Draw completed objective block (green diamond) - adjust size
-        if (game.board[r][c] === game.CELL_TYPES.OBJECTIVE_COMPLETED) {
-          if (!game.fogEnabled || visible[r][c]) {
-            game.ctx.fillStyle = "rgba(46, 204, 113, 0.7)";
-            game.ctx.beginPath();
-            game.ctx.moveTo(x + game.TILE_SIZE / 2, y + 3);
-            game.ctx.lineTo(x + game.TILE_SIZE - 3, y + game.TILE_SIZE / 2);
-            game.ctx.lineTo(x + game.TILE_SIZE / 2, y + game.TILE_SIZE - 3);
-            game.ctx.lineTo(x + 3, y + game.TILE_SIZE / 2);
-            game.ctx.closePath();
-            game.ctx.fill();
-
-            // Draw checkmark
-            game.ctx.strokeStyle = "white";
-            game.ctx.lineWidth = 2; // Thinner line
-            game.ctx.beginPath();
-            game.ctx.moveTo(x + 15, y + game.TILE_SIZE / 2);
-            game.ctx.lineTo(x + game.TILE_SIZE / 2 - 4, y + game.TILE_SIZE - 15);
-            game.ctx.lineTo(x + game.TILE_SIZE - 15, y + 15);
-            game.ctx.stroke();
           }
         }
 
@@ -492,7 +429,9 @@ export function register(game) {
         // Draw bomb block
         if (game.board[r][c] === game.CELL_TYPES.BOMB) {
           if (!game.fogEnabled || visible[r][c]) {
-            game.ctx.drawImage(game.pieceImages.bomb, x + 8, y + 8, game.TILE_SIZE - 16, game.TILE_SIZE - 16);
+            if (!game.drawTileTexture(game.ctx, "bomb", x, y, game.TILE_SIZE)) {
+              game.ctx.drawImage(game.pieceImages.bomb, x + 8, y + 8, game.TILE_SIZE - 16, game.TILE_SIZE - 16);
+            }
           }
         }
 
@@ -587,30 +526,8 @@ export function register(game) {
 
       // ✅ Only draw if fog is disabled OR square is visible
       if (!game.fogEnabled || visible[game.goal.row][game.goal.col]) {
-        // Draw base king image
-        game.ctx.drawImage(game.pieceImages.target, x + 8, y + 8, game.TILE_SIZE - 16, game.TILE_SIZE - 16);
         const goalLocked = !game.areAllObjectivesCompleted() || game.goal.type === "counter" && game.goal.counter <= 0;
-
-        // If it's a counter goal, draw counter
-        if (game.goal.type === "counter" && !goalLocked) {
-          game.drawCounterGoalBadge(x, y, game.goal.counter);
-        }
-
-        // Lock overlay
-        if (goalLocked) {
-          game.ctx.fillStyle = "rgba(0,0,0,0.7)";
-          game.ctx.beginPath();
-          game.ctx.arc(x + game.TILE_SIZE / 2, y + game.TILE_SIZE / 2, 12, 0, Math.PI * 2);
-          game.ctx.fill();
-          game.ctx.fillStyle = "white";
-          game.ctx.font = "bold 16px Arial";
-          game.ctx.textAlign = "center";
-          game.ctx.textBaseline = "middle";
-          game.ctx.fillText("🔒", x + game.TILE_SIZE / 2, y + game.TILE_SIZE / 2);
-        }
-        if (game.goal.type === "counter" && goalLocked) {
-          game.drawCounterGoalBadge(x, y, game.goal.counter, y + 10);
-        }
+        game.drawGoalStyle(x, y, { locked: goalLocked, counter: game.goal.type === "counter" ? game.goal.counter : null });
       }
     }
     for (const duck of game.ducks) {
@@ -621,6 +538,7 @@ export function register(game) {
     }
     game.drawLaserEffects(visible);
     game.drawPlatformLevelGuide();
+    if (game.mode === "style-test") game.drawStyleTestSamples();
   };
 }
 export function initialize(game) {}

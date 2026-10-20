@@ -1,0 +1,12 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="70.5882" height="70.5882" viewBox="0 0 70.5882 70.5882" fill="none" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+<g id="Button color">
+<use xlink:href="#stroke0_0_823" fill="#8E8C9A"/>
+<mask id="stroke1_0_823" fill="white">
+<use xlink:href="#stroke0_0_823"/>
+</mask>
+<path d="M35.2941 70.5882C15.8017 70.5882 0 54.7865 0 35.2941C0 15.8017 15.8017 0 35.2941 0C54.7865 0 70.5882 15.8017 70.5882 35.2941C70.5882 54.7865 54.7865 70.5882 35.2941 70.5882Z" stroke-width="3.8893" stroke="#3E1203" mask="url(#stroke1_0_823)"/>
+</g>
+<defs>
+<path id="stroke0_0_823" d="M0 35.2941C0 15.8017 15.8017 0 35.2941 0C54.7865 0 70.5882 15.8017 70.5882 35.2941C70.5882 54.7865 54.7865 70.5882 35.2941 70.5882C15.8017 70.5882 0 54.7865 0 35.2941Z"/>
+</defs>
+</svg>

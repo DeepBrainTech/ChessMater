@@ -1,7 +1,22 @@
+import { showModal, hideModal } from '../game/modalFocus.js';
+
 export function initializeEditor(game) {
   /** Level editor interactions and export, using explicit engine state. */
   (function () {
     if (!game.CM_EDITOR_PAGE) return;
+    const tipPreview = document.getElementById('blockTipModal');
+    const tipButton = document.getElementById('blockTipToggle');
+    const closeTip = document.getElementById('closeBlockTip');
+    if (tipPreview) {
+      if (tipButton) game.lifecycle.listen(tipButton, 'click', () => showModal(tipPreview));
+      if (closeTip) game.lifecycle.listen(closeTip, 'click', () => hideModal(tipPreview));
+      game.lifecycle.listen(tipPreview, 'click', event => {
+        if (event.target === tipPreview) hideModal(tipPreview);
+      });
+      game.lifecycle.listen(document, 'keydown', event => {
+        if (event.key === 'Escape' && tipPreview.classList.contains('active')) hideModal(tipPreview);
+      });
+    }
     const puzzleNumberInput = document.getElementById("puzzleNumber");
     const saveNotice = document.getElementById("saveNotice");
     if (puzzleNumberInput) {

@@ -29,15 +29,8 @@ class PortalGameClient {
         }
         return payload.data;
     }
-    purchasePath(productId) {
-        return "/api/games/" + encodeURIComponent(this.apiSlug)
-            + "/purchases/" + encodeURIComponent(productId);
-    }
     assets() {
         return this.request("/api/user/assets");
-    }
-    inventory() {
-        return this.request("/api/user/shop/inventory");
     }
     catalog() {
         const query = new URLSearchParams({ game_mode: this.gameKey });
@@ -52,21 +45,9 @@ class PortalGameClient {
     refreshSession() {
         return this.request("/api/games/" + encodeURIComponent(this.apiSlug) + "/session");
     }
-    quote(productId) {
-        return this.request(this.purchasePath(productId) + "/quote");
-    }
-    redeemGrant(productId, request) {
-        return this.request(this.purchasePath(productId) + "/redeem", {
-            method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(request),
-        });
-    }
     redeemItem(request) {
         const query = new URLSearchParams({ ...request, game_mode: this.gameKey });
         return this.request("/api/user/shop/redeem?" + query, { method: "POST" });
-    }
-    consumeItem(request, count = 1) {
-        const query = new URLSearchParams({ ...request, count: String(count), game_mode: this.gameKey });
-        return this.request("/api/user/shop/consume?" + query, { method: "POST" });
     }
     checkout(asset, bundleId, locale) {
         const kind = asset === "coins" ? "coin" : "diamond";
@@ -77,7 +58,7 @@ class PortalGameClient {
     }
 }
 /** Browser-side retries are scoped to the signed-in game account. */
-class PortalInventoryClient extends PortalGameClient {
+class PortalCommerceClient extends PortalGameClient {
     constructor(base, slug, accountId, gameKey = slug, environment = globalThis) {
         super(base, slug, gameKey, environment);
         this.accountId = accountId;
@@ -148,25 +129,21 @@ class PortalInventoryClient extends PortalGameClient {
             this.busy.delete(key);
         }
     }
-    buyItem(itemId) {
-        return this.mutate(`redeem:${itemId}`, id => this.redeemItem({ item_id: itemId, request_id: id }));
+    buyLocalItem(itemId) {
+        return this.mutate(`local-redeem:${itemId}`, id => this.redeemItem({ item_id: itemId, request_id: id }), true);
     }
-    useItem(itemId, count = 1) {
-        return this.mutate(`consume:${itemId}:${count}`, id => this.consumeItem({ item_id: itemId, request_id: id }, count));
+    finishLocalItem(itemId, purchaseId) {
+        const key = this.key(`local-redeem:${itemId}`);
+        if (!purchaseId || this.read(key) === purchaseId) this.remove(key);
     }
-    hasPendingUse(itemId, count = 1) {
-        try {
-            return !!this.read(this.key(`consume:${itemId}:${count}`));
-        }
-        catch {
-            return false;
-        }
+    migrateInventory() {
+        return this.request('/api/user/shop/chessmater/migrate', { method: 'POST' });
     }
-    buyGrant(productId, target) {
-        return this.mutate(`grant:${productId}:${target}`, id => this.redeemGrant(productId, { target, request_id: id }), true);
+    pendingDeliveries() {
+        return this.request('/api/user/shop/chessmater/deliveries');
     }
-    finishGrant(productId, target) {
-        this.remove(this.key(`grant:${productId}:${target}`));
+    acknowledgeDelivery(purchaseId) {
+        return this.request('/api/user/shop/chessmater/deliveries/' + encodeURIComponent(purchaseId) + '/ack', { method: 'POST' });
     }
 }
 /** This identifies browser retry storage; the server verifies authentication. */
@@ -183,4 +160,4 @@ function gameAccountId(token) {
     }
 }
 
-export { PortalInventoryClient, PortalApiError, gameAccountId };
+export { PortalCommerceClient, PortalApiError, gameAccountId };

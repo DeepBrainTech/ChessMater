@@ -1,0 +1,138 @@
+/* Match the game's 1920 x 1080 composition, including its scale cap. */
+/* Exchange overlays sit above the game dialogs, which use layer 10001. */
+.power-ups-modal { --power-up-unit:min(1px, calc(100vw / 1920), calc(100dvh / 1080)); position: fixed; inset: 0; z-index: 10002; display: none; align-items: center; justify-content: center; padding: calc(48 * var(--power-up-unit)) calc(24 * var(--power-up-unit)) calc(24 * var(--power-up-unit)); background: rgb(40 40 40 / 40%); box-sizing: border-box; }
+.power-ups-modal.active { display: flex; }
+.power-ups-panel button { transition:filter .15s, opacity .15s; }
+.power-ups-panel { position: relative; display:flex; flex-direction:column; container-type:inline-size; width:calc(1172.6 * var(--power-up-unit)); max-width:100%; max-height:100%; min-height:0; padding:calc(6.4 * var(--power-up-unit)); box-sizing:border-box; border-radius:calc(24 * var(--power-up-unit)); background:conic-gradient(from 90deg,#fdb702,#ffe9af 13%,#fec332 43%,#fdb702); box-shadow:inset 0 0 0 calc(2.4 * var(--power-up-unit)) #3e1203; color:#3e1203; font:calc(22.4 * var(--power-up-unit))/1.2 "Game ADLaM Display",sans-serif; }
+#powerUpsTitle { position: absolute; z-index: 2; top: calc(-32.64 * var(--power-up-unit)); left: 50%; transform: translateX(-50%); margin: 0; padding: calc(13 * var(--power-up-unit)) calc(28 * var(--power-up-unit)); border: calc(6 * var(--power-up-unit)) solid #fdb702; border-radius: calc(12 * var(--power-up-unit)); box-shadow: 0 0 0 calc(2.3 * var(--power-up-unit)) #3e1203,inset 0 0 0 calc(2 * var(--power-up-unit)) #3e1203; background: #3e1203; color: #fcf8f1; white-space: nowrap; font: 700 calc(25.6 * var(--power-up-unit))/1 "Game Alegreya",Georgia,serif; }
+.power-ups-inner { flex:1 1 auto; min-height:0; padding:calc(16 * var(--power-up-unit)); border-radius:calc(18 * var(--power-up-unit)); overflow:auto; overscroll-behavior:contain; scrollbar-width:thin; scrollbar-color:#bb8d43 transparent; box-sizing:border-box; background:#fcf8f1 url('/assets/images/level-complete/paper.png') center/150% 150%; }
+.power-ups-header { display:flex; justify-content:flex-end; align-items:center; gap:calc(24 * var(--power-up-unit)); height:calc(59.2 * var(--power-up-unit)); margin-bottom:calc(16 * var(--power-up-unit)); }
+.power-coins { display:flex; align-items:center; justify-content:space-between; gap:calc(12 * var(--power-up-unit)); flex:0 1 auto; width:max-content; min-width:calc(150 * var(--power-up-unit)); max-width:calc(100% - 91.2 * var(--power-up-unit)); height:calc(48 * var(--power-up-unit)); padding:calc(8 * var(--power-up-unit)) calc(16 * var(--power-up-unit)) calc(8 * var(--power-up-unit)) calc(8 * var(--power-up-unit)); box-sizing:border-box; border-radius:calc(40 * var(--power-up-unit)); background:#3e1203; color:#ffc135; font:700 calc(22 * var(--power-up-unit))/1 Arial,sans-serif; }
+.power-coin-balance { display:flex; align-items:center; gap:calc(10 * var(--power-up-unit)); min-width:0; }
+.power-coin-value { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.power-coin-balance img { flex:0 0 calc(32 * var(--power-up-unit)); width:calc(32 * var(--power-up-unit)); height:calc(32 * var(--power-up-unit)); object-fit:contain; }
+.power-coins-add { display:flex; align-items:center; justify-content:center; flex:0 0 calc(38 * var(--power-up-unit)); width:calc(38 * var(--power-up-unit)); height:calc(32 * var(--power-up-unit)); box-sizing:border-box; border:0; border-radius:0; background:transparent; box-shadow:none; color:#ffc400; font:400 calc(32 * var(--power-up-unit))/1 Arial,sans-serif; text-decoration:none; }
+.power-coins-add:hover { filter:brightness(1.12); }
+.power-price img,.power-bundle-price del img { width:calc(32 * var(--power-up-unit)); height:calc(32 * var(--power-up-unit)); object-fit:contain; }
+.power-close { position:relative; flex:0 0 calc(67.2 * var(--power-up-unit)); width:calc(67.2 * var(--power-up-unit)); height:calc(59.2 * var(--power-up-unit)); padding:0; border:0; background:transparent; cursor:pointer; }
+.power-close .completion-icon { position:absolute; inset:24% 28%; width:44%; height:52%; }
+/* Keep Figma card outlines and row separators visible at reduced game scales. */
+.power-row { display:grid; grid-template-columns:calc(224.8 * var(--power-up-unit)) minmax(0,1fr) auto minmax(0,1fr); gap:calc(16 * var(--power-up-unit)); align-items:center; min-height:calc(108 * var(--power-up-unit)); padding-bottom:calc(16 * var(--power-up-unit)); margin-bottom:calc(16 * var(--power-up-unit)); border-bottom:max(1px, calc(.8 * var(--power-up-unit))) solid #fdb7024d; box-sizing:border-box; }
+.power-label { display:flex; align-items:center; gap:calc(16 * var(--power-up-unit)); padding:calc(8 * var(--power-up-unit)); }
+.power-icon { position:relative; display:inline-flex; align-items:center; justify-content:center; flex:0 0 auto; width:calc(60.8 * var(--power-up-unit)); height:calc(59.2 * var(--power-up-unit)); --round-fill:url('/assets/images/powerups/round-gold.svg'); }
+.power-icon--undo { --round-fill:url('/assets/images/powerups/round-blue.svg'); }
+.power-icon--antigravity { --round-fill:url('/assets/images/powerups/round-purple.svg'); }
+.power-icon>span { position:absolute; background:center/100% 100% no-repeat; }
+.power-icon-border { inset:.7% 1.75% -.7% .88%; background-image:url('/assets/images/powerups/round-border.png') !important; }
+.power-icon-fill { inset:6.1% 7.1% 4.7% 6.1%; background-image:var(--round-fill) !important; }
+.power-icon-shadow { inset:52.4% 6.3% 7.5% 7.5%; background-image:url('/assets/images/powerups/round-shadow.svg') !important; }
+.power-icon-shine { inset:6.2% 12.9% 10.7% 6.2%; }
+.power-icon-shine--a { background-image:url('/assets/images/powerups/round-shine-a.svg') !important; }
+.power-icon-shine--b { background-image:url('/assets/images/powerups/round-shine-b.svg') !important; }
+.power-icon img { position:relative; width:calc(32 * var(--power-up-unit)); height:calc(32 * var(--power-up-unit)); object-fit:contain; transform:translateY(calc(1.6 * var(--power-up-unit))); }
+.power-option { position:relative; display:flex; align-items:center; gap:calc(16 * var(--power-up-unit)); padding:calc(16 * var(--power-up-unit)); min-width:0; min-height:calc(91.2 * var(--power-up-unit)); border:max(1px, calc(.8 * var(--power-up-unit))) solid #fdb702; border-radius:calc(16 * var(--power-up-unit)); background:#fef6ee; box-sizing:border-box; }
+.power-quantity { display:flex; align-items:center; justify-content:center; flex:0 0 calc(56 * var(--power-up-unit)); height:calc(36.34 * var(--power-up-unit)); background:url('/assets/images/powerups/quantity-fill.svg') center/90.6% 88.2% no-repeat,url('/assets/images/powerups/quantity-border.png') center/100% 100% no-repeat; font:700 calc(22.4 * var(--power-up-unit)) "Game Alegreya",Georgia,serif; }
+.power-option-name { flex:1; font-size:calc(25.6 * var(--power-up-unit)); line-height:calc(25.6 * var(--power-up-unit)); white-space:nowrap; }
+.power-option-name del { display:flex; align-items:center; gap:calc(2 * var(--power-up-unit)); color:#3e120366; font:700 calc(22.4 * var(--power-up-unit))/calc(25.6 * var(--power-up-unit)) "Game Alegreya",Georgia,serif; }
+.power-option-name del img { width:calc(20 * var(--power-up-unit)); height:calc(20 * var(--power-up-unit)); opacity:.6; }
+.power-or { padding:0 calc(4 * var(--power-up-unit)); }
+.power-price { position:relative; display:flex; align-items:center; justify-content:center; flex:0 0 calc(145.6 * var(--power-up-unit)); height:calc(57.6 * var(--power-up-unit)); padding:0 calc(12 * var(--power-up-unit)); border:0; background:transparent; color:#3e1203; font:700 calc(25.6 * var(--power-up-unit)) "Game Alegreya",Georgia,serif; cursor:pointer; }
+.power-price-art { position:absolute; inset:0; pointer-events:none; }
+.power-price-art>span { position:absolute; background:center/100% 100% no-repeat; }
+.power-price-border { inset:-2.08% 0; background-image:url('/assets/images/powerups/price-border.png') !important; }
+.power-price-fill { inset:6.94% 3.57%; background-image:url('/assets/images/powerups/price-fill.svg') !important; }
+.power-price-shadow { inset:53.2% 3.57% 7.84%; background:#00000026 !important; border-radius:0 0 calc(8 * var(--power-up-unit)) calc(8 * var(--power-up-unit)); }
+.power-price-shine { inset:5.42% 5.98% 10.16% 3.67%; background-image:url('/assets/images/powerups/price-shine.svg') !important; }
+.power-price-jewel { top:32%; height:36%; width:12%; background-image:url('/assets/images/game/ui-button-diamond.svg') !important; }
+.power-price-jewel--left { left:-3.3%; }
+.power-price-jewel--right { right:-3.3%; }
+.power-price-content { position:relative; display:flex; align-items:center; justify-content:center; gap:calc(8 * var(--power-up-unit)); }
+.power-price:disabled { cursor:not-allowed; filter:grayscale(1); opacity:.65; }
+.power-price:focus-visible,.power-close:focus-visible,.power-coins-add:focus-visible { outline:calc(3 * var(--power-up-unit)) solid #6200d8; outline-offset:calc(4 * var(--power-up-unit)); }
+.power-ribbon { position:absolute; left:calc(-32 * var(--power-up-unit)); top:calc(-15 * var(--power-up-unit)); z-index:1; transform:rotate(-15deg); background:url('/assets/images/powerups/ribbon-border.png') center/100% 100% no-repeat; color:#fff; border-radius:calc(8 * var(--power-up-unit)); padding:calc(5 * var(--power-up-unit)) calc(9 * var(--power-up-unit)); font:700 calc(24 * var(--power-up-unit))/calc(26 * var(--power-up-unit)) "Game Alegreya",Georgia,serif; white-space:nowrap; }
+.power-ribbon-art { position:absolute; inset:0; pointer-events:none; }
+.power-ribbon-art>span { position:absolute; background:center/100% 100% no-repeat; }
+.power-ribbon-art .power-ribbon-fill { inset:6.6% 2.9% 7.7% 2.4%; background-image:url('/assets/images/powerups/ribbon-fill.svg'); }
+.power-ribbon-art .power-ribbon-shadow { inset:39.4% 3.4% 16% 2.6%; border-radius:0 0 calc(4.8 * var(--power-up-unit)) calc(4.8 * var(--power-up-unit)); background:rgb(0 0 0 / 15%); filter:blur(calc(.221 * var(--power-up-unit))); }
+.power-ribbon-art .power-ribbon-shine { inset:5.7% 3.6% 9.9% 1.9%; }
+.power-ribbon-art .power-ribbon-shine--a { background-image:url('/assets/images/powerups/ribbon-shine-a.svg'); }
+.power-ribbon-art .power-ribbon-shine--b { background-image:url('/assets/images/powerups/ribbon-shine-b.svg'); }
+.power-ribbon-text { position:relative; display:block; transform:translateY(calc(-2.17 * var(--power-up-unit))); }
+.power-bundle>.power-ribbon { left:calc(-16 * var(--power-up-unit)); }
+.power-bundle { position:relative; display:flex; align-items:center; gap:calc(24 * var(--power-up-unit)); min-height:calc(144.8 * var(--power-up-unit)); padding:calc(8 * var(--power-up-unit)) calc(32 * var(--power-up-unit)); box-sizing:border-box; border:max(1px, calc(.8 * var(--power-up-unit))) solid #fdb702; border-radius:calc(24 * var(--power-up-unit)); background:#fdb70233; }
+.power-bundle-icons { position:relative; width:calc(110 * var(--power-up-unit)); height:calc(104 * var(--power-up-unit)); flex:0 0 calc(110 * var(--power-up-unit)); }
+.power-bundle-icons .power-icon { position:absolute; }
+.power-bundle-icons .power-icon:nth-child(1) { left:calc(18 * var(--power-up-unit)); }
+.power-bundle-icons .power-icon:nth-child(2) { left:calc(49 * var(--power-up-unit)); top:calc(30 * var(--power-up-unit)); }
+.power-bundle-icons .power-icon:nth-child(3) { left:0; top:calc(36 * var(--power-up-unit)); }
+.power-bundle-description { display:flex; flex:1; min-width:0; flex-direction:column; gap:calc(8 * var(--power-up-unit)); overflow-wrap:anywhere; }
+.power-bundle-description strong { font-weight:400; }
+.power-bundle-description>span { font-size:calc(25.6 * var(--power-up-unit)); }
+.power-bundle-price { position:relative; display:flex; gap:calc(24 * var(--power-up-unit)); align-items:center; }
+.power-bundle-price del { display:flex; align-items:center; gap:calc(2 * var(--power-up-unit)); color:#3e120366; font:700 calc(22.4 * var(--power-up-unit)) "Game Alegreya",Georgia,serif; }
+.power-bundle-price del img { opacity:.6; width:calc(25.6 * var(--power-up-unit)); height:calc(25.6 * var(--power-up-unit)); }
+.power-shop-message { --notice-color:#925100; position:absolute; z-index:3; top:calc(15 * var(--power-up-unit)); left:calc(22 * var(--power-up-unit)); display:flex; align-items:center; justify-content:center; gap:calc(10 * var(--power-up-unit)); width:max-content; max-width:min(42%,calc(100% - 44 * var(--power-up-unit))); min-height:calc(44 * var(--power-up-unit)); padding:calc(8 * var(--power-up-unit)) calc(14 * var(--power-up-unit)); box-sizing:border-box; border:1px solid #e7c47f; border-radius:calc(12 * var(--power-up-unit)); background:#fff6e6; box-shadow:0 calc(3 * var(--power-up-unit)) calc(9 * var(--power-up-unit)) #3e120326; color:var(--notice-color); font:700 calc(18 * var(--power-up-unit))/1.2 "Game Alegreya",Georgia,serif; text-align:center; pointer-events:none; opacity:0; visibility:hidden; transform:translateY(calc(8 * var(--power-up-unit))); transition:opacity .18s ease,transform .22s ease,visibility .18s; }
+.power-shop-message[data-visible="true"] { opacity:1; visibility:visible; transform:translateY(calc(-3 * var(--power-up-unit))); }
+.power-shop-message--success { --notice-color:#397229; border-color:#b9cf99; background:#f1f6e6; }
+.power-shop-message--error { --notice-color:#a13b2c; border-color:#e7b8a7; background:#fff0e9; }
+.power-shop-message--loading,.power-shop-message--purchasing { --notice-color:#7a531f; }
+.power-shop-message-icon { display:flex; align-items:center; justify-content:center; flex:0 0 calc(24 * var(--power-up-unit)); width:calc(24 * var(--power-up-unit)); height:calc(24 * var(--power-up-unit)); border:1px solid currentColor; border-radius:50%; box-sizing:border-box; font:700 calc(18 * var(--power-up-unit))/1 Arial,sans-serif; }
+.power-shop-message-icon--busy { border:calc(2 * var(--power-up-unit)) solid #e7c47f; border-top-color:currentColor; animation:power-shop-loading .8s linear infinite; }
+.power-ups-panel[data-needs-coins="true"] .power-coins-add { color:#ffdf66; text-shadow:0 0 calc(6 * var(--power-up-unit)) #fdb702; }
+@keyframes power-shop-loading { to { transform:rotate(360deg); } }
+@media(prefers-reduced-motion:reduce) { .power-shop-message-icon--busy { animation:none; } }
+/* Follow the game page's stacked mobile layout at the same breakpoint. */
+@media (max-width:760px), (max-width:1024px) and (orientation:portrait) {
+  .power-ups-modal { --power-up-unit:1px; padding:48px clamp(8px, 2vw, 24px) clamp(8px, 2dvh, 24px); }
+  .power-ups-panel { width:100%; }
+@container(max-width:1100px) {
+  .power-row { grid-template-columns:170px minmax(0,1fr) auto minmax(0,1fr); gap:12px; }
+  .power-label { gap:10px; padding:0; font-size:19px; }
+  .power-icon { width:48px; height:47px; }
+  .power-icon img { width:30px; height:33px; }
+  .power-option { padding:12px; gap:10px; }
+  .power-option-name { font-size:22px; }
+  .power-price { flex-basis:128px; font-size:23px; }
+  .power-quantity { flex-basis:44px; }
+  .power-bundle { padding:16px; gap:16px; flex-wrap:wrap; }
+  .power-bundle-description>span { font-size:21px; }
+  .power-bundle-price { margin-left:auto; }
+}
+@container(max-width:900px) {
+  .power-row { grid-template-columns:minmax(0,1fr) auto minmax(0,1fr); }
+  .power-label { grid-column:1/-1; }
+}
+@container(max-width:760px) {
+  .power-option { display:grid; grid-template-columns:44px minmax(0,1fr); gap:10px; }
+  .power-option-name { font-size:20px; white-space:normal; overflow-wrap:anywhere; }
+  .power-option-name del { font-size:18px; }
+  .power-quantity { width:44px; }
+  .power-option>.power-price { grid-column:1/-1; width:min(100%,145.6px); justify-self:center; }
+  .power-ribbon { left:-12px; font-size:20px; }
+  .power-or { padding:0; font-size:18px; }
+  .power-bundle-description { flex-basis:180px; }
+  .power-bundle-price { width:100%; justify-content:flex-end; }
+}
+@container(max-width:440px) {
+  .power-ups-inner { padding:12px; }
+  .power-ups-header { gap:12px; }
+  .power-shop-message { top:72px; left:12px; max-width:calc(100% - 24px); min-height:52px; font-size:17px; padding:8px 10px; }
+  .power-row { grid-template-columns:minmax(0,1fr); gap:16px; }
+  .power-or { display:none; }
+  .power-option { grid-template-columns:40px minmax(0,1fr) 112px; gap:8px; padding:10px; }
+  .power-option>.power-price { grid-column:auto; width:100%; height:54px; }
+  .power-option-name { font-size:18px; line-height:1.2; }
+  .power-option-name del { font-size:17px; }
+  .power-quantity { width:40px; height:30px; font-size:19px; }
+  .power-ribbon { font-size:17px; left:-8px; top:-15px; }
+  .power-bundle { gap:12px; }
+  .power-bundle-description { flex-basis:130px; font-size:19px; }
+  .power-bundle-description>span { font-size:17px; }
+  .power-bundle-icons { flex-basis:90px; width:90px; height:86px; }
+  .power-bundle-icons .power-icon:nth-child(2) { left:39px; top:24px; }
+  .power-bundle-icons .power-icon:nth-child(3) { top:30px; }
+  .power-bundle-price { gap:12px; }
+  .power-bundle-price .power-price { flex:0 0 128px; }
+}
+
+}

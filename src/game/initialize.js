@@ -4,7 +4,7 @@ import { levels } from './levels.js';
 import { modules } from './engine/modules.js';
 import { createLifecycle } from './lifecycle.js';
 import { emitGameUi } from './uiBridge.js';
-import { PortalInventoryClient, PortalApiError, gameAccountId } from '../services/portalCommerce.js';
+import { PortalCommerceClient, PortalApiError, gameAccountId } from '../services/portalCommerce.js';
 
 let initialized = false;
 
@@ -15,7 +15,7 @@ export function initializeGame({ editor = false } = {}) {
   const game = resetGameRuntime();
   Object.assign(game, {
     lifecycle, CM_EDITOR_PAGE: editor, CM_ASSETS: assets, LEVELS: levels,
-    PortalInventoryClient, PortalApiError, gameAccountId,
+    PortalCommerceClient, PortalApiError, gameAccountId,
     cmEmitGameUi: event => { if (lifecycle.active) emitGameUi(event); },
   });
   try {

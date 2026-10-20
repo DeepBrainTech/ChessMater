@@ -1,4 +1,7 @@
 export function register(game) {
+  game.isPhaseCell = function (cellType) {
+    return cellType === game.CELL_TYPES.PHASE_BLOCK || cellType === game.CELL_TYPES.PHASE_BLOCK_ACTIVE;
+  };
   game.normalizePortalApiBase = function (base) {
     if (!base || typeof base !== "string") return "";
     return base.replace(/\/+$/, "");
@@ -103,7 +106,7 @@ export function register(game) {
     }
   };
   game.isLaserBlockingCell = function (row, col) {
-    return game.board[row][col] === game.CELL_TYPES.SOLID_BLOCK || game.board[row][col] === game.CELL_TYPES.PHASE_BLOCK_ACTIVE || game.board[row][col] === game.CELL_TYPES.MOVING_PLATFORM;
+    return game.board[row][col] === game.CELL_TYPES.SOLID_BLOCK || game.board[row][col] === game.CELL_TYPES.MOVING_PLATFORM;
   };
   game.isLaserActive = function (laser, moveNumber = game.levelMoveCount) {
     const fireEverySteps = game.getLaserFireEverySteps(laser);

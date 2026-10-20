@@ -9,7 +9,7 @@ npm install
 npm run dev
 ```
 
-开发服务器同时提供游戏 `/` 和关卡编辑器 `/editor.html`。本地开发使用测试用户 `dev_user`。
+开发服务器同时提供游戏 `/` 和关卡编辑器 `/editor.html`。游戏统一使用主站登录，不再自动创建用户或解锁全部关卡。编辑器可离线编辑关卡，服务端接口仍需认证。
 
 ```bash
 npm run build
@@ -18,14 +18,94 @@ npm start
 
 Vite 同时构建两个 HTML 入口到 `dist/`。根目录的 `server.js` 托管构建结果，默认端口为 8080。
 
-API 服务位于 `backend/`，本地默认端口为 3000：
+直接运行 `npm run dev` 时，Vite 也会读取根目录 `.env` 的 `PORTAL_URL` 和 `PORTAL_API_URL`，分别用于主站链接和主站 API；对应的 `VITE_*` 配置优先。游戏 API 单独通过 `VITE_API_BASE_URL` 配置。修改这些地址或 `vite.config.js` 后重启开发服务器。
+
+API 服务位于 `backend/`，默认端口为 3000；上述 Docker 联调使用 3001，单独启动时也应设置 `PORT=3001`：
 
 ```bash
 npm --prefix backend install
 npm --prefix backend start
 ```
 
-API 服务需要数据库和 Portal JWT 环境变量，具体读取位置见 `backend/db.js`、`backend/server.js` 和 `backend/portal-grants.js`。
+API 服务需要数据库和 Portal JWT 环境变量，具体读取位置见 `backend/db.js` 和 `backend/server.js`。
+
+## Docker 开发环境与主站联调
+
+`docker-compose.dev.yml` 用于开发联调，`docker-compose.yml` 用于生产部署。两份配置独立使用，不需要合并。
+
+需要 Docker Desktop（Linux containers），并先启动现有主站。开发配置仅启动 ChessMater 的前端、API 和游戏数据库，统一连接现有主站，不创建主站服务、主站数据库或 Redis。
+
+根目录 `.env` 中设置 `PORTAL_URL=http://localhost:3000`、`PORTAL_API_URL=http://localhost:8000`，并将 `LOCAL_CHESSMATER_JWT_SECRET`（或 `CHESSMATER_JWT_SECRET`）设置为现有主站签发 ChessMater 令牌使用的密钥。
+
+```powershell
+cd D:\DeepBrainTech\ChessMater
+docker compose -f docker-compose.dev.yml up -d --build
+```
+
+首次启动会安装依赖，查看启动状态：
+
+```powershell
+docker compose -f docker-compose.dev.yml ps
+docker compose -f docker-compose.dev.yml logs -f game-web game-api
+```
+
+- 现有主站：`http://localhost:3000/zh/login`
+- 现有主站 API：`http://localhost:8000`
+- ChessMater：`http://localhost:5173`
+- 游戏 API：`http://localhost:3001`
+
+先在主站登录，然后从 Brain Games 点击 ChessMater。主站签发短期 JWT，通过 URL hash 传入游戏；游戏后端校验后创建用户和 HttpOnly 会话。刷新游戏时从主站 Cookie 恢复令牌，过期后重新获取。所有环境统一要求主站认证；未登录直接访问游戏会跳转主站登录页。地址统一使用 `localhost`，不要混用 `127.0.0.1`，否则主站 Cookie 不共享。
+
+登录和资产统一使用现有主站账号；游戏进度保存在 ChessMater 自己的数据库中。
+
+主站 `frontend/main_page/config/game-launch.ts` 中的 ChessMater 入口需要支持以下配置，本次已在本地主站添加：
+
+```typescript
+gameUrl:
+  process.env.NEXT_PUBLIC_CHESSMATER_URL || "",
+```
+
+源码已挂载并启用热重载。修改依赖后执行 `docker compose -f docker-compose.dev.yml exec game-web npm install --no-package-lock`（后端改为 `game-api`），再重启对应服务。
+
+现有主站前端设置 `NEXT_PUBLIC_CHESSMATER_URL=http://localhost:5173/`；修改后重启或重建其前端以加载配置。此入口不回退到线上地址；生产主站也必须显式配置 `NEXT_PUBLIC_CHESSMATER_URL`。
+
+```powershell
+# 停止联调，保留账号与游戏进度
+docker compose -f docker-compose.dev.yml down
+```
+
+本配置仅用于本机开发。游戏端口为 5173/3001，游戏数据库仅映射到本机 `127.0.0.1:5433`。数据库客户端选择 PostgreSQL，Host 填 `127.0.0.1`，Port 填 `5433`，Username 和 Password 均填 `postgres`，Database 填 `chessmater`，关闭 SSL。修改端口映射后执行 `docker compose -f docker-compose.dev.yml up -d game-db` 使其生效。上述停止命令仅管理游戏服务，主站由自己的项目管理。
+
+## Docker 生产环境
+
+生产配置部署 ChessMater 前端、API 和独立 PostgreSQL，连接已部署的主站。前端使用 Vite 构建产物，后端使用 Node 直接启动；均不挂载源码、不启用热重载，并配置自动重启和健康检查。开发与生产使用不同的项目名及数据库卷。
+
+```powershell
+Copy-Item .env.example .env
+```
+
+编辑根目录 `.env`（Docker Compose 会自动读取），填写：
+
+- `POSTGRES_PASSWORD`：生产游戏数据库密码。
+- `CHESSMATER_JWT_SECRET`：与主站签发 ChessMater 令牌使用的密钥一致。
+- `CHESSMATER_SESSION_JWT_SECRET`：独立的游戏会话签名密钥。
+- `CHESSMATER_API_URL`：浏览器可访问的游戏 API HTTPS 地址。
+- `PORTAL_URL`、`PORTAL_API_URL`：生产主站及其 API 地址，默认使用当前线上域名。
+
+```powershell
+docker compose up -d --build
+docker compose ps
+docker compose logs -f game-web game-api
+```
+
+通过服务器的 HTTPS 反向代理将游戏域名指向 `127.0.0.1:8080`，将游戏 API 域名指向 `127.0.0.1:3002`。代理需要传递原始 `Host` 和 `X-Forwarded-Proto: https`，以正确设置登录 Cookie。生产主站的 `NEXT_PUBLIC_CHESSMATER_URL` 应指向游戏域名。游戏页面与 API 使用项目允许的 `deepbraintechnology.com` 子域名。
+
+前端 URL 配置在镜像构建时写入，修改后需要重新执行带 `--build` 的启动命令。签名密钥和数据库密码仅传入后端运行环境；`.env` 已被 Git 和 Docker 构建上下文忽略。
+
+```powershell
+# 停止生产容器，保留数据库
+docker compose down
+```
 
 ## 文件职责
 
@@ -81,6 +161,21 @@ npm run test:browser:production
 浏览器检查默认寻找 Windows 上的 Chrome 或 Edge；其他环境可设置 `CHESSMATER_BROWSER` 为 Chromium 浏览器的可执行文件路径。检查在隐藏浏览器中运行，本地 API 使用测试响应，不连接数据库、不执行真实兑换。
 
 开发模式检查全部关卡加载和回放绘制，以及走棋、撤销、重启、提示、返回首页、编辑器加载与引擎重新挂载。生产模式检查构建后的游戏和编辑器入口。
+
+## Hint 次数
+
+Hint 按钮显示剩余次数。首次进入并创建 ChessMater 进度时，账号获得一次 3 Hint、2 Undo、1 AntiGravity 初始礼包；再次登录不会重复领取。300 金币兑换 1 次 Hint；首次查看攻略消耗 1 次，本轮关卡内可无限查看，按钮显示 ON。重新开始、切换关卡或刷新页面后需要再次消耗。没有可用攻略时不扣次数，Level Tips 保持免费。
+
+Hint、Undo、AntiGravity 次数为 0 且本轮尚未使用时，点击会打开统一的 Power-Ups 兑换框。单次价格依次为 300、400、600 金币；5 次包为 1300、1700、2500 金币。1900 金币的 Utility Pack 发放 3 Hint + 2 Undo + 1 AntiGravity。主站 `config/shop_items.py` 保存价格与发放配置；`services/chessmater_inventory.py` 扣除主站金币并保存可恢复的购买凭证。ChessMater 验证签名后，在自己的数据库中增加次数；重复请求不会重复扣款或入库。
+
+三种道具的全部余额都保存在 ChessMater 的 `user_progress.hint_credits`、`undo_credits`、`antigravity_credits`。主站只保留金币、钻石、鲜花和购买/发放流水。游戏不再从主站背包读取或消耗道具；`chess_mater_reply` 仅作为 Hint 商品标识保留。每轮 Hint 消耗使用独立请求编号，网络重试不会重复扣次数。
+
+每个账号首次通过当前最新解锁关卡时，奖励 200 主站金币；历史关卡不补发，重复通关不再奖励。游戏后台在保存通关进度的同一事务中记录待发奖励，主站以账号和关卡去重入账；到账后在 `Level Complete!` 下方显示金币图标和 `+200`。网络失败时保留待发记录，在重试、重新进入或页面恢复焦点时补发。此功能需要同时部署主站的 `routes/chessmater_reward_routes.py`、`services/chessmater_rewards.py` 和路由注册。两边使用相同的 `CHESSMATER_JWT_SECRET`；游戏后台通过 `PORTAL_API_URL` 访问主站，Docker 本地开发使用 `PORTAL_INTERNAL_API_URL`。游戏启动时自动创建奖励记录表。新增官方关卡时须同步两边奖励校验的关卡上限（目前为 105）。
+已有数据库的旧永久解锁表使用 `backend/migrations/20261019_drop_permanent_replay_unlocks.sql` 删除；新数据库不再创建这张表。迁移不影响库存、购买流水、关卡进度或最佳路线。
+
+主站与 ChessMater 后端、前端需要一起部署。ChessMater 启动时自动确保库存接收表，也可执行 `backend/migrations/20261019_local_inventory_deliveries.sql`。旧主站库存会在用户进入游戏时自动迁移并删除对应 ChessMater 记录；共享的 `user_item_inventories` 表和其他游戏记录保留。
+
+批量迁移已有账号时，在 `backend` 目录显式设置 `PORTAL_DATABASE_URL`、`CHESSMATER_DATABASE_URL`、`CHESSMATER_JWT_SECRET`，然后运行 `node scripts/migrate-portal-inventory.cjs` 预览，确认后加 `--apply` 执行。需要 TLS 的连接分别设置 `PORTAL_DATABASE_SSL=true`、`CHESSMATER_DATABASE_SSL=true`。脚本只迁移三种 ChessMater 库存，保留购买流水；中断后可安全重跑，不重复入库。请先部署两边代码，再运行迁移，避免旧版本继续使用主站库存。主站测试使用独立内存数据库，游戏库存事务测试使用临时 PostgreSQL schema。
 
 ## Portal 语言
 

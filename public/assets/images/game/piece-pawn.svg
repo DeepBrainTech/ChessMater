@@ -1,0 +1,21 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="128" height="164" viewBox="0 0 128 164" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Frame 6">
+<path id="Vector" d="M64 76C83.8823 76 100 59.8823 100 40C100 20.1177 83.8823 4 64 4C44.1177 4 28 20.1177 28 40C28 59.8823 44.1177 76 64 76Z" fill="#FF7A1A" stroke-width="8" stroke="#9A3412"/>
+<path id="Vector_2" d="M34 38C46 22 82 22 94 38V52H34V38Z" fill="#5D4F37" stroke-width="6" stroke="#9A3412"/>
+<g id="Vector_3">
+<path d="M64 6V22ZM40 18C56 8 72 8 88 18Z" fill="#FF7A1A"/>
+<path d="M64 6V22M40 18C56 8 72 8 88 18" stroke-width="6" stroke-linecap="round" stroke="#FFD23F"/>
+</g>
+<path id="Vector_4" d="M42 72H86L80 92L102 146H26L48 92L42 72Z" fill="#FFB703" stroke-width="8" stroke-linejoin="round" stroke="#9A3412"/>
+<path id="Vector_5" d="M38 92H90L100 122L64 142L28 122L38 92Z" fill="#5D4F37" stroke-width="6" stroke="#9A3412"/>
+<path id="Vector_6" d="M64 98L86 108V124C86 138 76 146 64 152C52 146 42 138 42 124V108L64 98Z" fill="#FFD23F" stroke-width="6" stroke="#9A3412"/>
+<path id="Vector_7" d="M64 112L72 118L68 130H60L56 118L64 112Z" fill="#FFD23F" stroke-width="4" stroke="#9A3412"/>
+<path id="Vector_8" d="M42 54C44.2091 54 46 52.2091 46 50C46 47.7909 44.2091 46 42 46C39.7909 46 38 47.7909 38 50C38 52.2091 39.7909 54 42 54Z" fill="#F97316"/>
+<path id="Vector_9" d="M86 54C88.2091 54 90 52.2091 90 50C90 47.7909 88.2091 46 86 46C83.7909 46 82 47.7909 82 50C82 52.2091 83.7909 54 86 54Z" fill="#F97316"/>
+<path id="Vector_10" d="M14 144H114L124 160H4L14 144Z" fill="#FFB703" stroke-width="8" stroke-linejoin="round" stroke="#9A3412"/>
+<g id="Vector_11">
+<path d="M22 152H106Z" fill="#FF7A1A"/>
+<path d="M22 152H106" stroke-width="4" stroke="#9A3412"/>
+</g>
+</g>
+</svg>
