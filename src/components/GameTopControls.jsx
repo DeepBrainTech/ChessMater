@@ -11,13 +11,11 @@ export default function GameTopControls() {
   const [antigravity, setAntigravity] = useState({ credits: 0, enabled: false, unlocked: false });
   const [guide, setGuide] = useState({ available: false, unlocked: false });
   const [hintCredits, setHintCredits] = useState(null);
-  const [styleTest, setStyleTest] = useState(false);
 
   useEffect(() => {
     return subscribeGameUi((event) => {
       if (event.type === "undoCredits") setUndoCredits(event.undoCredits);
       if (event.type === "hintCredits") setHintCredits(event.hintCredits);
-      if (event.type === "puzzleLoaded") setStyleTest(event.styleTest);
       if (event.type === "antigravity") {
         setAntigravity({ credits: event.antigravityCredits, enabled: event.antigravityEnabled, unlocked: event.antigravityUnlockedThisRun });
       }
@@ -33,10 +31,10 @@ export default function GameTopControls() {
       <div className="game-primary-actions">
         <GameButton id="antigravityToggle" label="Anti-Gravity" color="purple" icon="antigravity"
           quantity={antigravity.unlocked ? (antigravity.enabled ? "ON" : "OFF") : `x${antigravity.credits}`}
-          pressed={antigravity.enabled} disabled={styleTest} onClick={() => game.toggleAntigravity?.()} />
+          pressed={antigravity.enabled} onClick={() => game.toggleAntigravity?.()} />
         <GameButton id="blockTipToggle" label="Hint" color="gold" icon="hint" title={guideTitle} ariaLabel={guideTitle}
           quantity={guide.unlocked ? <span className="hint-view-label">View</span> : `x${hintCredits ?? "—"}`} />
-        <GameButton id="undoMoveBtn" label="Undo" color="blue" icon="undo" quantity={`x${undoCredits ?? 0}`} disabled={styleTest} />
+        <GameButton id="undoMoveBtn" label="Undo" color="blue" icon="undo" quantity={`x${undoCredits ?? 0}`} />
       </div>
       <div className="game-utility-actions">
         <button id="restartLevelBtn" className="game-utility-action" type="button" title="Restart level" aria-label="Restart level">

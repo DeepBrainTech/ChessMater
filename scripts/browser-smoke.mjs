@@ -91,18 +91,6 @@ try {
       const loaded = game.currentPuzzleData?.name;
       // Exercise every shipped level, including special tiles and replay drawing.
       const originalLevels = JSON.stringify(game.LEVELS);
-      document.getElementById('styleTestLevelButton').click();
-      if (game.mode !== 'style-test' || game.ROWS !== 11) throw new Error('Updated Test board did not load');
-      if (game.currentPuzzleData.samples.length !== 76) throw new Error('Test element samples are incomplete');
-      if (!game.targetPieces.some(piece => piece.captured)) throw new Error('Captured target preview is missing');
-      const testRect = game.canvas.getBoundingClientRect();
-      for (const sample of game.currentPuzzleData.samples) {
-        game.handleMove({
-          clientX: testRect.left + (sample.col + .5) * game.TILE_SIZE * testRect.width / game.canvas.width,
-          clientY: testRect.top + (sample.row + .5) * game.TILE_SIZE * testRect.height / game.canvas.height,
-        });
-        if (game.styleTestSelectedCell?.row !== sample.row || game.styleTestSelectedCell?.col !== sample.col) throw new Error('Test sample cannot be inspected');
-      }
       for (const level of game.LEVELS) {
         game.loadPuzzle(level);
         if (!game.currentPuzzleData || game.board.length !== level.rows) throw new Error('Level failed: ' + level.name);

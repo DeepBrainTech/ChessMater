@@ -7,16 +7,6 @@ export function register(game) {
     game.showTransformerMenu = false;
     game.transformerPosition = null;
     game.transformerPlayerIndex = -1;
-    game.styleTestSelectedCell = null;
-    if (puzzleData.styleTest) {
-      game.fallingPieces = [];
-      game.risingPieces = [];
-      game.explodingPlayers = [];
-      game.selectedPlayerIndex = -1;
-      game.pendingMoveTraceEntry = null;
-      game.pendingMoveCounter = false;
-      game.shakeAmount = 0;
-    }
     if (game.levelCompleteModal) {
       game.levelCompleteModal.classList.remove("active");
     }
@@ -169,13 +159,13 @@ export function register(game) {
       game.updateTargetPieceCount();
       game.updateStatus(`Puzzle "${puzzleData.name}" loaded successfully! Size: ${loadedRows}x${loadedCols}`);
       // ✅ Reset state so pieces can move again
-      game.mode = puzzleData.styleTest ? "style-test" : "play";
+      game.mode = "play";
       game.gameWon = false;
       game.antigravityEnabled = false;
       game.antigravityUnlockedThisRun = false;
       game.resetHintForRun({ preserve: preserveHint });
       game.frameCount = 0;
-      game.levelMoveCount = puzzleData.styleTest ? 2 : 0;
+      game.levelMoveCount = 0;
       game.updateMoveCountDisplay();
       game.updateAntigravityButtonLabel();
       game.updateFewestOtherMovesDisplay(null, null, "", false);
@@ -198,7 +188,7 @@ export function register(game) {
       } else {
         game.fetchFewestOtherMovesForCurrentLevel();
       }
-      game.cmEmitGameUi?.({ type: "puzzleLoaded", styleTest: !!puzzleData.styleTest, blockTip: rawTip });
+      game.cmEmitGameUi?.({ type: "puzzleLoaded", blockTip: rawTip });
       game.drawBoard();
     } catch (error) {
       game.updateStatus("Error loading puzzle: " + error.message);
@@ -514,7 +504,6 @@ export function register(game) {
     }
   };
   game.syncProgressAfterWin = function () {
-    if (game.currentPuzzleData?.styleTest) return;
     game.captureWinningReplaySnapshot();
     let actualLevelIndex = game.currentLevelIndex;
     if (actualLevelIndex < 0 && typeof game.LEVELS !== "undefined" && game.currentPuzzleData && game.currentPuzzleData.name) {
@@ -576,7 +565,6 @@ export function register(game) {
     }).catch(() => {});
   };
   game.checkWinCondition = function () {
-    if (game.currentPuzzleData?.styleTest) return;
     if (game.isCheckingWinCondition) {
       return;
     }

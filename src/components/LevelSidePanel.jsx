@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { subscribeGameUi } from "../game/uiBridge.js";
 import { game } from "../game/runtime.js";
-import { styleTestLevel } from "../game/styleTestLevel.js";
 
 export default function LevelSidePanel({ children }) {
   const [players, setPlayers] = useState(0);
@@ -9,14 +8,12 @@ export default function LevelSidePanel({ children }) {
   const [targets, setTargets] = useState({ captured: 0, total: 0 });
   const [moves, setMoves] = useState(0);
   const [best, setBest] = useState(null);
-  const [styleTest, setStyleTest] = useState(false);
   const [levelTip, setLevelTip] = useState(() => String(game.currentPuzzleData?.blockTip ?? "").trim());
 
   useEffect(() => {
     return subscribeGameUi((event) => {
       if (event.type === "playerCount") setPlayers(event.count);
       if (event.type === "puzzleLoaded") {
-        setStyleTest(event.styleTest);
         setLevelTip(event.blockTip || "");
       }
       if (event.type === "moveCount") setMoves(event.levelMoveCount);
@@ -63,7 +60,7 @@ export default function LevelSidePanel({ children }) {
             </div>
           </div>
         </section>
-        {!styleTest && levelTip && (
+        {levelTip && (
           <section className="game-level-tips" aria-labelledby="gameLevelTipsHeading">
             <div className="game-level-tips-card">
               <h2 id="gameLevelTipsHeading">
@@ -78,15 +75,6 @@ export default function LevelSidePanel({ children }) {
       </aside>
       <section className="level-selector" aria-label="Level progress">
         <div className="level-grid" id="levelGrid" tabIndex={0} aria-label="关卡选择，可左右滑动"></div>
-        <button
-          id="styleTestLevelButton"
-          className={`level-button level-style-test-button${styleTest ? " current-level" : ""}`}
-          type="button"
-          title="Test · 全元素样式预览"
-          aria-label="打开 Test 全元素样式预览关卡"
-          aria-pressed={styleTest}
-          onClick={() => game.loadPuzzle?.(styleTestLevel)}
-        >Test</button>
       </section>
     </>
   );

@@ -14,14 +14,6 @@ export function register(game) {
     let col = Math.floor(x / game.TILE_SIZE);
     let row = Math.floor(y / game.TILE_SIZE);
     if (row < 0 || row >= game.ROWS || col < 0 || col >= game.COLS) return;
-    if (game.mode === "style-test") {
-      const sample = game.currentPuzzleData.samples.find(item => item.row === row && item.col === col);
-      const label = sample?.label || (game.isCellInActiveLaser(row, col) ? "激光光束" : (row + col) % 2 === 0 ? "浅色底格" : "深色底格");
-      game.styleTestSelectedCell = { row, col };
-      game.cmEmitGameUi?.({ type: "styleTestSelection", row, col, label });
-      game.drawBoard();
-      return;
-    }
     if (game.CM_EDITOR_PAGE && game.mode === "edit") {
       if (typeof game.cmEditorOnEditCell === "function") {
         game.cmEditorOnEditCell(row, col, x - col * game.TILE_SIZE, y - row * game.TILE_SIZE);
@@ -237,7 +229,7 @@ export function register(game) {
     }
     game.ctx.setTransform(1, 0, 0, 1, game.shakeX, game.shakeY);
     game.ctx.clearRect(-game.shakeX, -game.shakeY, game.canvas.width, game.canvas.height);
-    if (game.mode === "style-test" || game.gameWon) {
+    if (game.gameWon) {
       game.drawBoard();
       game.lifecycle.requestAnimationFrame(game.gameLoop);
       return;

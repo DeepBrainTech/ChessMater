@@ -68,24 +68,6 @@ export function register(game) {
     }
     game.ctx.restore();
   };
-  game.drawStyleTestSamples = function () {
-    for (const sample of game.currentPuzzleData.samples) {
-      const x = sample.col * game.TILE_SIZE;
-      const y = sample.row * game.TILE_SIZE;
-      if (sample.variant === "goal") game.drawGoalStyle(x, y, sample);
-      if (sample.variant === "transformer-active") game.drawTileTexture(game.ctx, "swapActive", x, y, game.TILE_SIZE);
-      if (sample.variant === "fog") game.drawFogOverlay(x, y, sample.row, sample.col);
-      if (sample.variant === "possible-move") game.drawPossibleMoveMarker(x, y);
-    }
-    if (game.styleTestSelectedCell) {
-      const { row, col } = game.styleTestSelectedCell;
-      game.ctx.save();
-      game.ctx.strokeStyle = "#7020a0";
-      game.ctx.lineWidth = 3;
-      game.ctx.strokeRect(col * game.TILE_SIZE + 2, row * game.TILE_SIZE + 2, game.TILE_SIZE - 4, game.TILE_SIZE - 4);
-      game.ctx.restore();
-    }
-  };
   game.drawPossibleMoves = function () {
     if (game.mode !== "play" || game.selectedPlayerIndex === -1 || game.gameWon) return;
     for (let r = 0; r < game.ROWS; r++) {
@@ -538,7 +520,6 @@ export function register(game) {
     }
     game.drawLaserEffects(visible);
     game.drawPlatformLevelGuide();
-    if (game.mode === "style-test") game.drawStyleTestSamples();
   };
 }
 export function initialize(game) {}
