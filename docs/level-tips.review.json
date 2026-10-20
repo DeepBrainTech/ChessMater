@@ -1,0 +1,556 @@
+{
+  "status": "draft_for_review",
+  "source": "src/game/levels.js",
+  "language_order": [
+    "zh-CN",
+    "en"
+  ],
+  "review_notes": {
+    "zh-CN": "供审阅的文案草稿，尚未写入游戏。按棋盘布局和引擎规则编写，未逐关完成通关验证。目标格统一称为目标；终点与目标分开表述。AntiGravity 是否必需尚未逐关核实，当前不把任何关卡标记为必须使用。",
+    "en": "Copy draft for review; not applied to the game. Based on board layouts and engine rules, without a completed playthrough of every level. Collectibles are called objectives; the goal is the destination. AntiGravity requirements have not been verified per level, so no level is currently labeled as requiring it."
+  },
+  "antigravity": {
+    "verification_status": "not_verified_per_level",
+    "introduction": {
+      "zh-CN": "开启 AntiGravity 后，棋子会向上浮起；关闭后恢复向下掉落。",
+      "en": "Turn on AntiGravity to make your pieces rise; turn it off to restore downward gravity."
+    },
+    "required_level_template": {
+      "zh-CN": "本关需要使用 AntiGravity。",
+      "en": "This level requires AntiGravity."
+    },
+    "assignment_note": "仅在核实对应关卡确实无法在普通重力下通关后，才将 required_level_template 改写为该关的具体提示。"
+  },
+  "levels": [
+    {
+      "level": 1,
+      "zh-CN": "王每次可向任意方向走一格。",
+      "en": "The king moves one square in any direction."
+    },
+    {
+      "level": 2,
+      "zh-CN": "马走日字，可以跳过障碍。",
+      "en": "The knight moves in an L and can jump over obstacles."
+    },
+    {
+      "level": 3,
+      "zh-CN": "单向方块只能沿箭头方向通过。",
+      "en": "Phase blocks can only be passed through in the arrow's direction."
+    },
+    {
+      "level": 4,
+      "zh-CN": "变身格可以改变棋子的类型。",
+      "en": "Transformers let you change a piece's type."
+    },
+    {
+      "level": 5,
+      "zh-CN": "收集所有目标后才能进入终点。",
+      "en": "Collect all objectives to unlock the goal."
+    },
+    {
+      "level": 6,
+      "zh-CN": "终点倒计数归零后会锁定。",
+      "en": "The goal locks when its counter reaches zero."
+    },
+    {
+      "level": 7,
+      "zh-CN": "小心炸弹。",
+      "en": "Watch out for bombs!"
+    },
+    {
+      "level": 8,
+      "zh-CN": "车只能横向或纵向移动。",
+      "en": "The rook moves only horizontally or vertically."
+    },
+    {
+      "level": 9,
+      "zh-CN": "三个目标全部收集后，终点才会解锁。",
+      "en": "Collect all three objectives to unlock the goal."
+    },
+    {
+      "level": 10,
+      "zh-CN": "象只能沿斜线移动。",
+      "en": "The bishop moves only diagonally."
+    },
+    {
+      "level": 11,
+      "zh-CN": "马能跳过墙壁，但不能落在墙上。",
+      "en": "The knight can jump over walls, but cannot land on them."
+    },
+    {
+      "level": 12,
+      "zh-CN": "可以切换控制棋子，任意一枚到达终点即可。",
+      "en": "Switch between pieces. Any one of them can reach the goal to finish."
+    },
+    {
+      "level": 13,
+      "zh-CN": "不同类型的棋子有不同的走法。",
+      "en": "Each piece type has its own movement rules."
+    },
+    {
+      "level": 14,
+      "zh-CN": "后可以横向、纵向或斜向移动。",
+      "en": "The queen moves horizontally, vertically, or diagonally."
+    },
+    {
+      "level": 15,
+      "zh-CN": "移动任意棋子，炸弹也会移动。",
+      "en": "Moving any piece also moves the bombs."
+    },
+    {
+      "level": 16,
+      "zh-CN": "点击不同棋子，可以切换控制。",
+      "en": "Click a different piece to control it."
+    },
+    {
+      "level": 17,
+      "zh-CN": "终点倒计数归零后，即使到达也无法通关。",
+      "en": "Once the goal's counter reaches zero, reaching it will not finish the level."
+    },
+    {
+      "level": 18,
+      "zh-CN": "单向方块只能沿箭头方向通过。",
+      "en": "Phase blocks can only be passed through in the arrow's direction."
+    },
+    {
+      "level": 19,
+      "zh-CN": "棋子可以互相支撑，移开下方棋子会让上方棋子下落。",
+      "en": "Pieces can support each other. Moving a lower piece lets those above fall."
+    },
+    {
+      "level": 20,
+      "zh-CN": "棋子不能穿过其他棋子。",
+      "en": "Pieces cannot pass through other pieces."
+    },
+    {
+      "level": 21,
+      "zh-CN": "象走斜线，车走直线。",
+      "en": "The bishop moves diagonally; the rook moves in straight lines."
+    },
+    {
+      "level": 22,
+      "zh-CN": "顶部两端的目标都要收集。",
+      "en": "Collect the objectives at both ends of the top row."
+    },
+    {
+      "level": 23,
+      "zh-CN": "不同棋子收集的目标会合并计算。",
+      "en": "Objectives collected by different pieces count toward the same total."
+    },
+    {
+      "level": 24,
+      "zh-CN": "变身后，棋子按新的类型移动。",
+      "en": "After transforming, a piece follows its new type's movement rules."
+    },
+    {
+      "level": 25,
+      "zh-CN": "三个目标都要收集，顺序不限。",
+      "en": "Collect all three objectives in any order."
+    },
+    {
+      "level": 26,
+      "zh-CN": "切换棋子不会重置终点倒计数。",
+      "en": "Switching pieces does not reset the goal's counter."
+    },
+    {
+      "level": 27,
+      "zh-CN": "所有棋子共用同一个终点倒计数。",
+      "en": "All pieces share the same goal counter."
+    },
+    {
+      "level": 28,
+      "zh-CN": "收集两个目标后，还要在倒计数归零前到达终点。",
+      "en": "Collect both objectives and reach the goal before its counter reaches zero."
+    },
+    {
+      "level": 29,
+      "zh-CN": "收集目标不会重置终点倒计数。",
+      "en": "Collecting an objective does not reset the goal's counter."
+    },
+    {
+      "level": 30,
+      "zh-CN": "到达变身格后，可以选择新的棋子类型。",
+      "en": "Reach a transformer to choose a new piece type."
+    },
+    {
+      "level": 31,
+      "zh-CN": "迷雾只显示棋子可到达的格子。",
+      "en": "Fog reveals only squares your pieces can reach."
+    },
+    {
+      "level": 32,
+      "zh-CN": "象可以沿斜线向上或向下移动。",
+      "en": "The bishop can move diagonally upward or downward."
+    },
+    {
+      "level": 33,
+      "zh-CN": "王每次可向任意方向走一格。",
+      "en": "The king moves one square in any direction."
+    },
+    {
+      "level": 34,
+      "zh-CN": "棋子失去支撑时会向下掉落。",
+      "en": "Pieces fall when they lose support."
+    },
+    {
+      "level": 35,
+      "zh-CN": "单向方块只能沿箭头方向通过。",
+      "en": "Phase blocks can only be passed through in the arrow's direction."
+    },
+    {
+      "level": 36,
+      "zh-CN": "马可以跳过障碍，象不能。",
+      "en": "The knight can jump over obstacles; the bishop cannot."
+    },
+    {
+      "level": 37,
+      "zh-CN": "即使终点就在旁边，也要先收集所有目标。",
+      "en": "Even if the goal is nearby, collect all objectives first."
+    },
+    {
+      "level": 38,
+      "zh-CN": "三个目标全部收集后，身旁的终点才会解锁。",
+      "en": "Collect all three objectives to unlock the nearby goal."
+    },
+    {
+      "level": 39,
+      "zh-CN": "后不能跳过障碍，马可以。",
+      "en": "The queen cannot jump over obstacles; the knight can."
+    },
+    {
+      "level": 40,
+      "zh-CN": "变身格可以让车改用其他棋子的走法。",
+      "en": "A transformer lets the rook take on another piece type's moves."
+    },
+    {
+      "level": 41,
+      "zh-CN": "收集目标后，还需要到达终点。",
+      "en": "After collecting the objective, you still need to reach the goal."
+    },
+    {
+      "level": 42,
+      "zh-CN": "可以用不同棋子分别收集目标和到达终点。",
+      "en": "One piece can collect the objective while another reaches the goal."
+    },
+    {
+      "level": 43,
+      "zh-CN": "变身只改变选中棋子的类型。",
+      "en": "Transforming changes only the selected piece's type."
+    },
+    {
+      "level": 44,
+      "zh-CN": "移开下方棋子，会改变上方棋子的支撑。",
+      "en": "Moving a lower piece changes the support for pieces above it."
+    },
+    {
+      "level": 45,
+      "zh-CN": "马的跳跃不受沿途障碍影响。",
+      "en": "Obstacles along the way do not block a knight's jump."
+    },
+    {
+      "level": 46,
+      "zh-CN": "任意一枚棋子都可以收集目标。",
+      "en": "Any of your pieces can collect the objective."
+    },
+    {
+      "level": 47,
+      "zh-CN": "王可以斜向走一格。",
+      "en": "The king can move one square diagonally."
+    },
+    {
+      "level": 48,
+      "zh-CN": "迷雾不会改变王的走法。",
+      "en": "Fog does not change how the king moves."
+    },
+    {
+      "level": 49,
+      "zh-CN": "马能跳过炸弹，但落点不能是炸弹所在格。",
+      "en": "The knight can jump over bombs, but cannot land on one."
+    },
+    {
+      "level": 50,
+      "zh-CN": "迷雾下仍需在倒计数归零前到达终点。",
+      "en": "Under fog, you must still reach the goal before its counter reaches zero."
+    },
+    {
+      "level": 51,
+      "zh-CN": "这种炸弹会斜向移动。",
+      "en": "This bomb type moves diagonally."
+    },
+    {
+      "level": 52,
+      "zh-CN": "进入传送门，会传送到同色的另一端。",
+      "en": "Entering a portal sends you to its matching-color partner."
+    },
+    {
+      "level": 53,
+      "zh-CN": "易位操作：先选中王，再点击符合条件的特殊车。",
+      "en": "To castle, select the king, then click an eligible special rook."
+    },
+    {
+      "level": 54,
+      "zh-CN": "不同颜色的传送门互不连通。",
+      "en": "Portals of different colors do not connect."
+    },
+    {
+      "level": 55,
+      "zh-CN": "移动平台会随行动升降。",
+      "en": "The moving platform rises and falls with your actions."
+    },
+    {
+      "level": 56,
+      "zh-CN": "站在移动平台上的棋子会随平台移动。",
+      "en": "A piece standing on a moving platform moves with it."
+    },
+    {
+      "level": 57,
+      "zh-CN": "同色传送门成对连接。",
+      "en": "Portals connect in matching-color pairs."
+    },
+    {
+      "level": 58,
+      "zh-CN": "王和特殊车都未移动过，才有可能易位。",
+      "en": "Castling requires both the king and special rook to be unmoved."
+    },
+    {
+      "level": 59,
+      "zh-CN": "变身后仍需收集全部三个目标。",
+      "en": "You still need all three objectives after transforming."
+    },
+    {
+      "level": 60,
+      "zh-CN": "易位会同时改变王和特殊车的位置。",
+      "en": "Castling repositions both the king and the special rook."
+    },
+    {
+      "level": 61,
+      "zh-CN": "马和象收集的目标会合并计算。",
+      "en": "Objectives collected by the knight and bishop count toward the same total."
+    },
+    {
+      "level": 62,
+      "zh-CN": "移动任意棋子，平台都会移动。",
+      "en": "Moving either piece also moves the platform."
+    },
+    {
+      "level": 63,
+      "zh-CN": "三个目标和终点共用这段倒计数。",
+      "en": "Collect all three objectives and reach the goal within the same counter."
+    },
+    {
+      "level": 64,
+      "zh-CN": "易位后，仍需收集全部三个目标。",
+      "en": "After castling, you still need to collect all three objectives."
+    },
+    {
+      "level": 65,
+      "zh-CN": "后和马可以分别收集不同的目标。",
+      "en": "The queen and knight can collect separate objectives."
+    },
+    {
+      "level": 66,
+      "zh-CN": "紫色传送门只连接另一扇紫色传送门。",
+      "en": "A purple portal connects only to its purple partner."
+    },
+    {
+      "level": 67,
+      "zh-CN": "单向方块只能沿箭头方向通过。",
+      "en": "Phase blocks can only be passed through in the arrow's direction."
+    },
+    {
+      "level": 68,
+      "zh-CN": "三个目标全部收集后，终点才会解锁。",
+      "en": "Collect all three objectives to unlock the goal."
+    },
+    {
+      "level": 69,
+      "zh-CN": "马可以跳过障碍，王每次只能走一格。",
+      "en": "The knight can jump over obstacles; the king moves only one square at a time."
+    },
+    {
+      "level": 70,
+      "zh-CN": "兵向上直走，首次移动可前进两格。",
+      "en": "The pawn moves straight upward and may advance two squares on its first move."
+    },
+    {
+      "level": 71,
+      "zh-CN": "鸭子会随行动横移，直接碰到会失败。",
+      "en": "Ducks move sideways with your actions. Direct contact ends the run."
+    },
+    {
+      "level": 72,
+      "zh-CN": "可以站在鸭子上方，随它移动。",
+      "en": "You can stand above a duck and ride with it."
+    },
+    {
+      "level": 73,
+      "zh-CN": "鸭子可以载着棋子横向移动。",
+      "en": "Ducks can carry pieces sideways."
+    },
+    {
+      "level": 74,
+      "zh-CN": "两排鸭子的移动方向相反。",
+      "en": "The two rows of ducks move in opposite directions."
+    },
+    {
+      "level": 75,
+      "zh-CN": "两个目标全部收集后，终点才会解锁。",
+      "en": "Collect both objectives to unlock the goal."
+    },
+    {
+      "level": 76,
+      "zh-CN": "站在鸭子上方，车也能随鸭子横移。",
+      "en": "A rook standing above a duck rides sideways with it."
+    },
+    {
+      "level": 77,
+      "zh-CN": "移动平台也可以横向移动。",
+      "en": "Moving platforms can also travel horizontally."
+    },
+    {
+      "level": 78,
+      "zh-CN": "易位需要王与特殊车之间没有障碍。",
+      "en": "Castling requires a clear path between the king and special rook."
+    },
+    {
+      "level": 79,
+      "zh-CN": "鸭子载着象横移后，象仍然只能走斜线。",
+      "en": "After a duck carries the bishop sideways, the bishop still moves only diagonally."
+    },
+    {
+      "level": 80,
+      "zh-CN": "平台会载着上方的棋子一起横移。",
+      "en": "The platform carries the piece above it sideways."
+    },
+    {
+      "level": 81,
+      "zh-CN": "兵的两格前进只在首次移动时可用。",
+      "en": "The pawn's two-square advance is available only on its first move."
+    },
+    {
+      "level": 82,
+      "zh-CN": "蓝色传送门只连接另一扇蓝色传送门。",
+      "en": "A blue portal connects only to its blue partner."
+    },
+    {
+      "level": 83,
+      "zh-CN": "绿色传送门只连接另一扇绿色传送门。",
+      "en": "A green portal connects only to its green partner."
+    },
+    {
+      "level": 84,
+      "zh-CN": "兵可以在变身格改成其他类型的棋子。",
+      "en": "The pawn can change into another piece type at a transformer."
+    },
+    {
+      "level": 85,
+      "zh-CN": "兵可以斜向前进一格，吃掉目标。",
+      "en": "The pawn can move one square diagonally forward to capture an objective."
+    },
+    {
+      "level": 86,
+      "zh-CN": "移动棋子时，平台、鸭子和炸弹都会移动。",
+      "en": "Moving a piece also moves the platform, ducks, and bombs."
+    },
+    {
+      "level": 87,
+      "zh-CN": "蓝色和橙色传送门分别成对连接。",
+      "en": "Blue and orange portals form separate matching pairs."
+    },
+    {
+      "level": 88,
+      "zh-CN": "橙色传送门只连接另一扇橙色传送门。",
+      "en": "An orange portal connects only to its orange partner."
+    },
+    {
+      "level": 89,
+      "zh-CN": "三块平台都沿横向移动。",
+      "en": "All three platforms move horizontally."
+    },
+    {
+      "level": 90,
+      "zh-CN": "兵不能横走，但可以由鸭子载着横移。",
+      "en": "The pawn cannot move sideways, but a duck can carry it sideways."
+    },
+    {
+      "level": 91,
+      "zh-CN": "移动平台和传送门都不会改变马的走法。",
+      "en": "Neither the platform nor the portals change the knight's movement rules."
+    },
+    {
+      "level": 92,
+      "zh-CN": "到达变身格后，可以重新选择棋子类型。",
+      "en": "Reach the transformer to choose a new piece type."
+    },
+    {
+      "level": 93,
+      "zh-CN": "沿移动路线经过目标，也能完成收集。",
+      "en": "Objectives along your movement path are collected as you pass through them."
+    },
+    {
+      "level": 94,
+      "zh-CN": "车与象共用同一个终点倒计数。",
+      "en": "The rook and bishop share the same goal counter."
+    },
+    {
+      "level": 95,
+      "zh-CN": "两枚棋子收集的目标会合并计算。",
+      "en": "Objectives collected by either piece count toward the same total."
+    },
+    {
+      "level": 96,
+      "zh-CN": "倒计数不会因使用传送门而重置。",
+      "en": "Using a portal does not reset the goal's counter."
+    },
+    {
+      "level": 97,
+      "zh-CN": "马可以跳过鸭子，但不能落在鸭子所在格。",
+      "en": "The knight can jump over ducks, but cannot land on one."
+    },
+    {
+      "level": 98,
+      "zh-CN": "兵可以斜向前进一格，吃掉目标。",
+      "en": "The pawn can move one square diagonally forward to capture an objective."
+    },
+    {
+      "level": 99,
+      "zh-CN": "这关增加了迷雾和终点倒计数。",
+      "en": "This version adds fog and a goal counter."
+    },
+    {
+      "level": 100,
+      "zh-CN": "移开下面的马，会让失去支撑的马下落。",
+      "en": "Moving a lower knight makes unsupported knights above it fall."
+    },
+    {
+      "level": 101,
+      "zh-CN": "激光沿亮边方向发射，按行动次数触发。",
+      "en": "Lasers fire in the directions marked by bright edges, triggered by action count."
+    },
+    {
+      "level": 102,
+      "zh-CN": "不同激光方块的发射周期可以不同。",
+      "en": "Different laser blocks can have different firing intervals."
+    },
+    {
+      "level": 103,
+      "zh-CN": "必须先吃掉黑色目标棋子，才能进入终点。",
+      "en": "Capture the black target piece to unlock the goal."
+    },
+    {
+      "level": 104,
+      "zh-CN": "原地跳跃也算行动，可以调整激光发射时机。",
+      "en": "A hop in place counts as an action and can shift laser timing."
+    },
+    {
+      "level": 105,
+      "zh-CN": "收集两个目标并吃掉三枚黑棋后，终点才会解锁。",
+      "en": "Collect both objectives and capture all three black pieces to unlock the goal."
+    }
+  ],
+  "revision": 2,
+  "copy_style": {
+    "zh-CN": "只写核心规则、机制区别或通关条件；允许重复，不添加泛泛的路线建议。",
+    "en": "State only a core rule, mechanic distinction, or completion requirement. Repetition is allowed; omit generic route advice."
+  }
+}

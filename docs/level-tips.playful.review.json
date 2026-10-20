@@ -1,0 +1,442 @@
+{
+  "status": "draft_for_review",
+  "style": "short_playful_game_tips",
+  "source": "src/game/levels.js",
+  "based_on": "docs/level-tips.review.json",
+  "review_notes": {
+    "en": "Short, casual English game tips for review; not applied to the game. The previous draft is preserved. AntiGravity requirements still need verification per level."
+  },
+  "antigravity": {
+    "verification_status": "not_verified_per_level",
+    "introduction": {
+      "en": "Want to float up? Turn on AntiGravity!"
+    },
+    "required_level_template": {
+      "en": "You'll need AntiGravity for this one!"
+    },
+    "assignment_note": "Only add the required-level tip after verifying that the level requires AntiGravity."
+  },
+  "levels": [
+    {
+      "level": 1,
+      "en": "The king takes one step in any direction!"
+    },
+    {
+      "level": 2,
+      "en": "Knights jump in an L, right over obstacles!"
+    },
+    {
+      "level": 3,
+      "en": "One-way blocks? Follow the arrow to pass through!"
+    },
+    {
+      "level": 4,
+      "en": "Fancy a different piece? Try a transformer!"
+    },
+    {
+      "level": 5,
+      "en": "Grab every objective to unlock the goal!"
+    },
+    {
+      "level": 6,
+      "en": "Don't let the counter hit zero. The goal will lock!"
+    },
+    {
+      "level": 7,
+      "en": "Watch out for bombs!"
+    },
+    {
+      "level": 8,
+      "en": "Rooks move straight. No diagonal shortcuts!"
+    },
+    {
+      "level": 9,
+      "en": "Don't miss any. You need all three objectives!"
+    },
+    {
+      "level": 10,
+      "en": "The bishop's turn. Think diagonally!"
+    },
+    {
+      "level": 11,
+      "en": "Knights can jump over walls, but can't land on them!"
+    },
+    {
+      "level": 12,
+      "en": "Both pieces are yours. Either one can finish!"
+    },
+    {
+      "level": 13,
+      "en": "Try another piece. Each has its own moves!"
+    },
+    {
+      "level": 14,
+      "en": "Straight or diagonal? The queen does both!"
+    },
+    {
+      "level": 15,
+      "en": "You move, the bombs move too!"
+    },
+    {
+      "level": 16,
+      "en": "More than one piece can move. Click another!"
+    },
+    {
+      "level": 17,
+      "en": "Counter hits zero? The goal closes!"
+    },
+    {
+      "level": 18,
+      "en": "Follow the arrow. One-way blocks don't work in reverse!"
+    },
+    {
+      "level": 19,
+      "en": "Move the piece below, and the ones above may drop!"
+    },
+    {
+      "level": 20,
+      "en": "Your own pieces can block the way too!"
+    },
+    {
+      "level": 21,
+      "en": "Bishops go diagonal, rooks go straight. Pick your piece!"
+    },
+    {
+      "level": 22,
+      "en": "Objectives at both ends of the top. Don't miss one!"
+    },
+    {
+      "level": 23,
+      "en": "Split up! Everyone's objectives count together."
+    },
+    {
+      "level": 24,
+      "en": "New piece, new moves!"
+    },
+    {
+      "level": 25,
+      "en": "Any order works. Just grab all three!"
+    },
+    {
+      "level": 26,
+      "en": "Switching pieces won't restart the counter!"
+    },
+    {
+      "level": 27,
+      "en": "One counter for everyone. Make those moves count!"
+    },
+    {
+      "level": 28,
+      "en": "Both objectives, then the goal. All before zero!"
+    },
+    {
+      "level": 29,
+      "en": "Grabbing an objective won't refill the counter!"
+    },
+    {
+      "level": 30,
+      "en": "Step onto the transformer. What will you become?"
+    },
+    {
+      "level": 31,
+      "en": "Fog ahead! You can only see squares your pieces can reach."
+    },
+    {
+      "level": 32,
+      "en": "Bishops go diagonally down as well as up!"
+    },
+    {
+      "level": 33,
+      "en": "One step for the king. Diagonals count too!"
+    },
+    {
+      "level": 34,
+      "en": "Nothing underneath? Down you go!"
+    },
+    {
+      "level": 35,
+      "en": "Follow the arrow to get through a one-way block!"
+    },
+    {
+      "level": 36,
+      "en": "The knight can jump over it. The bishop can't!"
+    },
+    {
+      "level": 37,
+      "en": "Close to the goal? You still need every objective!"
+    },
+    {
+      "level": 38,
+      "en": "The goal's right there! But grab all three objectives first."
+    },
+    {
+      "level": 39,
+      "en": "The queen has range, but the knight can jump obstacles!"
+    },
+    {
+      "level": 40,
+      "en": "Even a rook can transform. Try a new set of moves!"
+    },
+    {
+      "level": 41,
+      "en": "Got the objective? Now reach the goal!"
+    },
+    {
+      "level": 42,
+      "en": "One grabs the objective, another takes the goal. That works!"
+    },
+    {
+      "level": 43,
+      "en": "Only this piece transforms. The others stay as they are."
+    },
+    {
+      "level": 44,
+      "en": "Moving a lower piece? Watch for falling friends!"
+    },
+    {
+      "level": 45,
+      "en": "An L-shaped jump takes the knight right over obstacles!"
+    },
+    {
+      "level": 46,
+      "en": "So many knights! Any one can grab the objective."
+    },
+    {
+      "level": 47,
+      "en": "Remember, the king can step diagonally too!"
+    },
+    {
+      "level": 48,
+      "en": "Fog or no fog, the king still moves one square!"
+    },
+    {
+      "level": 49,
+      "en": "Jump over bombs, not onto them!"
+    },
+    {
+      "level": 50,
+      "en": "The counter's still ticking in the fog. Keep an eye on it!"
+    },
+    {
+      "level": 51,
+      "en": "Heads up! These bombs move diagonally!"
+    },
+    {
+      "level": 52,
+      "en": "Step into a portal and pop out at its matching color!"
+    },
+    {
+      "level": 53,
+      "en": "Try castling! Click the king, then an eligible special rook."
+    },
+    {
+      "level": 54,
+      "en": "Match the colors. Don't mix up the portals!"
+    },
+    {
+      "level": 55,
+      "en": "A platform that goes up and down. Hop aboard!"
+    },
+    {
+      "level": 56,
+      "en": "Get on the platform and ride along!"
+    },
+    {
+      "level": 57,
+      "en": "Same color, same pair. Match your portals!"
+    },
+    {
+      "level": 58,
+      "en": "Want to castle? Neither the king nor special rook can have moved!"
+    },
+    {
+      "level": 59,
+      "en": "Transform all you like. You still need all three objectives!"
+    },
+    {
+      "level": 60,
+      "en": "One castle, two pieces on the move!"
+    },
+    {
+      "level": 61,
+      "en": "Let the knight and bishop share the work. Objectives count together!"
+    },
+    {
+      "level": 62,
+      "en": "Move either piece, and the platform moves too!"
+    },
+    {
+      "level": 63,
+      "en": "Three objectives and the goal. Get them all before zero!"
+    },
+    {
+      "level": 64,
+      "en": "Don't forget those three objectives while you're castling!"
+    },
+    {
+      "level": 65,
+      "en": "The queen and knight can both collect. Share the work!"
+    },
+    {
+      "level": 66,
+      "en": "Purple goes to purple. Match those colors!"
+    },
+    {
+      "level": 67,
+      "en": "No going against a one-way block. Check the arrow!"
+    },
+    {
+      "level": 68,
+      "en": "Three objectives. Miss one and the goal stays locked!"
+    },
+    {
+      "level": 69,
+      "en": "The knight jumps in an L; the king takes one step. Each has its uses!"
+    },
+    {
+      "level": 70,
+      "en": "Pawns move upward. Their first move can cover two squares!"
+    },
+    {
+      "level": 71,
+      "en": "Watch out for ducks. Don't bump into them!"
+    },
+    {
+      "level": 72,
+      "en": "Stand on top of a duck and hitch a ride!"
+    },
+    {
+      "level": 73,
+      "en": "Ducks aren't just in the way. They can give you a ride!"
+    },
+    {
+      "level": 74,
+      "en": "One row goes left, the other right. Watch both!"
+    },
+    {
+      "level": 75,
+      "en": "Grab both objectives to open the goal!"
+    },
+    {
+      "level": 76,
+      "en": "Rooks can hitch a duck ride too. Hop on!"
+    },
+    {
+      "level": 77,
+      "en": "Platforms can go sideways too!"
+    },
+    {
+      "level": 78,
+      "en": "Want to castle? Clear the path between king and special rook!"
+    },
+    {
+      "level": 79,
+      "en": "A duck can carry the bishop sideways. The bishop still moves diagonally!"
+    },
+    {
+      "level": 80,
+      "en": "Hold on! This platform carries you sideways!"
+    },
+    {
+      "level": 81,
+      "en": "That two-square pawn move? First move only!"
+    },
+    {
+      "level": 82,
+      "en": "Blue goes to blue. Check the color!"
+    },
+    {
+      "level": 83,
+      "en": "Green goes to green. In one, out the other!"
+    },
+    {
+      "level": 84,
+      "en": "Pawns can transform too. Pick a new piece and keep going!"
+    },
+    {
+      "level": 85,
+      "en": "Objective one square diagonally ahead? The pawn can capture it!"
+    },
+    {
+      "level": 86,
+      "en": "You move, the platform, ducks, and bombs move too!"
+    },
+    {
+      "level": 87,
+      "en": "Blue to blue, orange to orange. Keep the pairs straight!"
+    },
+    {
+      "level": 88,
+      "en": "Where does orange lead? The other orange portal!"
+    },
+    {
+      "level": 89,
+      "en": "Three platforms, all moving sideways. Watch where they go!"
+    },
+    {
+      "level": 90,
+      "en": "Pawns can't move sideways. Ducks can give them a lift!"
+    },
+    {
+      "level": 91,
+      "en": "Platforms and portals won't change those L-shaped knight moves!"
+    },
+    {
+      "level": 92,
+      "en": "Need different moves? Head to the transformer!"
+    },
+    {
+      "level": 93,
+      "en": "Passing through an objective collects it. No need to stop!"
+    },
+    {
+      "level": 94,
+      "en": "Rook move or bishop move, it all uses the same counter!"
+    },
+    {
+      "level": 95,
+      "en": "Either piece can collect. Let them both join the search!"
+    },
+    {
+      "level": 96,
+      "en": "Portals are fast, but they won't reset the counter!"
+    },
+    {
+      "level": 97,
+      "en": "Jump over ducks, not into them!"
+    },
+    {
+      "level": 98,
+      "en": "Pawns can capture objectives diagonally, one square at a time!"
+    },
+    {
+      "level": 99,
+      "en": "A familiar route. This time with fog and a counter!"
+    },
+    {
+      "level": 100,
+      "en": "Move a knight below, and the ones above may tumble!"
+    },
+    {
+      "level": 101,
+      "en": "Bright edges show where lasers fire. Your moves trigger them!"
+    },
+    {
+      "level": 102,
+      "en": "These lasers don't all fire to the same beat!"
+    },
+    {
+      "level": 103,
+      "en": "Capture the black piece to unlock the goal!"
+    },
+    {
+      "level": 104,
+      "en": "Bad laser timing? A hop in place counts as a move too!"
+    },
+    {
+      "level": 105,
+      "en": "Two objectives, three black pieces. Don't miss any!"
+    }
+  ],
+  "language": "en"
+}

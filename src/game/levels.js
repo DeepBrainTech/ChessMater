@@ -2,7 +2,7 @@ export const levels = [
     {
       "version": "1.3",
       "name": "Puzzle 1",
-      "blockTip": "Level 1: Introduction to basic movement and green solid blocks.",
+      "blockTip": "The king takes one step in any direction!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -34,6 +34,7 @@ export const levels = [
     {
       "version": "1.3",
       "name": "Puzzle 2",
+      "blockTip": "Knights jump in an L, right over obstacles!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -65,7 +66,7 @@ export const levels = [
     {
       "version": "1.3",
       "name": "Puzzle 3",
-      "blockTip": "Level 3: Blue Phase Blocks can be passed from below only.",
+      "blockTip": "One-way blocks? Follow the arrow to pass through!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -97,7 +98,7 @@ export const levels = [
     {
       "version": "1.3",
       "name": "Puzzle 4",
-      "blockTip": "Level 4: Transformer blocks change your chess piece type!",
+      "blockTip": "Fancy a different piece? Try a transformer!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -129,7 +130,7 @@ export const levels = [
     {
       "version": "1.3",
       "name": "Puzzle 5",
-      "blockTip": "Level 5: Objective blocks must be stepped on before the goal.",
+      "blockTip": "Grab every objective to unlock the goal!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -177,7 +178,7 @@ export const levels = [
     {
       "version": "1.3",
       "name": "Puzzle 6",
-      "blockTip": "Level 6: Counter Goals lock after X moves—reach them in time!",
+      "blockTip": "Don't let the counter hit zero. The goal will lock!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -211,7 +212,7 @@ export const levels = [
     {
       "version": "1.3",
       "name": "Puzzle 7",
-      "blockTip": "Level 7: Beware of bombs! They move and explode.",
+      "blockTip": "Watch out for bombs!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -251,6 +252,7 @@ export const levels = [
     {
       "version": "1.3",
       "name": "Puzzle 8",
+      "blockTip": "Rooks move straight. No diagonal shortcuts!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -284,6 +286,7 @@ export const levels = [
     {
       "version": "1.3",
       "name": "Puzzle 9",
+      "blockTip": "Don't miss any. You need all three objectives!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -333,6 +336,7 @@ export const levels = [
     {
       "version": "1.3",
       "name": "Puzzle 10",
+      "blockTip": "The bishop's turn. Think diagonally!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -383,6 +387,7 @@ export const levels = [
     {
       "version": "1.3",
       "name": "Puzzle 11",
+      "blockTip": "Knights can jump over walls, but can't land on them!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -416,6 +421,7 @@ export const levels = [
     {
       "version": "1.3",
       "name": "Puzzle 12",
+      "blockTip": "Both pieces are yours. Either one can finish!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -454,6 +460,7 @@ export const levels = [
     {
       "version": "1.3",
       "name": "Puzzle 13",
+      "blockTip": "Try another piece. Each has its own moves!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -497,6 +504,7 @@ export const levels = [
     {
       "version": "1.3",
       "name": "Puzzle 14",
+      "blockTip": "Straight or diagonal? The queen does both!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -530,6 +538,7 @@ export const levels = [
     {
       "version": "1.3",
       "name": "Puzzle 15",
+      "blockTip": "You move, the bombs move too!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -584,6 +593,7 @@ export const levels = [
     {
       "version": "1.3",
       "name": "Puzzle 16",
+      "blockTip": "More than one piece can move. Click another!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -642,6 +652,7 @@ export const levels = [
     {
       "version": "1.3",
       "name": "Puzzle 17",
+      "blockTip": "Counter hits zero? The goal closes!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -688,6 +699,7 @@ export const levels = [
     {
       "version": "1.3",
       "name": "Puzzle 18",
+      "blockTip": "Follow the arrow. One-way blocks don't work in reverse!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -731,6 +743,7 @@ export const levels = [
     {
       "version": "1.3",
       "name": "Puzzle 19",
+      "blockTip": "Move the piece below, and the ones above may drop!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -799,6 +812,7 @@ export const levels = [
     {
       "version": "1.3",
       "name": "Puzzle 20",
+      "blockTip": "Your own pieces can block the way too!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -847,6 +861,7 @@ export const levels = [
     {
       "version": "1.3",
       "name": "Puzzle 21",
+      "blockTip": "Bishops go diagonal, rooks go straight. Pick your piece!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -890,6 +905,7 @@ export const levels = [
     {
       "version": "1.3",
       "name": "Puzzle 22",
+      "blockTip": "Objectives at both ends of the top. Don't miss one!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -950,6 +966,7 @@ export const levels = [
     {
       "version": "1.3",
       "name": "Puzzle 23",
+      "blockTip": "Split up! Everyone's objectives count together.",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -1030,6 +1047,7 @@ export const levels = [
     {
       "version": "1.3",
       "name": "Puzzle 24",
+      "blockTip": "New piece, new moves!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -1074,6 +1092,7 @@ export const levels = [
     {
       "version": "1.3",
       "name": "Puzzle 25",
+      "blockTip": "Any order works. Just grab all three!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -1123,6 +1142,7 @@ export const levels = [
     {
       "version": "1.3",
       "name": "Puzzle 26",
+      "blockTip": "Switching pieces won't restart the counter!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -1168,6 +1188,7 @@ export const levels = [
     {
       "version": "1.3",
       "name": "Puzzle 27",
+      "blockTip": "One counter for everyone. Make those moves count!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -1213,6 +1234,7 @@ export const levels = [
     {
       "version": "1.3",
       "name": "Puzzle 28",
+      "blockTip": "Both objectives, then the goal. All before zero!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -1275,6 +1297,7 @@ export const levels = [
     {
       "version": "1.3",
       "name": "Puzzle 29",
+      "blockTip": "Grabbing an objective won't refill the counter!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -1321,6 +1344,7 @@ export const levels = [
     {
       "version": "1.3",
       "name": "Puzzle 30",
+      "blockTip": "Step onto the transformer. What will you become?",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -1377,7 +1401,7 @@ export const levels = [
     {
       "version": "1.3",
       "name": "Puzzle 31",
-      "blockTip": "Level 31: ⚔️ Welcome to Fog of War! In this level, the board is shrouded in mystery — you can only see tiles your pieces can reach. Plan your moves carefully and explore the unknown. What lies beyond could be danger... or your path to victory. 🎯 Tip: Use long-range pieces like the Queen or Bishop to reveal more of the board quickly.",
+      "blockTip": "Fog ahead! You can only see squares your pieces can reach.",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -1411,6 +1435,7 @@ export const levels = [
     {
       "version": "1.3",
       "name": "Puzzle 32",
+      "blockTip": "Bishops go diagonally down as well as up!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -1444,6 +1469,7 @@ export const levels = [
     {
       "version": "1.3",
       "name": "Puzzle 33",
+      "blockTip": "One step for the king. Diagonals count too!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -1477,6 +1503,7 @@ export const levels = [
     {
       "version": "1.3",
       "name": "Puzzle 34",
+      "blockTip": "Nothing underneath? Down you go!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -1510,6 +1537,7 @@ export const levels = [
     {
       "version": "1.3",
       "name": "Puzzle 35",
+      "blockTip": "Follow the arrow to get through a one-way block!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -1544,6 +1572,7 @@ export const levels = [
         {
       "version": "1.3",
       "name": "Puzzle 36",
+      "blockTip": "The knight can jump over it. The bishop can't!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -1583,6 +1612,7 @@ export const levels = [
         {
       "version": "1.3",
       "name": "Puzzle 37",
+      "blockTip": "Close to the goal? You still need every objective!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -1628,6 +1658,7 @@ export const levels = [
         {
       "version": "1.3",
       "name": "Puzzle 38",
+      "blockTip": "The goal's right there! But grab all three objectives first.",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -1679,6 +1710,7 @@ export const levels = [
         {
       "version": "1.3",
       "name": "Puzzle 39",
+      "blockTip": "The queen has range, but the knight can jump obstacles!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -1720,6 +1752,7 @@ export const levels = [
       {
       "version": "1.3",
       "name": "Puzzle 40",
+      "blockTip": "Even a rook can transform. Try a new set of moves!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -1761,6 +1794,7 @@ export const levels = [
         {
       "version": "1.3",
       "name": "Puzzle 41",
+      "blockTip": "Got the objective? Now reach the goal!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -1812,6 +1846,7 @@ export const levels = [
         {
       "version": "1.3",
       "name": "Puzzle 42",
+      "blockTip": "One grabs the objective, another takes the goal. That works!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -1868,6 +1903,7 @@ export const levels = [
         {
       "version": "1.3",
       "name": "Puzzle 43",
+      "blockTip": "Only this piece transforms. The others stay as they are.",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -1920,6 +1956,7 @@ export const levels = [
         {
       "version": "1.3",
       "name": "Puzzle 44",
+      "blockTip": "Moving a lower piece? Watch for falling friends!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -1992,6 +2029,7 @@ export const levels = [
         {
       "version": "1.3",
       "name": "Puzzle 45",
+      "blockTip": "An L-shaped jump takes the knight right over obstacles!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -2038,6 +2076,7 @@ export const levels = [
         {
       "version": "1.3",
       "name": "Puzzle 46",
+      "blockTip": "So many knights! Any one can grab the objective.",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -2115,6 +2154,7 @@ export const levels = [
         {
       "version": "1.3",
       "name": "Puzzle 47",
+      "blockTip": "Remember, the king can step diagonally too!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -2152,6 +2192,7 @@ export const levels = [
         {
       "version": "1.3",
       "name": "Puzzle 48",
+      "blockTip": "Fog or no fog, the king still moves one square!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -2189,6 +2230,7 @@ export const levels = [
         {
       "version": "1.3",
       "name": "Puzzle 49",
+      "blockTip": "Jump over bombs, not onto them!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -2247,6 +2289,7 @@ export const levels = [
         {
       "version": "1.3",
       "name": "Puzzle 50",
+      "blockTip": "The counter's still ticking in the fog. Keep an eye on it!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -2284,6 +2327,7 @@ export const levels = [
         {
       "version": "1.3",
       "name": "Puzzle 51",
+      "blockTip": "Heads up! These bombs move diagonally!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -2402,7 +2446,7 @@ export const levels = [
       ],
       "fog": false,
       "createdAt": "2026-05-29T15:55:52.939Z",
-      "blockTip": "Teleporter:Click"
+      "blockTip": "Step into a portal and pop out at its matching color!"
     },
 
     // puzzle 53
@@ -2451,13 +2495,14 @@ export const levels = [
       "bombs": [],
       "fog": false,
       "createdAt": "2026-05-27T05:47:59.907Z",
-      "blockTip": "Castling. First click the king, and then click the special rook."
+      "blockTip": "Try castling! Click the king, then an eligible special rook."
     },
 
     // puzzle 54
         {
       "version": "1.3",
       "name": "Puzzle 54",
+      "blockTip": "Match the colors. Don't mix up the portals!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -2530,6 +2575,7 @@ export const levels = [
         {
       "version": "1.3",
       "name": "Puzzle 55",
+      "blockTip": "A platform that goes up and down. Hop aboard!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -2582,6 +2628,7 @@ export const levels = [
         {
       "version": "1.3",
       "name": "Puzzle 56",
+      "blockTip": "Get on the platform and ride along!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -2640,6 +2687,7 @@ export const levels = [
         {
       "version": "1.3",
       "name": "Puzzle 57",
+      "blockTip": "Same color, same pair. Match your portals!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -2703,6 +2751,7 @@ export const levels = [
         {
       "version": "1.3",
       "name": "Puzzle 58",
+      "blockTip": "Want to castle? Neither the king nor special rook can have moved!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -2762,6 +2811,7 @@ export const levels = [
       {
       "version": "1.3",
       "name": "Puzzle 59",
+      "blockTip": "Transform all you like. You still need all three objectives!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -2824,6 +2874,7 @@ export const levels = [
     {
       "version": "1.3",
       "name": "Puzzle 60",
+      "blockTip": "One castle, two pieces on the move!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -2888,6 +2939,7 @@ export const levels = [
         {
       "version": "1.3",
       "name": "Puzzle 61",
+      "blockTip": "Let the knight and bishop share the work. Objectives count together!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -2950,6 +3002,7 @@ export const levels = [
         {
       "version": "1.3",
       "name": "Puzzle 62",
+      "blockTip": "Move either piece, and the platform moves too!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -3013,6 +3066,7 @@ export const levels = [
         {
       "version": "1.3",
       "name": "Puzzle 63",
+      "blockTip": "Three objectives and the goal. Get them all before zero!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -3074,6 +3128,7 @@ export const levels = [
         {
       "version": "1.3",
       "name": "Puzzle 64",
+      "blockTip": "Don't forget those three objectives while you're castling!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -3144,6 +3199,7 @@ export const levels = [
         {
       "version": "1.3",
       "name": "Puzzle 65",
+      "blockTip": "The queen and knight can both collect. Share the work!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -3212,6 +3268,7 @@ export const levels = [
         {
       "version": "1.3",
       "name": "Puzzle 66",
+      "blockTip": "Purple goes to purple. Match those colors!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -3262,6 +3319,7 @@ export const levels = [
         {
       "version": "1.3",
       "name": "Puzzle 67",
+      "blockTip": "No going against a one-way block. Check the arrow!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -3332,6 +3390,7 @@ export const levels = [
         {
       "version": "1.3",
       "name": "Puzzle 68",
+      "blockTip": "Three objectives. Miss one and the goal stays locked!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -3394,6 +3453,7 @@ export const levels = [
         {
       "version": "1.3",
       "name": "Puzzle 69",
+      "blockTip": "The knight jumps in an L; the king takes one step. Each has its uses!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -3438,6 +3498,7 @@ export const levels = [
     {
       "version": "1.3",
       "name": "Puzzle 70",
+      "blockTip": "Pawns move upward. Their first move can cover two squares!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -3568,7 +3629,7 @@ export const levels = [
       "movingPlatforms": [],
       "fog": false,
       "createdAt": "2026-06-18T16:13:02.879Z",
-      "blockTip": "You can't touch the duck. Otherwise you will fail."
+      "blockTip": "Watch out for ducks. Don't bump into them!"
     },
     // puzzle 72
         {
@@ -3627,12 +3688,13 @@ export const levels = [
       "movingPlatforms": [],
       "fog": false,
       "createdAt": "2026-06-18T16:17:33.053Z",
-      "blockTip": "You can step on the duck as a platform"
+      "blockTip": "Stand on top of a duck and hitch a ride!"
     },
     // puzzle 73
         {
       "version": "1.3",
       "name": "Puzzle 73",
+      "blockTip": "Ducks aren't just in the way. They can give you a ride!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -3697,6 +3759,7 @@ export const levels = [
         {
       "version": "1.3",
       "name": "Puzzle 74",
+      "blockTip": "One row goes left, the other right. Watch both!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -3787,6 +3850,7 @@ export const levels = [
         {
       "version": "1.3",
       "name": "Puzzle 75",
+      "blockTip": "Grab both objectives to open the goal!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -3917,7 +3981,7 @@ export const levels = [
       "movingPlatforms": [],
       "fog": false,
       "createdAt": "2026-06-25T04:11:30.578Z",
-      "blockTip": "Puzzle 76: Not every shortcut is a shortcut. Timing matters."
+      "blockTip": "Rooks can hitch a duck ride too. Hop on!"
     },
 
     // puzzle 77
@@ -4001,7 +4065,7 @@ export const levels = [
       ],
       "fog": false,
       "createdAt": "2026-06-25T05:26:44.249Z",
-      "blockTip": "Puzzle 77: Ducks set the rhythm; the platform decides where that rhythm becomes useful."
+      "blockTip": "Platforms can go sideways too!"
     },
 
     // puzzle 78
@@ -4073,13 +4137,14 @@ export const levels = [
       "movingPlatforms": [],
       "fog": false,
       "createdAt": "2026-06-25T06:08:41.451Z",
-      "blockTip": "Puzzle 78: Castle first, then read the duck lanes before committing to the upper route."
+      "blockTip": "Want to castle? Clear the path between king and special rook!"
     },
 
     // puzzle 79
         {
       "version": "1.3",
       "name": "Puzzle 79",
+      "blockTip": "A duck can carry the bishop sideways. The bishop still moves diagonally!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -4170,6 +4235,7 @@ export const levels = [
         {
       "version": "1.3",
       "name": "Puzzle 80",
+      "blockTip": "Hold on! This platform carries you sideways!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -4299,7 +4365,7 @@ export const levels = [
       "movingPlatforms": [],
       "fog": false,
       "createdAt": "2026-06-25T16:57:51.198Z",
-      "blockTip": "Puzzle 81: The first pawn move matters. Let one mechanic hand you to the next."
+      "blockTip": "That two-square pawn move? First move only!"
     },
 
     // puzzle 82
@@ -4360,13 +4426,14 @@ export const levels = [
       ],
       "fog": false,
       "createdAt": "2026-07-02T00:00:00.000Z",
-      "blockTip": "Puzzle 82: This one is about a knight, a moving floor, and a door that changes the final jump."
+      "blockTip": "Blue goes to blue. Check the color!"
     },
 
     // puzzle 83
         {
       "version": "1.3",
       "name": "Puzzle 83",
+      "blockTip": "Green goes to green. In one, out the other!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -4500,13 +4567,14 @@ export const levels = [
       ],
       "fog": false,
       "createdAt": "2026-07-02T00:40:00.000Z",
-      "blockTip": "Puzzle 84: A pawn can start fast, but the platform decides where that speed becomes useful."
+      "blockTip": "Pawns can transform too. Pick a new piece and keep going!"
     },
 
     // puzzle 85
         {
       "version": "1.3",
       "name": "Puzzle 85",
+      "blockTip": "Objective one square diagonally ahead? The pawn can capture it!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -4588,6 +4656,7 @@ export const levels = [
         {
       "version": "1.3",
       "name": "Puzzle 86",
+      "blockTip": "You move, the platform, ducks, and bombs move too!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -4675,6 +4744,7 @@ export const levels = [
         {
       "version": "1.3",
       "name": "Puzzle 87",
+      "blockTip": "Blue to blue, orange to orange. Keep the pairs straight!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -4727,6 +4797,7 @@ export const levels = [
         {
       "version": "1.3",
       "name": "Puzzle 88",
+      "blockTip": "Where does orange lead? The other orange portal!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -4787,6 +4858,7 @@ export const levels = [
         {
       "version": "1.3",
       "name": "Puzzle 89",
+      "blockTip": "Three platforms, all moving sideways. Watch where they go!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -4877,6 +4949,7 @@ export const levels = [
         {
       "version": "1.3",
       "name": "Puzzle 90",
+      "blockTip": "Pawns can't move sideways. Ducks can give them a lift!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -4942,6 +5015,7 @@ export const levels = [
         {
       "version": "1.3",
       "name": "Puzzle 91",
+      "blockTip": "Platforms and portals won't change those L-shaped knight moves!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -5001,6 +5075,7 @@ export const levels = [
         {
       "version": "1.3",
       "name": "Puzzle 92",
+      "blockTip": "Need different moves? Head to the transformer!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -5050,6 +5125,7 @@ export const levels = [
         {
       "version": "1.3",
       "name": "Puzzle 93",
+      "blockTip": "Passing through an objective collects it. No need to stop!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -5103,6 +5179,7 @@ export const levels = [
         {
       "version": "1.3",
       "name": "Puzzle 94",
+      "blockTip": "Rook move or bishop move, it all uses the same counter!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -5162,6 +5239,7 @@ export const levels = [
         {
       "version": "1.3",
       "name": "Puzzle 95",
+      "blockTip": "Either piece can collect. Let them both join the search!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -5224,6 +5302,7 @@ export const levels = [
         {
       "version": "1.3",
       "name": "Puzzle 96",
+      "blockTip": "Portals are fast, but they won't reset the counter!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -5285,6 +5364,7 @@ export const levels = [
         {
       "version": "1.3",
       "name": "Puzzle 97",
+      "blockTip": "Jump over ducks, not into them!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -5356,6 +5436,7 @@ export const levels = [
         {
       "version": "1.3",
       "name": "Puzzle 98",
+      "blockTip": "Pawns can capture objectives diagonally, one square at a time!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -5450,7 +5531,7 @@ export const levels = [
         {
       "version": "1.3",
       "name": "Puzzle 99",
-      "blockTip": "Same layout as the previous puzzle, but now with fog of war. Time to test your memory.",
+      "blockTip": "A familiar route. This time with fog and a counter!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -5547,6 +5628,7 @@ export const levels = [
         {
       "version": "1.3",
       "name": "Puzzle 100",
+      "blockTip": "Move a knight below, and the ones above may tumble!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -5733,13 +5815,14 @@ export const levels = [
       "movingPlatforms": [],
       "fog": false,
       "createdAt": "2026-07-30T16:56:46.680Z",
-      "blockTip": "Laser Blocks fire from their bright edges on move intervals. Count your steps, then move the king across safely."
+      "blockTip": "Bright edges show where lasers fire. Your moves trigger them!"
     },
 
     // puzzle 102
         {
       "version": "1.3",
       "name": "Puzzle 102",
+      "blockTip": "These lasers don't all fire to the same beat!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -5840,6 +5923,7 @@ export const levels = [
         {
       "version": "1.3",
       "name": "Puzzle 103",
+      "blockTip": "Capture the black piece to unlock the goal!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -5919,7 +6003,7 @@ export const levels = [
         {
       "version": "1.3",
       "name": "Puzzle 104",
-      "blockTip": "Puzzle 104: Lasers fire by move count, not time. If the next square fires on this move, hop in place to shift the count before crossing.",
+      "blockTip": "Bad laser timing? A hop in place counts as a move too!",
       "rows": 10,
       "cols": 16,
       "board": [
@@ -5996,6 +6080,7 @@ export const levels = [
         {
       "version": "1.3",
       "name": "Puzzle 105",
+      "blockTip": "Two objectives, three black pieces. Don't miss any!",
       "rows": 10,
       "cols": 16,
       "board": [
