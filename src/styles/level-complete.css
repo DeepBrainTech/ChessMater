@@ -266,7 +266,7 @@
   background:
     url("/assets/images/level-complete/unlock-shine.svg") center / 90% 82% no-repeat,
     url("/assets/images/level-complete/unlock-fill.svg") center / 93% 83% no-repeat,
-    url("/assets/images/level-complete/unlock-border.png") center / 100% 100% no-repeat;
+    url("/assets/images/powerups/price-border.png") center / 100% 100% no-repeat;
 }
 .level-complete-replay-lock-cost::before,
 .level-complete-replay-lock-cost::after {

@@ -31,7 +31,7 @@ async function fixture({ unlocked = 1, completed = false, pending = false } = {}
 
 test('a first clear reserves and delivers 200 coins; a repeat clear does not award again', async t => {
   process.env.CHESSMATER_JWT_SECRET = 'isolated-progress-reward-secret';
-  t.mock.method(globalThis, 'fetch', async () => ({ ok: true, json: async () => ({ success: true, data: { coins: 200 } }) }));
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: true, json: async () => ({ success: true, data: { game_key: 'chessmater', level: 1, rewards: { coins: 200 } } }) }));
   const f = await fixture();
   const body = { maxUnlocked: 2, level: 1, moves: 8 };
   assert.equal((await f.call(body)).data.coinReward, 200);
@@ -59,7 +59,7 @@ test('a portal failure preserves saved progress and the pending reward for a lat
   assert.equal(result.data.coinReward, 0);
   assert.ok(f.queries.includes('COMMIT'));
   assert.equal(f.delivered(), 0);
-  globalThis.fetch.mock.mockImplementation(async () => ({ ok: true, json: async () => ({ success: true, data: { coins: 200 } }) }));
+  globalThis.fetch.mock.mockImplementation(async () => ({ ok: true, json: async () => ({ success: true, data: { game_key: 'chessmater', level: 1, rewards: { coins: 200 } } }) }));
   assert.equal((await f.call({ maxUnlocked: 2, level: 1, moves: 8 })).data.coinReward, 200);
   assert.equal(f.reserved(), 1);
 });

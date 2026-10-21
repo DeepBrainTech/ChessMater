@@ -17,8 +17,8 @@ test('reward delivery signs only the server-fixed completion and confirms portal
       { audience: 'chessmater-level-reward', issuer: 'chessmater-game' });
     assert.equal(claims.user_id, '42');
     assert.equal(claims.level, 3);
-    assert.equal(claims.purpose, 'first-clear-coins');
-    return { ok: true, json: async () => ({ success: true, data: { coins: 200 } }) };
+    assert.equal(claims.purpose, 'first-clear-reward');
+    return { ok: true, json: async () => ({ success: true, data: { game_key: 'chessmater', level: 3, rewards: { coins: 200 } } }) };
   }), true);
   assert.equal(marked, true);
 });
@@ -33,7 +33,27 @@ test('already delivered levels do not contact the portal; failed deliveries rema
   } };
   for (const result of [{ ok: false, success: false, coins: 200 }, { ok: true, success: true, coins: 999 }]) {
     await assert.rejects(deliverLevelReward(pending, 42, 3, async () => ({ ok: result.ok,
-      json: async () => ({ success: result.success, data: { coins: result.coins } }) })), /did not confirm/);
+      json: async () => ({ success: result.success, data: { game_key: 'chessmater', level: 3, rewards: { coins: result.coins } } }) })), /did not confirm/);
+  }
+  assert.equal(writes, 0);
+});
+
+
+test('a response for a different game or level cannot acknowledge a pending reward', async () => {
+  process.env.CHESSMATER_JWT_SECRET = 'isolated-level-reward-secret';
+  let writes = 0;
+  const pool = { query: async sql => {
+    if (sql.startsWith('UPDATE')) writes++;
+    return { rows: [{ level_index: 3 }] };
+  } };
+  for (const data of [
+    { game_key: 'number-blast', level: 3, rewards: { coins: 200 } },
+    { game_key: 'chessmater', level: 4, rewards: { coins: 200 } },
+    { coins: 200 },
+  ]) {
+    await assert.rejects(deliverLevelReward(pool, 42, 3, async () => ({
+      ok: true, json: async () => ({ success: true, data }),
+    })), /did not confirm/);
   }
   assert.equal(writes, 0);
 });

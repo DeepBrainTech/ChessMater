@@ -170,15 +170,35 @@ Hint、Undo、AntiGravity 次数为 0 且本轮尚未使用时，点击会打开
 
 三种道具的全部余额都保存在 ChessMater 的 `user_progress.hint_credits`、`undo_credits`、`antigravity_credits`。主站只保留金币、钻石、鲜花和购买/发放流水。游戏不再从主站背包读取或消耗道具；`chess_mater_reply` 仅作为 Hint 商品标识保留。每轮 Hint 消耗使用独立请求编号，网络重试不会重复扣次数。
 
-每个账号首次通过当前最新解锁关卡时，奖励 200 主站金币；历史关卡不补发，重复通关不再奖励。游戏后台在保存通关进度的同一事务中记录待发奖励，主站以账号和关卡去重入账；到账后在 `Level Complete!` 下方显示金币图标和 `+200`。网络失败时保留待发记录，在重试、重新进入或页面恢复焦点时补发。此功能需要同时部署主站的 `routes/chessmater_reward_routes.py`、`services/chessmater_rewards.py` 和路由注册。两边使用相同的 `CHESSMATER_JWT_SECRET`；游戏后台通过 `PORTAL_API_URL` 访问主站，Docker 本地开发使用 `PORTAL_INTERNAL_API_URL`。游戏启动时自动创建奖励记录表。新增官方关卡时须同步两边奖励校验的关卡上限（目前为 105）。
+每个账号首次通过当前最新解锁关卡时，奖励 200 主站金币；历史关卡不补发，重复通关不再奖励。游戏后台在保存通关进度的同一事务中记录待发奖励，主站以账号和关卡去重入账；到账后在 `Level Complete!` 下方显示金币图标和 `+200`。网络失败时保留待发记录，在重试、重新进入或页面恢复焦点时补发。此功能需要同时部署主站的 `routes/game_reward_routes.py`、`services/game_rewards.py`、`config/game_rewards.py` 和路由注册。两边使用相同的 `CHESSMATER_JWT_SECRET`；游戏后台通过 `PORTAL_API_URL` 访问主站，Docker 本地开发使用 `PORTAL_INTERNAL_API_URL`。游戏启动时自动创建奖励记录表。新增官方关卡时须同步两边奖励校验的关卡上限（目前为 105）。
 已有数据库的旧永久解锁表使用 `backend/migrations/20261019_drop_permanent_replay_unlocks.sql` 删除；新数据库不再创建这张表。迁移不影响库存、购买流水、关卡进度或最佳路线。
 
 主站与 ChessMater 后端、前端需要一起部署。ChessMater 启动时自动确保库存接收表，也可执行 `backend/migrations/20261019_local_inventory_deliveries.sql`。旧主站库存会在用户进入游戏时自动迁移并删除对应 ChessMater 记录；共享的 `user_item_inventories` 表和其他游戏记录保留。
 
 批量迁移已有账号时，在 `backend` 目录显式设置 `PORTAL_DATABASE_URL`、`CHESSMATER_DATABASE_URL`、`CHESSMATER_JWT_SECRET`，然后运行 `node scripts/migrate-portal-inventory.cjs` 预览，确认后加 `--apply` 执行。需要 TLS 的连接分别设置 `PORTAL_DATABASE_SSL=true`、`CHESSMATER_DATABASE_SSL=true`。脚本只迁移三种 ChessMater 库存，保留购买流水；中断后可安全重跑，不重复入库。请先部署两边代码，再运行迁移，避免旧版本继续使用主站库存。主站测试使用独立内存数据库，游戏库存事务测试使用临时 PostgreSQL schema。
 
+## 排行榜头像
+
+本地排行榜测试数据：执行 `docker compose -f docker-compose.dev.yml exec -T game-api node scripts/seed-leaderboard.cjs` 添加 30 名 `TEST_` 玩家及 497 条关卡成绩；重复运行会重置这些测试记录。加 `--append` 参数仅补充缺少的测试玩家，保留已有数据。前 5 关均有步数成绩。清理命令为 `docker compose -f docker-compose.dev.yml exec -T game-api node scripts/seed-leaderboard.cjs --remove`。脚本仅允许本地开发数据库，不创建主站账号或发放奖励。
+
+排行榜前三名领奖台固定，仅第 4 名及之后的列表滚动。渐淡效果提示仍有数据的方向：顶部仅淡化下缘，中间淡化上下一侧，到底后仅淡化上缘，最后两行正常显示；不足一屏时不淡化。上缘约一行、下缘约两行使用连续渐变，并在接近边界时逐渐恢复正常；尚有未加载分页时保留对应方向的提示。滚动条仅在滚动期间显示。本人已位于前 9 名时不重复显示“Your Rank”跳转条，自己的榜单行保持高亮；第 10 名起才显示跳转条。本人实际排名行进入列表可见区域时（包括点击跳转后），跳转条隐藏且不留空行；滚离自己的排名后再显示，显隐时保持可见排名的位置。跳转条固定在滚动列表下方，不参与滚动；点击后在列表内定位到自己的排名附近，前三名保持原位。接口支持分页继续加载及按当前用户定位，百名之外也可跳转，并可加载前后排名或返回榜首。
+
+排行榜前三名头像通过游戏后端从主站批量获取，使用主站现有的上传头像 / Google 头像解析逻辑；无头像或图片失效时使用主站接口返回的主站默认头像地址。游戏不内置默认头像，也不自行指定默认头像地址；主站不可用时仍显示成绩。此功能需要同步部署主站的 `services/avatars.py`、`services/game_avatars.py`、`routes/game_avatar_routes.py` 和 `routes/games.py` 中的路由注册。主站默认头像使用 `PUBLIC_APP_URL`（兼容 `PORTAL_URL`，未配置时使用线上主站域名）下的 `/dashboard/default.png`。服务端请求复用 `PORTAL_API_URL`、`CHESSMATER_JWT_SECRET` 和 `CHESSMATER_JWT_ALG`，使用独立用途的短期令牌，每次仅查询前三名的头像，不返回其他个人资料。
+
 ## Portal 语言
 
 从主页打开游戏时可传入 `?locale=zn` 或 `?locale=en`，登录链接也支持 `#token=...&locale=zn`。同时提供时优先使用 hash 中的有效语言；`zh`、`zh-CN` 兼容为 `zn`。
 
 游戏保存该参数，返回 Portal 和登录跳转时沿用语言。未传参数时沿用上次记录，首次默认 `en`。此参数不改变游戏界面语言。
+
+### Shared portal avatar and asset services
+
+ChessMater calls the shared `POST /api/games/{api_slug}/leaderboard/avatars` endpoint with `api_slug=chessmater`. The portal registers the game in `config/game_auth.py`; no ChessMater-specific avatar route or service is required. Avatar requests use a server-signed token with `purpose=leaderboard-avatars`, `aud=chessmater-leaderboard-avatars`, `iss=chessmater-game`, and a 60-second expiry. The request contains at most three portal user IDs.
+
+Asset reads use the shared `GET /api/user/assets` endpoint with the portal login cookie. Portal assets remain authoritative; game-specific reward and inventory rules remain separate. Deploy the shared portal modules and this game together.
+
+### Shared portal level rewards
+
+The game backend calls `POST /api/games/{api_slug}/level-rewards/claim` with `api_slug=chessmater`. The token contains `user_id` (a portal account ID string), `level`, `purpose=first-clear-reward`, `aud=chessmater-level-reward`, `iss=chessmater-game`, and a 60-second expiry. Signing uses `CHESSMATER_REWARD_SECRET` when set, otherwise `CHESSMATER_JWT_SECRET`, with `CHESSMATER_JWT_ALG` (HS256 by default).
+
+The portal determines amounts from `config/game_rewards.py` and returns `data.game_key`, `data.level`, `data.rewards`, `data.already_claimed`, and `data.assets`. The game acknowledges a pending record only after the matching game/level and `rewards.coins=200` are confirmed. Portal claim identities remain unchanged so previously paid levels cannot pay again. Deploy both backends together; the old `first-clear-coins` token purpose and flat `data.coins` response are retired.

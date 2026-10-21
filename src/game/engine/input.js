@@ -401,7 +401,7 @@ export function initialize(game) {
   }
   game.pageScrollLockY = 0;
   game.MODAL_SCROLL_LOCK_SELECTOR = ".leaderboard-modal.active, .block-tip-modal.active, .undo-exchange-modal.active, .power-ups-modal.active";
-  game.MODAL_SCROLLABLE_SELECTOR = ".leaderboard-content, .guide-content, .level-complete-content, .block-tip-content, .undo-exchange-panel, .power-ups-inner";
+  game.MODAL_SCROLLABLE_SELECTOR = ".lb-content, .leaderboard-content, .guide-content, .level-complete-content, .block-tip-content, .undo-exchange-panel, .power-ups-inner";
   game.initModalScrollLock();
 
   // Initialize the game

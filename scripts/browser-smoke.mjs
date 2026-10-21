@@ -58,11 +58,21 @@ try {
     return result.result.value;
   };
   const until = async expression => {
-    for (let i = 0; i < 100; i++) { if (await evaluate(expression)) return; await delay(100); }
+    for (let i = 0; i < 100; i++) { if (await evaluate(`Boolean(${expression})`)) return; await delay(100); }
     throw new Error('Timed out: ' + expression + '\n' + errors.join('\n'));
   };
   await command('Runtime.enable');
   await command('Page.enable');
+  // Serve a fixture at the main-site URL supplied by the mocked avatar API.
+  const portalAvatarFixture = fs.readFileSync('public/assets/images/home/shield-primary.png').toString('base64');
+  socket.addEventListener('message', event => {
+    const message = JSON.parse(event.data);
+    if (message.method === 'Fetch.requestPaused') void command('Fetch.fulfillRequest', {
+      requestId: message.params.requestId, responseCode: 200,
+      responseHeaders: [{ name: 'Content-Type', value: 'image/png' }], body: portalAvatarFixture,
+    });
+  });
+  await command('Fetch.enable', { patterns: [{ urlPattern: base + '/__portal__/*' }] });
   await command('Page.addScriptToEvaluateOnNewDocument', { source: `
     // Keep smoke checks deterministic without a running database or paid Portal session.
     const originalFetch = window.fetch.bind(window);
@@ -71,6 +81,30 @@ try {
       const user = { id: 42, user_id: 42, portal_user_id: '42', username: 'browser-smoke' };
       const target = new URL(requestUrl, location.href);
       const local = ['localhost', '127.0.0.1'].includes(target.hostname);
+      if (local && ['3001', '3002'].includes(target.port) && target.pathname === '/leaderboard') {
+        const level = target.searchParams.get('mode') === 'level';
+        const scenario = window.__leaderboardScenario;
+        const personalRank = { podium: 2, front: 6, compact: 6, edge: 9, outside: 10, nearby: 11 }[scenario] || 328;
+        const total = scenario === 'empty' ? 0 : scenario === 'short' ? 1 : scenario === 'compact' ? 6 : scenario === 'nearby' ? 12 : 450;
+        const start = target.searchParams.get('aroundMe') === '1' ? 303 : Number(target.searchParams.get('startRank') || 1);
+        const entries = Array.from({ length: Math.min(100, Math.max(0, total - start + 1)) }, (_, offset) => {
+          const index = start + offset - 1;
+          return {
+          user_id: index + 1 === personalRank ? 42 : index + 100, rank: index + 1,
+          username: index === 3 ? '<img src=x onerror=alert(1)>' : 'cassandraxxx',
+          avatar_url: index === 0 ? location.origin + '/assets/images/home/shield-primary.png'
+            : index === 1 ? 'data:image/png;base64,invalid' : location.origin + '/__portal__/dashboard/default.png',
+          avatar_fallback_url: location.origin + '/__portal__/dashboard/default.png',
+          completed_levels: Math.max(1, 105 - index), best_moves: index,
+        }; });
+        const payload = { entries: scenario === 'empty' ? [] : entries,
+          start_rank: start, total, next_rank: start + 100 <= total ? start + 100 : null,
+          previous_rank: start > 1 ? Math.max(1, start - 100) : null,
+          current_user: scenario === 'empty' ? null : { user_id: 42, rank: personalRank, username: 'browser-smoke', completed_levels: 80, best_moves: 12 } };
+        return new Promise(resolve => setTimeout(() => resolve(new Response(JSON.stringify(payload), {
+          status: scenario === 'error' ? 500 : 200, headers: { 'Content-Type': 'application/json' }
+        })), scenario === 'page-delay' && start > 1 ? 400 : scenario === 'race' && level ? 300 : 0));
+      }
       if (local && ['8000', '8100'].includes(target.port)) return Promise.resolve(new Response(JSON.stringify({
         success: true, data: { user, game_token: 'browser-smoke-token', deliveries: [], migrated: false }
       }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
@@ -83,6 +117,152 @@ try {
   ` });
   await command('Page.navigate', { url: base });
   await until('document.querySelectorAll(".level-button").length > 0');
+  await command('Emulation.setDeviceMetricsOverride', { width: 1920, height: 1080, deviceScaleFactor: 1, mobile: false });
+  await evaluate('document.getElementById("leaderboardButton").focus(); document.getElementById("leaderboardButton").click()');
+  await until('document.querySelector(".lb-personal")?.textContent.includes("328")');
+  assert.equal(await evaluate('document.querySelectorAll(".lb-winner").length'), 3);
+  assert.equal(await evaluate('document.querySelectorAll(".lb-list > .lb-row").length'), 97);
+  assert.equal(await evaluate('document.querySelector(".lb-list .lb-name").textContent'), '<img src=x onerror=alert(1)>');
+  assert.equal(await evaluate('document.querySelector(".lb-list .lb-name img")'), null);
+  assert.ok(await evaluate('document.querySelector(".lb-winner--1").textContent.includes("105 levels")'));
+  await until('document.querySelector(".lb-winner--1 .lb-avatar")?.naturalWidth > 0 && document.querySelector(".lb-winner--2 .lb-avatar")?.src.endsWith("/__portal__/dashboard/default.png")');
+  assert.ok(await evaluate('document.querySelector(".lb-winner--1 .lb-avatar").src.endsWith("/assets/images/home/shield-primary.png")'), 'Portal avatar should be rendered');
+  assert.equal(await evaluate('document.querySelector(".lb-avatar").referrerPolicy'), 'no-referrer');
+  assert.ok(await evaluate(`(() => {
+    const tint = getComputedStyle(document.querySelector('.lb-scroll-frame'), '::after');
+    return tint.opacity === '1' && tint.backgroundImage.includes('77.546%') && tint.backgroundImage.includes('rgb(251, 242, 233)');
+  })()`), 'The lower edge should use the Figma paper tint and gradient stop');
+  assert.deepEqual(await evaluate('[document.querySelector(".lb-scroll").dataset.fadeTop, document.querySelector(".lb-scroll").dataset.fadeBottom]'), ['false', 'true']);
+  assert.ok(await evaluate('!document.querySelector(".lb-scroll").classList.contains("lb-scroll--active")'));
+  const personalTop = await evaluate('document.querySelector(".lb-personal").getBoundingClientRect().top');
+  const podiumBeforeScroll = await evaluate('[...document.querySelectorAll(".lb-winner")].map(node => node.getBoundingClientRect().top)');
+  await evaluate('document.querySelector(".lb-scroll").scrollTop = 200');
+  await until('document.querySelector(".lb-scroll").classList.contains("lb-scroll--active")');
+  assert.ok(Math.abs(await evaluate('document.querySelector(".lb-personal").getBoundingClientRect().top') - personalTop) < 1, 'Your Rank must stay fixed below the scrolling rankings');
+  assert.deepEqual(await evaluate('[...document.querySelectorAll(".lb-winner")].map(node => node.getBoundingClientRect().top)'), podiumBeforeScroll, 'First three places must stay fixed while the list scrolls');
+  assert.equal(await evaluate('document.querySelector("[data-rank=\\"9\\"]").style.maskImage'), '', 'The tint must not use an opacity mask on ranking rows');
+  assert.deepEqual(await evaluate('[document.querySelector(".lb-scroll").dataset.fadeTop, document.querySelector(".lb-scroll").dataset.fadeBottom]'), ['true', 'true']);
+  await until('!document.querySelector(".lb-scroll").classList.contains("lb-scroll--active")');
+  const tabsBeforeModeChange = await evaluate('({ left: document.querySelector(".lb-tabs").getBoundingClientRect().left, top: document.querySelector(".lb-tabs").getBoundingClientRect().top })');
+  await evaluate('document.querySelectorAll(".lb-tabs button")[1].click()');
+  await until('document.getElementById("leaderboardModeSelect") && document.querySelector(".lb-winner--1")?.textContent.includes("0 moves")');
+  assert.deepEqual(await evaluate('({ left: document.querySelector(".lb-tabs").getBoundingClientRect().left, top: document.querySelector(".lb-tabs").getBoundingClientRect().top })'), tabsBeforeModeChange, 'Ranking tabs must stay in place when the level selector appears');
+  await evaluate('document.getElementById("leaderboardModeSelect").value = "3"; document.getElementById("leaderboardModeSelect").dispatchEvent(new Event("change", { bubbles: true }))');
+  await until('document.querySelector(".lb-personal")?.textContent.includes("12 moves")');
+  assert.equal(await evaluate('document.getElementById("leaderboardModeSelect").value'), '3');
+  for (const [width, height] of [[1920, 1080], [1024, 576], [390, 844], [844, 390]]) {
+    await command('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false });
+    await evaluate('document.querySelector(".lb-scroll").scrollTop = 0');
+    await delay(100);
+    const geometry = await evaluate(`(() => {
+      const content = document.querySelector('.lb-content').getBoundingClientRect();
+      const list = document.querySelector('.lb-scroll');
+      return { contentFits: content.left >= 0 && content.right <= innerWidth && content.top >= 0 && content.bottom <= innerHeight,
+        personalOutsideScroller: !list.contains(document.querySelector('.lb-personal')), canScroll: list.scrollHeight > list.clientHeight,
+        assetsLoaded: [...document.querySelectorAll('.lb-screen img')].every(img => img.complete && img.naturalWidth > 0) };
+    })()`);
+    assert.deepEqual(geometry, { contentFits: true, personalOutsideScroller: true, canScroll: true, assetsLoaded: true }, `Leaderboard layout ${width}x${height}`);
+    if (process.env.CHESSMATER_LEADERBOARD_SCREENSHOTS) {
+      const screenshot = await command('Page.captureScreenshot', { format: 'png' });
+      fs.writeFileSync(path.join(process.env.CHESSMATER_LEADERBOARD_SCREENSHOTS, `${width}x${height}.png`), Buffer.from(screenshot.data, 'base64'));
+    }
+  }
+  const podiumBeforeJump = await evaluate('({ top: document.querySelector(".lb-podium").getBoundingClientRect().top, text: document.querySelector(".lb-podium").textContent })');
+  await evaluate('document.querySelector(".lb-personal").click()');
+  await until('document.querySelector("[data-rank=\\"328\\"]") && document.activeElement.dataset.rank === "328"');
+  const rankPosition = await evaluate(`(() => {
+    const viewport = document.querySelector('.lb-scroll').getBoundingClientRect();
+    const row = document.querySelector('[data-rank="328"]').getBoundingClientRect();
+    return Math.abs((row.top + row.bottom - viewport.top - viewport.bottom) / 2);
+  })()`);
+  assert.ok(rankPosition < 5, 'Personal ranking should be centered in its surrounding ranks');
+  assert.ok(await evaluate('document.querySelector(".lb-personal").hidden'), 'The shortcut must hide after jumping to the actual ranking row');
+  assert.deepEqual(await evaluate('({ top: document.querySelector(".lb-podium").getBoundingClientRect().top, text: document.querySelector(".lb-podium").textContent })'), podiumBeforeJump, 'Jumping to a remote rank must preserve the fixed podium');
+  assert.ok(await evaluate('document.querySelector("[data-rank=\\"327\\"]") && !!document.querySelector("[data-rank=\\"329\\"]")'));
+  await evaluate('document.querySelectorAll(".lb-page-actions button")[1].click()');
+  await until('document.querySelector("[data-rank=\\"203\\"]") && !document.querySelector(".lb-page-actions button").disabled');
+  assert.ok(await evaluate(`(() => {
+    const viewport = document.querySelector('.lb-scroll').getBoundingClientRect();
+    const row = document.querySelector('[data-rank="328"]').getBoundingClientRect();
+    return Math.abs((row.top + row.bottom - viewport.top - viewport.bottom) / 2) < 5;
+  })()`), 'Loading previous rankings should preserve the visible rank position');
+  await evaluate('document.querySelector(".lb-page-actions button").click()');
+  await until('document.querySelector(".lb-winner--1") && document.querySelector(".lb-scroll").scrollTop === 0');
+  await evaluate('window.__leaderboardScenario = "page-delay"; document.querySelector(".lb-scroll").scrollTop = document.querySelector(".lb-scroll").scrollHeight');
+  await until('document.querySelector(".lb-results").getAttribute("aria-busy") === "true"');
+  assert.equal(await evaluate('document.querySelector(".lb-scroll").dataset.fadeBottom'), 'true', 'More unloaded rankings should retain the downward hint');
+  await until('document.querySelector("[data-rank=\\"200\\"]")');
+  await evaluate('window.__leaderboardScenario = ""');
+  await evaluate('document.querySelector(".lb-scroll").scrollTop = 0');
+  await evaluate('window.__leaderboardScenario = "error"; document.querySelector(".lb-personal").click()');
+  await until('document.querySelector(".lb-page-error")');
+  assert.ok(await evaluate('!!document.querySelector("[data-rank=\\"4\\"]")'), 'A failed jump must preserve the current leaderboard');
+  await evaluate('window.__leaderboardScenario = ""; document.querySelector(".lb-personal").click()');
+  await until('document.activeElement.dataset.rank === "328"');
+  await evaluate('document.querySelector(".lb-page-actions button").click()');
+  await until('document.querySelector(".lb-winner--1") && document.querySelector(".lb-scroll").scrollTop === 0 && document.querySelector(".lb-results").getAttribute("aria-busy") === "false"');
+  await evaluate('window.__leaderboardScenario = "race"; document.querySelectorAll(".lb-tabs button")[0].click()');
+  await until('document.querySelector(".lb-winner--1")?.textContent.includes("105 levels")');
+  await evaluate('document.querySelectorAll(".lb-tabs button")[1].click()');
+  await delay(40);
+  assert.ok(await evaluate('document.querySelector(".lb-winner--1")?.textContent.includes("105 levels") && !!document.querySelector(".lb-scroll") && !document.querySelector(".lb-message[role=status]")'), 'Keep the existing leaderboard and score units visible while the next tab loads');
+  await evaluate('document.querySelectorAll(".lb-tabs button")[0].click()');
+  await delay(400);
+  assert.ok(await evaluate('document.querySelector(".lb-winner--1")?.textContent.includes("105 levels")'), 'Stale request must not overwrite the active mode');
+  for (const scenario of ['empty', 'short', 'error']) {
+    await evaluate(`window.__leaderboardScenario = '${scenario}'; document.querySelectorAll('.lb-tabs button')[1].click()`);
+    await until('document.querySelector(".lb-results").getAttribute("aria-busy") === "false"');
+    if (scenario === 'empty') assert.equal(await evaluate('!!document.querySelector(".lb-personal")'), false);
+    if (scenario === 'short') assert.equal(await evaluate('document.querySelectorAll(".lb-vacant").length'), 2);
+    if (scenario === 'error') {
+      assert.ok(await evaluate('!!document.querySelector(".lb-message[role=alert]")'));
+      await evaluate('window.__leaderboardScenario = ""; document.querySelector(".lb-message button").click()');
+      await until('document.querySelector(".lb-personal")?.textContent.includes("328")');
+    }
+    await evaluate('document.querySelectorAll(".lb-tabs button")[0].click()');
+    await until('document.querySelector(".lb-results").getAttribute("aria-busy") === "false"');
+  }
+  for (const scenario of ['podium', 'front', 'compact', 'edge', 'outside', 'nearby']) {
+    await evaluate(`window.__leaderboardScenario = '${scenario}'; document.querySelectorAll('.lb-tabs button')[1].click()`);
+    await until('document.querySelector(".lb-results").getAttribute("aria-busy") === "false"');
+    assert.equal(await evaluate('!!document.querySelector(".lb-personal:not([hidden])")'), ['outside', 'nearby'].includes(scenario), 'Personal shortcut visibility: ' + scenario);
+    if (scenario === 'front') assert.ok(await evaluate('document.querySelector(\'[data-rank="6"]\').classList.contains("lb-row--me")'), 'The actual row stays highlighted');
+    if (scenario === 'compact') {
+      assert.deepEqual(await evaluate('[document.querySelector(".lb-scroll").dataset.fadeTop, document.querySelector(".lb-scroll").dataset.fadeBottom]'), ['false', 'false']);
+      assert.ok(await evaluate('["::before", "::after"].every(side => getComputedStyle(document.querySelector(".lb-scroll-frame"), side).opacity === "0")'), 'A list that fits should have no fading');
+    }
+    if (scenario === 'nearby') {
+      await command('Emulation.setDeviceMetricsOverride', { width: 1920, height: 1080, deviceScaleFactor: 1, mobile: false });
+      await delay(100);
+      await evaluate('document.querySelector(".lb-scroll").scrollTop = document.querySelector(".lb-scroll").scrollHeight');
+      await until('document.querySelector(".lb-personal").hidden');
+      assert.deepEqual(await evaluate('[document.querySelector(".lb-scroll").dataset.fadeTop, document.querySelector(".lb-scroll").dataset.fadeBottom]'), ['true', 'false']);
+      assert.equal(await evaluate('getComputedStyle(document.querySelector(".lb-scroll-frame"), "::after").opacity'), '0', 'The last two rows must not be tinted at the end');
+      assert.equal(await evaluate('getComputedStyle(document.querySelector(".lb-scroll-frame"), "::before").opacity'), '1', 'The top edge should hint at earlier rankings');
+      if (process.env.CHESSMATER_LEADERBOARD_SCREENSHOTS) {
+        const screenshot = await command('Page.captureScreenshot', { format: 'png' });
+        fs.writeFileSync(path.join(process.env.CHESSMATER_LEADERBOARD_SCREENSHOTS, 'bottom.png'), Buffer.from(screenshot.data, 'base64'));
+      }
+      assert.ok(await evaluate('document.querySelector(\'[data-rank="11"]\').classList.contains("lb-row--me")'));
+      await evaluate('document.querySelector(".lb-scroll").scrollTop = 0');
+      await until('!document.querySelector(".lb-personal").hidden');
+      await evaluate('document.querySelector(".lb-personal").click()');
+      await until('document.querySelector(".lb-personal").hidden && document.activeElement.dataset.rank === "11"');
+      await until('!document.querySelector(".lb-scroll").classList.contains("lb-scroll--active")');
+      assert.ok(await evaluate(`(() => {
+        const viewport = document.querySelector('.lb-scroll').getBoundingClientRect();
+        const row = document.querySelector('[data-rank="11"]').getBoundingClientRect();
+        return row.top >= viewport.top && row.bottom <= viewport.bottom;
+      })()`), 'The actual row must remain visible after the shortcut collapses');
+    }
+    await evaluate('document.querySelectorAll(".lb-tabs button")[0].click()');
+    await until('document.querySelector(".lb-results").getAttribute("aria-busy") === "false"');
+  }
+  await evaluate('document.getElementById("leaderboardModal").dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }))');
+  await until('!document.getElementById("leaderboardModal").classList.contains("active")');
+  assert.equal(await evaluate('document.activeElement.id'), 'leaderboardButton');
+  await command('Emulation.clearDeviceMetricsOverride');
+  console.log('Leaderboard modes, fading, transient scrollbars, personal-rank jumps, pagination, responsive layouts and error/race checks passed.');
   await evaluate('document.getElementById("startButton").click()');
   await until('document.body.classList.contains("in-game")');
   if (!production) {
