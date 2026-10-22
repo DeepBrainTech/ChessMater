@@ -454,14 +454,18 @@ try {
   }
   await evaluate('document.getElementById("guideModal").dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true }))');
   assert.ok(await evaluate('!!document.querySelector(".beginner-board--2")'));
+  const guideTransition = await evaluate('getComputedStyle(document.querySelector(".beginner-piece")).transitionDuration');
+  assert.ok(guideTransition.split(',').some(duration => parseFloat(duration) > 0), 'Guide movement must have an animated transition');
   await command('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
-  assert.equal(await evaluate('getComputedStyle(document.querySelector(".beginner-piece")).transitionDuration'), '0s');
+  assert.equal(await evaluate('getComputedStyle(document.querySelector(".beginner-piece")).transitionDuration'), guideTransition, 'System reduced motion preserves guide movement transitions');
   await evaluate('document.querySelectorAll(".beginner-pagination button")[3].click()');
   await until('!!document.querySelector(".beginner-board--3 .beginner-target-open")');
   await evaluate('document.querySelector(".beginner-target-open").closest("button").click()');
+  assert.equal(await evaluate('document.querySelector(".beginner-board").dataset.motion'), 'moving', 'System reduced motion preserves the movement animation before completion');
   await until('document.querySelector(".beginner-board").classList.contains("beginner-board--complete")');
-  assert.equal(await evaluate('document.querySelectorAll(".confetti-container--contained").length'), 0, 'Reduced motion omits confetti');
-  assert.ok(await evaluate('document.querySelector(".beginner-piece-explanation").textContent.includes("Well done!")'), 'Reduced motion keeps completion feedback');
+  await until('!!document.querySelector(".confetti-container--contained") && !!document.querySelector(".beginner-goal-glow")');
+  assert.equal(await evaluate('document.querySelectorAll(".confetti-container--contained").length'), 1, 'System reduced motion preserves the guide celebration');
+  assert.ok(await evaluate('document.querySelector(".beginner-piece-explanation").textContent.includes("Well done!")'), 'System reduced motion keeps completion feedback');
   await command('Emulation.setEmulatedMedia', { features: [] });
   await evaluate('document.getElementById("closeGuideModal").click()');
   await until('!document.querySelector("#guideModal.active")');
