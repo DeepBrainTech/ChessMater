@@ -1,25 +1,30 @@
 export function register(game) {
-  game.triggerConfetti = function () {
-    //const Winsound = new Audio("assets/audio/woo-hoo-82843.mp3");
-    const Winsound = new Audio("assets/audio/completion.mp3");
-    game.playSound(Winsound, 0.7);
-    const confettiCount = 150; // More confetti!
+  game.triggerConfetti = function ({ target = game.canvas, lifecycle = game.lifecycle, count = 150, duration = 5000, contained = false, origin = { x: .5, y: .5 }, silent = false } = {}) {
+    if (!silent) {
+      const Winsound = new Audio("assets/audio/completion.mp3");
+      game.playSound(Winsound, 0.7);
+    }
+    const confettiCount = count;
     const confettiColors = ['#ff6b6b', '#4ecdc4', '#f9ca24', '#6c5ce7', '#00b894', '#fd79a8', '#ff9ff3', '#54a0ff', '#ff5252', '#00cec9', '#fdcb6e', '#a29bfe', '#55efc4', '#74b9ff', '#ffeaa7'];
-    const container = document.createElement('div');
-    container.className = 'confetti-container';
-    document.body.appendChild(game.lifecycle.trackNode(container));
-    const canvasRect = game.canvas.getBoundingClientRect();
-    const centerX = canvasRect.left + canvasRect.width / 2;
-    const startY = canvasRect.top + 30; // Start near top of canvas
+    const doc = target.ownerDocument || document;
+    const container = doc.createElement('div');
+    container.className = `confetti-container${contained ? ' confetti-container--contained' : ''}`;
+    container.setAttribute('aria-hidden', 'true');
+    (contained ? target : doc.body).appendChild(lifecycle.trackNode(container));
+    const bounds = target.getBoundingClientRect();
+    const canvasRect = contained ? { left: 0, top: 0, width: bounds.width, height: bounds.height } : bounds;
+    const centerX = contained ? canvasRect.width * origin.x : canvasRect.left + canvasRect.width / 2;
+    const startY = contained ? canvasRect.height * origin.y : canvasRect.top + 30;
+    const sizeScale = contained ? Math.min(1, canvasRect.width / 407) * .65 : 1;
 
     const confettiPieces = [];
     const startTime = Date.now();
 
     // Create enhanced confetti pieces
     for (let i = 0; i < confettiCount; i++) {
-      const confetti = document.createElement('div');
+      const confetti = doc.createElement('div');
       const color = confettiColors[Math.floor(Math.random() * confettiColors.length)];
-      const size = Math.random() * 10 + 6;
+      const size = (Math.random() * 10 + 6) * sizeScale;
       const shapeType = Math.floor(Math.random() * 4); // 0: circle, 1: square, 2: rectangle, 3: diamond
 
       let styles = `
@@ -59,40 +64,42 @@ export function register(game) {
 
       confettiPieces.push({
         element: confetti,
-        x: centerX - size / 2 + (Math.random() * 200 - 100),
+        x: centerX - size / 2 + (Math.random() - .5) * (contained ? canvasRect.width * .12 : 200),
         // Wider spread
         y: startY,
-        speed: Math.random() * 4 + (isLight ? 1 : 2),
+        speed: (Math.random() * 4 + (isLight ? 1 : 2)) * sizeScale,
+        burstVelocity: contained ? -(Math.random() * 5 + 3) * sizeScale : 0,
         // Lighter pieces fall slower
         rotation: Math.random() * Math.PI * 2,
         rotationSpeed: (Math.random() * 0.3 - 0.15) * (isLight ? 1.5 : 1),
-        horizontalSpeed: Math.random() * 6 - 3,
+        horizontalSpeed: (Math.random() * 6 - 3) * sizeScale,
         horizontalWave: Math.random() * 0.05,
         waveOffset: Math.random() * Math.PI * 2,
         size: size,
         shapeType: shapeType,
         opacity: Math.random() * 0.9 + 0.1,
         wobbleSpeed: Math.random() * 0.1 + 0.05,
-        wobbleAmount: Math.random() * 5 + 2
+        wobbleAmount: (Math.random() * 5 + 2) * sizeScale
       });
     }
 
     // Add some streamers for extra effect
-    game.addStreamers(container, canvasRect, centerX, startY);
+    if (!contained) game.addStreamers(container, canvasRect, centerX, startY);
 
     // Animation loop
     function animateConfetti() {
       const elapsed = Date.now() - startTime;
-      if (elapsed > 5000) {
+      if (elapsed > duration) {
         // Longer duration
         container.remove();
         return;
       }
-      const progress = elapsed / 5000;
+      const progress = elapsed / duration;
       confettiPieces.forEach((piece, index) => {
         // Update position with wave motion
-        piece.y += piece.speed;
-        piece.x += piece.horizontalSpeed + Math.sin(elapsed * piece.horizontalWave + piece.waveOffset) * 2;
+        if (contained) piece.burstVelocity += .12 * sizeScale;
+        piece.y += piece.speed + piece.burstVelocity;
+        piece.x += piece.horizontalSpeed + Math.sin(elapsed * piece.horizontalWave + piece.waveOffset) * 2 * sizeScale;
 
         // Wobble effect
         const wobble = Math.sin(elapsed * piece.wobbleSpeed) * piece.wobbleAmount;
@@ -115,20 +122,20 @@ export function register(game) {
         piece.element.style.opacity = opacity;
 
         // Remove pieces that go off screen
-        if (piece.y > window.innerHeight || opacity <= 0) {
+        if (piece.y > (contained ? canvasRect.height : window.innerHeight) || opacity <= 0) {
           piece.element.remove();
           confettiPieces.splice(index, 1);
         }
       });
       if (confettiPieces.length > 0) {
-        game.lifecycle.requestAnimationFrame(animateConfetti);
+        lifecycle.requestAnimationFrame(animateConfetti);
       } else {
         container.remove();
       }
     }
 
     // Add burst effect at the beginning
-    game.createInitialBurst(container, canvasRect, centerX, startY);
+    if (!contained) game.createInitialBurst(container, canvasRect, centerX, startY);
     animateConfetti();
   };
   game.addStreamers = // Add streamers for extra celebration

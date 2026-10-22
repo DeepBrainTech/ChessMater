@@ -1,6 +1,8 @@
 import { session } from '../../services/session.js';
+import { ensurePlayerSelected } from '../playerSelection.js';
 export function register(game) {
   game.handleMove = function (e) {
+    if (game.pieceMoveAnimation) return;
     if (game.showTransformerMenu && game.transformerPosition) {
       game.handleTransformerMenuClick(e);
       return;
@@ -21,6 +23,8 @@ export function register(game) {
       return;
     }
     if (game.mode === "play") {
+      if (game.fallingPieces.length || game.risingPieces.length || game.pendingMoveCounter) return;
+      ensurePlayerSelected(game);
       if (game.players.length === 0) {
         game.updateStatus("No pieces on this level. Choose another level.");
         return;
@@ -29,6 +33,11 @@ export function register(game) {
       // Check if clicked on a player
       const clickedPlayerIndex = game.getPlayerAt(row, col);
       if (clickedPlayerIndex !== -1) {
+        if (clickedPlayerIndex === game.selectedPlayerIndex) {
+          game.selectedPlayerIndex = -1;
+          game.updateStatus("Click on a player piece first to select it");
+          return;
+        }
         if (game.selectedPlayerIndex !== -1) {
           const selectedPiece = game.players[game.selectedPlayerIndex];
           const clickedPiece = game.players[clickedPlayerIndex];
@@ -37,9 +46,9 @@ export function register(game) {
           if (selectedKingClickedRook || selectedRookClickedKing) {
             const castled = selectedKingClickedRook ? game.castleKingWithRook(game.selectedPlayerIndex, clickedPlayerIndex) : game.castleKingWithRook(clickedPlayerIndex, game.selectedPlayerIndex);
             if (castled) {
-              game.selectedPlayerIndex = -1;
+              game.selectedPlayerIndex = selectedKingClickedRook ? game.selectedPlayerIndex : clickedPlayerIndex;
+              return;
             }
-            return;
           }
         }
         game.selectedPlayerIndex = clickedPlayerIndex;
@@ -52,7 +61,6 @@ export function register(game) {
       if (game.selectedPlayerIndex !== -1) {
         if (game.isValidMove(game.selectedPlayerIndex, row, col)) {
           game.movePlayer(game.selectedPlayerIndex, row, col);
-          game.selectedPlayerIndex = -1; // Deselect after moving
         } else {
           game.updateStatus("Invalid move for selected piece");
         }
@@ -153,6 +161,7 @@ export function register(game) {
     // Draw the rising pieces on top
     game.ctx.save();
     for (const piece of game.risingPieces) {
+      if (game.pieceImageLayer) continue; // The board render already positioned the image element.
       const x = piece.col * game.TILE_SIZE;
       game.ctx.drawImage(game.pieceImages[piece.pieceType], x + 8, piece.currentY + 8, game.TILE_SIZE - 16, game.TILE_SIZE - 16);
     }
@@ -174,7 +183,7 @@ export function register(game) {
   };
   game.toggleAntigravity = async function () {
     if (game.gameWon) return;
-    if (game.fallingPieces.length || game.risingPieces.length || game.pendingMoveCounter) return;
+    if (game.pieceMoveAnimation || game.fallingPieces.length || game.risingPieces.length || game.pendingMoveCounter) return;
     if (!game.antigravityUnlockedThisRun) {
       if (game.antigravityCredits <= 0) {
         game.openAntigravityExchangeModal();
@@ -365,10 +374,6 @@ export function initialize(game) {
         game.closeInGameWalkthroughModal();
         return;
       }
-    }
-    if (game.mode === "play" && e.key === "Escape") {
-      game.selectedPlayerIndex = -1;
-      game.updateStatus("Selection cleared");
     }
   });
   game.frameCount = 0;

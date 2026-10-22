@@ -1,7 +1,9 @@
 import { session } from '../../services/session.js';
+import { ensurePlayerSelected } from '../playerSelection.js';
 export function register(game) {
   game.loadPuzzle = // --- Load puzzle from JSON file ---
   function (puzzleData, { preserveHint = false } = {}) {
+    game.cancelPieceMoveAnimation?.();
     game.currentPuzzleData = JSON.parse(JSON.stringify(puzzleData)); // Deep copy
     game.moveHistorySnapshots = [];
     game.showTransformerMenu = false;
@@ -189,6 +191,7 @@ export function register(game) {
         game.fetchFewestOtherMovesForCurrentLevel();
       }
       game.cmEmitGameUi?.({ type: "puzzleLoaded", blockTip: rawTip });
+      ensurePlayerSelected(game, 0);
       game.drawBoard();
     } catch (error) {
       game.updateStatus("Error loading puzzle: " + error.message);
@@ -588,8 +591,8 @@ export function register(game) {
           game.showTransformerMenu = false;
           game.captureWinningReplaySnapshot();
           game.updateStatus("Puzzle solved! All requirements completed and goal reached!");
-          game.triggerConfetti();
           game.showLevelCompleteModal();
+          game.triggerConfetti({ target: game.levelCompleteModal?.querySelector?.('.level-complete-content') || game.canvas });
           game.syncProgressAfterWin();
           break;
         }
@@ -729,11 +732,12 @@ export function register(game) {
     const isCastleTargetAvailable = col => game.board[king.row][col] === game.CELL_TYPES.EMPTY || isOriginalKingOrRookCell(col);
     return isCastleTargetAvailable(kingTargetCol) && isCastleTargetAvailable(rookTargetCol);
   };
-  game.castleKingWithRook = function (kingIndex, rookIndex) {
+  game.castleKingWithRook = function (kingIndex, rookIndex, { animate = true } = {}) {
     if (!game.canCastle(kingIndex, rookIndex)) {
       game.updateStatus("Castling is not available here");
       return false;
     }
+    if (animate && game.startCastleAnimation?.(kingIndex, rookIndex)) return true;
     const king = game.players[kingIndex];
     const rook = game.players[rookIndex];
     const oldKingRow = king.row;
@@ -744,6 +748,7 @@ export function register(game) {
     const kingTargetCol = king.col + direction * 2;
     const rookTargetCol = kingTargetCol - direction;
     game.saveUndoSnapshot();
+    ensurePlayerSelected(game, kingIndex);
     game.queueMoveTraceCapture({
       from: {
         row: oldKingRow,
@@ -787,7 +792,7 @@ export function register(game) {
     }
     return true;
   };
-  game.movePlayer = function (playerIndex, newRow, newCol) {
+  game.movePlayer = function (playerIndex, newRow, newCol, { animate = true } = {}) {
     if (playerIndex < 0 || playerIndex >= game.players.length) return;
     if (game.gameWon) return;
     const player = game.players[playerIndex];
@@ -803,7 +808,9 @@ export function register(game) {
       }
       return;
     }
+    if (animate && game.startPlayerMoveAnimation?.(playerIndex, newRow, newCol)) return;
     game.saveUndoSnapshot();
+    ensurePlayerSelected(game, playerIndex);
     game.queueMoveTraceCapture({
       from: {
         row: fromRow,

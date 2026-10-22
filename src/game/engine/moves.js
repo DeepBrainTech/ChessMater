@@ -1,3 +1,5 @@
+import { ensurePlayerSelected } from '../playerSelection.js';
+
 export function register(game) {
   game.saveUndoSnapshot = function () {
     game.moveHistorySnapshots.push({
@@ -25,6 +27,7 @@ export function register(game) {
     });
   };
   game.undoMove = async function () {
+    if (game.pieceMoveAnimation) return;
     if (game.undoCredits <= 0) {
       game.openUndoExchangeModal();
       return;
@@ -38,6 +41,7 @@ export function register(game) {
       return;
     }
     const snapshot = game.moveHistorySnapshots.pop();
+    game.cancelPieceMoveAnimation?.();
     game.ROWS = snapshot.ROWS;
     game.COLS = snapshot.COLS;
     game.resizeCanvas();
@@ -58,7 +62,7 @@ export function register(game) {
     game.teleportBlocks = game.cloneGameData(snapshot.teleportBlocks);
     game.playerTeleportCooldowns = new Map(snapshot.playerTeleportCooldowns || []);
     game.gameWon = snapshot.gameWon;
-    game.selectedPlayerIndex = -1;
+    ensurePlayerSelected(game, snapshot.selectedPlayerIndex);
     game.levelMoveCount = snapshot.levelMoveCount;
     game.pendingMoveTraceEntry = null;
     if (game.currentLevelMoveTrace.length > 1) {

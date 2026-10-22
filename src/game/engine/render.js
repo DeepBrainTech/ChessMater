@@ -1,3 +1,8 @@
+import { MOVE_MARKER } from '../moveMarker.js';
+import { installPieceImageLayer } from '../pieceImageLayer.js';
+import { ensurePlayerSelected } from '../playerSelection.js';
+import { installPieceMovementAnimation, playerDrawPosition } from '../pieceMovementAnimation.js';
+
 export function register(game) {
   game.drawTileTexture = function (renderCtx, name, x, y, size, { alpha = 1, rotation = 0 } = {}) {
     const image = game.tileImages && game.tileImages[name];
@@ -32,11 +37,11 @@ export function register(game) {
 
   game.drawPossibleMoveMarker = function (x, y) {
     game.ctx.save();
-    game.ctx.fillStyle = "rgba(41, 128, 185, 0.5)";
+    game.ctx.fillStyle = MOVE_MARKER.fill;
     game.ctx.beginPath();
     game.ctx.arc(x + game.TILE_SIZE / 2, y + game.TILE_SIZE / 2, game.TILE_SIZE / 5, 0, Math.PI * 2);
     game.ctx.fill();
-    game.ctx.strokeStyle = "rgba(21, 67, 96, 0.8)";
+    game.ctx.strokeStyle = MOVE_MARKER.stroke;
     game.ctx.lineWidth = 2;
     game.ctx.stroke();
     game.ctx.restore();
@@ -53,6 +58,11 @@ export function register(game) {
   game.drawGoalStyle = function (x, y, { locked = false, counter = null } = {}) {
     game.ctx.save();
     game.ctx.drawImage(game.pieceImages.target, x + 8, y + 8, game.TILE_SIZE - 16, game.TILE_SIZE - 16);
+    if (game.pieceImageLayer) {
+      game.pieceImageLayer.decorateGoal(locked, counter);
+      game.ctx.restore();
+      return;
+    }
     if (counter !== null && !locked) game.drawCounterGoalBadge(x, y, counter);
     if (locked) {
       game.ctx.fillStyle = "rgba(0,0,0,0.7)";
@@ -69,7 +79,19 @@ export function register(game) {
     game.ctx.restore();
   };
   game.drawPossibleMoves = function () {
+    ensurePlayerSelected(game);
     if (game.mode !== "play" || game.selectedPlayerIndex === -1 || game.gameWon) return;
+    if (game.pieceMoveAnimation || game.fallingPieces.length || game.risingPieces.length || game.pendingMoveCounter || game.showTransformerMenu) return;
+    const selected = game.players[game.selectedPlayerIndex];
+    game.ctx.save();
+    game.ctx.fillStyle = MOVE_MARKER.fill;
+    game.ctx.globalAlpha = .25;
+    game.ctx.fillRect(selected.col * game.TILE_SIZE, selected.row * game.TILE_SIZE, game.TILE_SIZE, game.TILE_SIZE);
+    game.ctx.globalAlpha = 1;
+    game.ctx.strokeStyle = MOVE_MARKER.stroke;
+    game.ctx.lineWidth = 2;
+    game.ctx.strokeRect(selected.col * game.TILE_SIZE + 1, selected.row * game.TILE_SIZE + 1, game.TILE_SIZE - 2, game.TILE_SIZE - 2);
+    game.ctx.restore();
     for (let r = 0; r < game.ROWS; r++) {
       for (let c = 0; c < game.COLS; c++) {
         if (game.isValidMove(game.selectedPlayerIndex, r, c)) {
@@ -98,6 +120,7 @@ export function register(game) {
     const outerMargin = 20;
     const startX = centerX - menuWidth / 2;
     const startY = centerY - menuHeight / 2 - 10; // Slightly above center
+    game.pieceImageLayer?.occludeRect(startX - outerMargin, startY - outerMargin, menuWidth + outerMargin * 2, menuHeight + outerMargin * 2 + 20);
 
     // Draw menu background
     game.ctx.fillStyle = "rgba(0, 0, 0, 0.95)";
@@ -245,7 +268,7 @@ export function register(game) {
       }
     }
 
-    if ((cellType === game.CELL_TYPES.GOAL || cellType === game.CELL_TYPES.COUNTER_GOAL) && game.goal && game.goal.row === row && game.goal.col === col) {
+    if (!game.pieceImageLayer && (cellType === game.CELL_TYPES.GOAL || cellType === game.CELL_TYPES.COUNTER_GOAL) && game.goal && game.goal.row === row && game.goal.col === col) {
       ctx.drawImage(game.pieceImages.target, x + tile * 0.12, y + tile * 0.12, tile * 0.76, tile * 0.76);
     }
 
@@ -351,6 +374,7 @@ export function register(game) {
     }
   };
   game.drawBoard = function () {
+    game.pieceImageLayer?.beginFrame();
     const visible = game.fogEnabled ? game.getVisibleSquares() : null;
     for (let r = 0; r < game.ROWS; r++) {
       for (let c = 0; c < game.COLS; c++) {
@@ -392,8 +416,8 @@ export function register(game) {
               }
 
               // Draw the player piece on top
-              game.ctx.drawImage(game.pieceImages[player.pieceType], x + 8, y + 8, game.TILE_SIZE - 16, game.TILE_SIZE - 16);
-              if (player.pieceType === "castle_rook") {
+              if (!game.pieceImageLayer) game.ctx.drawImage(game.pieceImages[player.pieceType], x + 8, y + 8, game.TILE_SIZE - 16, game.TILE_SIZE - 16);
+              if (!game.pieceImageLayer && player.pieceType === "castle_rook") {
                 game.drawCastleRookMarker(game.ctx, x, y, game.TILE_SIZE);
               }
             }
@@ -418,7 +442,7 @@ export function register(game) {
         }
 
         // Draw goal (red king) - adjust size and position
-        if (game.board[r][c] === game.CELL_TYPES.GOAL && game.goal) {
+        if (!game.pieceImageLayer && game.board[r][c] === game.CELL_TYPES.GOAL && game.goal) {
           if (!game.fogEnabled || visible[r][c]) {
             if (game.areAllObjectivesCompleted()) {
               // Goal is accessible - draw normally
@@ -447,6 +471,7 @@ export function register(game) {
 
     // Draw players
     game.fallingPieces.forEach(piece => {
+      if (game.pieceImageLayer && piece.playerIndex === 'goal') return;
       const x = piece.col * game.TILE_SIZE;
 
       // ghost at starting square
@@ -457,6 +482,11 @@ export function register(game) {
       game.ctx.globalAlpha = 1.0;
       game.ctx.drawImage(game.pieceImages[piece.pieceType], x + 8, piece.y + 8, game.TILE_SIZE - 16, game.TILE_SIZE - 16);
     });
+    if (game.pieceImageLayer) {
+      for (const piece of game.risingPieces) {
+        game.ctx.drawImage(game.pieceImages[piece.pieceType], piece.col * game.TILE_SIZE + 8, piece.currentY + 8, game.TILE_SIZE - 16, game.TILE_SIZE - 16);
+      }
+    }
 
     // Draw exploding players with rotation effect
     for (const p of game.explodingPlayers) {
@@ -479,9 +509,8 @@ export function register(game) {
     game.players.forEach((player, i) => {
       const isFalling = game.fallingPieces.find(fp => fp.playerIndex === i);
       const isRising = game.risingPieces.find(rp => rp.playerIndex === i);
-      if (!isFalling && !isRising) {
-        const x = player.col * game.TILE_SIZE;
-        const y = player.row * game.TILE_SIZE;
+      if (!isFalling && !isRising && (!game.pieceImageLayer || !game.fogEnabled || visible[player.row]?.[player.col])) {
+        const { x, y } = playerDrawPosition(game, player);
 
         // Check if there's a teleport block at this position
         const teleportBlock = game.teleportBlocks.find(tp => tp.row === player.row && tp.col === player.col);
@@ -507,7 +536,7 @@ export function register(game) {
       if (isFalling) y = isFalling.y;
 
       // ✅ Only draw if fog is disabled OR square is visible
-      if (!game.fogEnabled || visible[game.goal.row][game.goal.col]) {
+      if ((!game.pieceImageLayer || !game.gameWon) && (!game.fogEnabled || visible[game.goal.row][game.goal.col])) {
         const goalLocked = !game.areAllObjectivesCompleted() || game.goal.type === "counter" && game.goal.counter <= 0;
         game.drawGoalStyle(x, y, { locked: goalLocked, counter: game.goal.type === "counter" ? game.goal.counter : null });
       }
@@ -522,4 +551,9 @@ export function register(game) {
     game.drawPlatformLevelGuide();
   };
 }
-export function initialize(game) {}
+export function initialize(game) {
+  if (!game.CM_EDITOR_PAGE) {
+    installPieceImageLayer(game);
+    installPieceMovementAnimation(game);
+  }
+}

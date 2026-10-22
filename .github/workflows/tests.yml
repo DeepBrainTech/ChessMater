@@ -1,0 +1,132 @@
+name: ChessMater tests
+
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: chessmater-tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: 'true'
+
+jobs:
+  frontend:
+    name: Game rules and build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+
+  backend:
+    name: Backend unit tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - run: npm test
+
+  database:
+    name: PostgreSQL integration tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: chessmater_test
+          POSTGRES_PASSWORD: ci-only-password
+          POSTGRES_DB: chessmater_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U chessmater_test -d chessmater_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      CHESSMATER_INVENTORY_DB_TEST: '1'
+      CHESSMATER_TEST_DATABASE_URL: postgresql://chessmater_test:ci-only-password@127.0.0.1:5432/chessmater_test
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - name: Run database tests with no skipped integrations
+        run: node --test tests/inventory.test.cjs tests/portal-migration.test.cjs tests/database-integration.test.cjs
+
+  browser:
+    name: Browser (${{ matrix.mode }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [development, production]
+    env:
+      CHESSMATER_TEST_ARTIFACTS: artifacts/browser-${{ matrix.mode }}
+      VITE_API_BASE_URL: http://127.0.0.1:3001
+      VITE_PORTAL_API_BASE_URL: http://127.0.0.1:8000
+      VITE_PORTAL_URL: http://127.0.0.1:3000
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Locate Chrome
+        run: echo "CHESSMATER_BROWSER=$(command -v google-chrome || command -v chromium || command -v chromium-browser)" >> "$GITHUB_ENV"
+      - if: matrix.mode == 'development'
+        run: npm run test:browser
+      - if: matrix.mode == 'production'
+        run: npm run test:browser:production
+      - name: Upload browser diagnostics
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: browser-${{ matrix.mode }}
+          path: artifacts/browser-${{ matrix.mode }}/
+          retention-days: 7
+          if-no-files-found: ignore
+
+  required:
+    name: CI passed
+    if: always()
+    needs: [frontend, backend, database, browser]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    steps:
+      - name: Require every test group to pass
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          node -e 'const jobs = JSON.parse(process.env.RESULTS); if (Object.values(jobs).some(job => job.result !== "success")) process.exit(1);'

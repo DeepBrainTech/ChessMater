@@ -1,0 +1,81 @@
+.beginner-screen {
+  --guide-unit: min(1px, calc(100vw / 1920), calc(100dvh / 1080));
+  background: #fbf2e9 url('/assets/images/game/game-background.webp') center / cover no-repeat;
+  color: #3e1203;
+  font-family: "Game ADLaM Display", sans-serif;
+}
+.beginner-screen * { box-sizing: border-box; }
+.beginner-content { width: calc(570 * var(--guide-unit)); display: flex; flex-direction: column; align-items: center; gap: calc(32 * var(--guide-unit)); touch-action: pan-y; }
+.guide-content .beginner-title { display: flex; align-items: center; justify-content: center; width: 100%; height: calc(71 * var(--guide-unit)); margin: 0; padding: 0 calc(10 * var(--guide-unit)); border-radius: calc(10 * var(--guide-unit)); background: #fcd06033; font-size: calc(30 * var(--guide-unit)); line-height: calc(36 * var(--guide-unit)); text-align: center; font-weight: 400; }
+.beginner-demo { display: flex; flex-direction: column; align-items: center; width: 100%; gap: calc(16 * var(--guide-unit)); }
+.guide-content .beginner-title { gap: .45em; }
+.beginner-step-number { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 1.6em; height: 1.6em; border-radius: 50%; background: #d87c00; color: #fcf8f1; font-size: .72em; line-height: 1; }
+.beginner-board { position: relative; width: calc(407 * var(--guide-unit)); aspect-ratio: 5 / 4; display: grid; grid-template-columns: repeat(5, 1fr); grid-template-rows: repeat(4, 1fr); overflow: hidden; isolation: isolate; }
+.beginner-board-stage { position: relative; width: calc(407 * var(--guide-unit)); }
+.beginner-board-stage .beginner-board { width: 100%; }
+.beginner-step { position: absolute; top: 50%; z-index: 3; width: max(44px, calc(64 * var(--guide-unit))); height: max(44px, calc(64 * var(--guide-unit))); padding: 0; border: 0; border-radius: 50%; background: transparent; transform: translateY(-50%); cursor: pointer; filter: drop-shadow(0 2px 4px #97744933); }
+.beginner-step--previous { right: calc(100% + 20 * var(--guide-unit)); }
+.beginner-step--next { left: calc(100% + 20 * var(--guide-unit)); }
+.beginner-step img { display: block; width: 100%; height: 100%; }
+.beginner-step--next img { transform: rotate(180deg); }
+.beginner-step:hover { filter: drop-shadow(0 2px 5px #97744966) brightness(1.03); }
+.beginner-tile { position: relative; min-width: 0; min-height: 0; }
+.beginner-screen button.beginner-tile { display: block; padding: 0; border: 0; border-radius: 0; background: transparent; cursor: default; }
+.beginner-screen button.beginner-tile[data-available="true"], .beginner-screen button.beginner-tile--selected { cursor: pointer; }
+.beginner-tile > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.beginner-tile--selected::after { content: ''; position: absolute; inset: 0; border: 2px solid var(--guide-marker-stroke); background: var(--guide-marker-fill); opacity: .45; }
+.beginner-move-dot { position: absolute; width: 40%; height: 40%; top: 30%; left: 30%; border: 2px solid var(--guide-marker-stroke); border-radius: 50%; background: var(--guide-marker-fill); pointer-events: none; }
+.beginner-piece { position: absolute; width: 20%; height: 25%; left: 0; top: 0; z-index: 2; pointer-events: none; transform: translate(calc(var(--piece-x) * 100%), calc(var(--piece-y) * 100%)); transition: transform .45s ease-in-out; }
+.beginner-landing-preview { position: absolute; width: 20%; height: 25%; z-index: 1; pointer-events: none; border: 2px dashed var(--guide-marker-stroke); border-radius: 8%; }
+.beginner-landing-preview img { opacity: .28; }
+.beginner-board[data-motion="falling"] .beginner-piece { transition-timing-function: cubic-bezier(.5, 0, 1, 1); }
+.beginner-piece-image { position: absolute; width: 70%; height: 85%; left: 15%; top: 7.5%; object-fit: contain; }
+.beginner-tile > .beginner-target-open { inset: 10% 15%; width: 70%; height: 80%; object-fit: contain; }
+.beginner-goal-glow { position: absolute; z-index: 1; width: 20%; height: 25%; border-radius: 12%; pointer-events: none; background: radial-gradient(circle, #fff4b5aa, #ffcd4c88 55%, #ffc13500 75%); box-shadow: inset 0 0 calc(18 * var(--guide-unit)) #ffc135; animation: beginner-goal-shine 1.5s ease-out forwards; }
+.beginner-piece-explanation--success { color: #b96607; }
+@keyframes beginner-goal-shine { 0% { opacity: 0; transform: scale(.8); } 20% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(1.15); } }
+.beginner-piece-picker { display: flex; justify-content: center; gap: calc(6 * var(--guide-unit)); width: 100%; }
+.beginner-piece-picker button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-width: 0; width: calc(72 * var(--guide-unit)); min-height: 44px; padding: calc(6 * var(--guide-unit)); border: 1px solid #3e12031a; border-radius: calc(8 * var(--guide-unit)); background: #fbe6ba33; font: inherit; font-size: max(10px, calc(13 * var(--guide-unit))); color: inherit; cursor: pointer; }
+.beginner-piece-picker button[aria-pressed="true"] { background: #fbe6ba; border-color: #b96607; }
+.beginner-piece-picker img { width: calc(34 * var(--guide-unit)); height: calc(38 * var(--guide-unit)); object-fit: contain; }
+.guide-content .beginner-piece-explanation { width: 100%; min-height: calc(52 * var(--guide-unit)); margin: 0; font-size: max(13px, calc(20 * var(--guide-unit))); line-height: 1.45; text-align: center; }
+.beginner-caption { display: flex; flex-direction: column; align-items: center; gap: calc(11 * var(--guide-unit)); width: calc(590 * var(--guide-unit)); }
+.beginner-description { min-height: calc(42 * var(--guide-unit)); display: flex; justify-content: center; align-items: center; gap: calc(6 * var(--guide-unit)); font-size: calc(20 * var(--guide-unit)); line-height: calc(32 * var(--guide-unit)); text-align: center; }
+.beginner-pagination { display: flex; align-items: center; justify-content: center; gap: calc(8 * var(--guide-unit)); }
+.beginner-pagination button { width: max(28px, calc(31 * var(--guide-unit))); height: max(28px, calc(16 * var(--guide-unit))); padding: 0; border: 0; background: transparent; display: grid; place-items: center; cursor: pointer; }
+.beginner-pagination span { display: block; width: max(8px, calc(16 * var(--guide-unit))); height: max(8px, calc(16 * var(--guide-unit))); background: #eedba5; border-radius: 50%; }
+.beginner-pagination [aria-current] span { background: #d87c00; }
+.beginner-actions { display: flex; flex-direction: column; gap: calc(11 * var(--guide-unit)); width: calc(235 * var(--guide-unit)); }
+.beginner-actions .start-screen-action { height: calc(60 * var(--guide-unit)); min-height: 36px; font-size: max(12px, calc(20.161 * var(--guide-unit))); font-family: inherit; }
+.beginner-screen button:focus-visible { outline: 2px solid #b96607; outline-offset: 3px; }
+.beginner-screen .beginner-tile:focus-visible { outline-offset: -3px; }
+.beginner-antigravity { position: absolute; z-index: 3; left: calc(100% + 20 * var(--guide-unit)); bottom: calc(50% + max(22px, 32 * var(--guide-unit)) + 16 * var(--guide-unit)); width: max(208px, calc(280 * var(--guide-unit))); }
+.beginner-antigravity .game-action { position: relative; display: flex; align-items: center; justify-content: center; width: 100%; height: max(48px, calc(64 * var(--guide-unit))); padding: 0; border: 0; background: transparent; color: #fcf8f1; font: 700 max(14px, calc(20 * var(--guide-unit)))/1 "Game Alegreya", Georgia, serif; filter: drop-shadow(0 3px .5px rgb(0 0 0 / 25%)); cursor: pointer; }
+.beginner-antigravity .game-action-content { flex-direction: row; justify-content: space-between; width: 84%; gap: 10px; }
+.beginner-antigravity .game-action-heading { flex-direction: row; gap: max(4px, calc(7 * var(--guide-unit))); font-size: inherit; line-height: 1.2; }
+.beginner-antigravity .game-action-icon { width: max(18px, calc(24 * var(--guide-unit))); height: max(18px, calc(24 * var(--guide-unit))); }
+.beginner-antigravity .game-credit { width: max(34px, calc(50 * var(--guide-unit))); height: max(24px, calc(34 * var(--guide-unit))); padding-bottom: calc(4 * var(--guide-unit)); font-size: max(14px, calc(20 * var(--guide-unit))); }
+.beginner-antigravity .game-action[aria-pressed="true"] { filter: drop-shadow(0 0 5px #a86bff88) brightness(1.12); }
+.beginner-antigravity .game-action:disabled { cursor: wait; opacity: .65; }
+@media (max-width: 760px) and (orientation: portrait) {
+  .beginner-screen { --guide-unit: min(.8px, calc((100vw - 32px) / 590), calc((100dvh - 48px) / 900)); }
+  .beginner-description { min-height: calc(64 * var(--guide-unit)); font-size: max(12px, calc(20 * var(--guide-unit))); }
+  .beginner-actions { width: max(176px, calc(235 * var(--guide-unit))); }
+  .beginner-board-stage:has(.beginner-antigravity) { padding-top: 64px; }
+  .beginner-board-stage:has(.beginner-antigravity) .beginner-step { top: calc(50% + 32px); }
+  .beginner-antigravity { left: auto; right: 0; top: 0; bottom: auto; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .beginner-screen *, .beginner-screen *::before, .beginner-screen *::after { animation: none !important; transition: none !important; }
+}
+@media (max-height: 500px) and (orientation: landscape) {
+  .beginner-content:has(.beginner-piece-picker) { width: min(90vw, 700px); display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+  .beginner-content:has(.beginner-piece-picker) .beginner-title { grid-column: 1 / -1; height: 36px; font-size: 18px; line-height: 22px; }
+  .beginner-content:has(.beginner-piece-picker) .beginner-demo { grid-column: 1; grid-row: 2 / 4; }
+  .beginner-piece-picker { gap: 4px; }
+  .beginner-piece-picker button { width: 44px; min-height: 50px; padding: 4px; }
+  .beginner-piece-picker img { width: 24px; height: 26px; }
+  .beginner-content:has(.beginner-piece-picker) .beginner-caption { grid-column: 2; grid-row: 2; width: 100%; }
+  .beginner-content:has(.beginner-piece-picker) .beginner-description { font-size: 13px; line-height: 19px; }
+  .beginner-content:has(.beginner-piece-picker) .beginner-actions { grid-column: 2; grid-row: 3; width: 176px; justify-self: center; }
+}

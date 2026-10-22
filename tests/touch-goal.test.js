@@ -61,3 +61,14 @@ test('touching the king before completing requirements does not win', () => {
   assert.notEqual(game.gameWon, true);
   assert.equal(game.savedTrace, undefined);
 });
+
+test('celebration starts after the completion dialog opens and uses its position', () => {
+  const game = setup();
+  const dialog = {}, order = [];
+  game.players[0].row = game.goal.row;
+  game.levelCompleteModal = { querySelector: () => dialog };
+  game.showLevelCompleteModal = () => order.push('dialog');
+  game.triggerConfetti = options => { order.push('celebration'); assert.equal(options.target, dialog); };
+  game.checkWinCondition();
+  assert.deepEqual(order, ['dialog', 'celebration']);
+});

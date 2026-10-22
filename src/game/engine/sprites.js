@@ -303,6 +303,10 @@ export function register(game) {
     renderCtx.restore();
   };
   game.drawCastleRookMarker = function (renderCtx, x, y, size) {
+    if (game.pieceImageLayer && renderCtx === game.ctx) {
+      game.pieceImageLayer.decorateCastle();
+      return;
+    }
     const radius = Math.max(4, size * 0.14);
     const centerX = x + size * 0.76;
     const centerY = y + size * 0.24;

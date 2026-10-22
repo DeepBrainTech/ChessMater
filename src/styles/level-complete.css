@@ -39,7 +39,7 @@
   height: 141.93%;
   left: -20.57%;
   top: -20.96%;
-  background: url("/assets/images/level-complete/paper.png") center / 100% 100% no-repeat;
+  background: url("/assets/images/game/game-background.webp") center / 100% 100% no-repeat;
   pointer-events: none;
 }
 .level-complete-coin-reward {

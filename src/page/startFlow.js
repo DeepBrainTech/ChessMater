@@ -108,6 +108,8 @@ export async function initStartFlow(signal) {
       await game.loadLevels(maxUnlocked);
       if (signal?.aborted) return;
     }
+    const bgMusic = document.getElementById("bgMusic");
+    if (bgMusic) bgMusic.currentTime = 0;
     setGameState(true);
 
     const levels = game.LEVELS || [];

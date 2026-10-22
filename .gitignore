@@ -1,8 +1,6 @@
 # Dependencies
 node_modules/
 backend/node_modules/
-package-lock.json
-backend/package-lock.json
 bun.lockb
 yarn.lock
 
@@ -62,6 +60,7 @@ wrangler.toml
 
 # Testing
 coverage/
+artifacts/
 .nyc_output/
 *.test.js.snap
 

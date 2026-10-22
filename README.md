@@ -2,6 +2,8 @@
 
 棋类重力解谜游戏，使用 React + Vite + Canvas，后端使用 Express + PostgreSQL。源码使用 UTF-8。
 
+自动测试、GitHub Actions 检查范围及合并门禁设置见 [CI 说明](docs/ci.md)。
+
 ## 开发与构建
 
 ```bash

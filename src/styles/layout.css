@@ -94,6 +94,15 @@ body.in-game .container.consumer-mode#mainContainer {
   background: transparent;
   box-shadow: none;
 }
+.game-piece-image-layer { position: absolute; transform-origin: 0 0; overflow: hidden; pointer-events: none; z-index: 1; }
+.game-piece-image-scene { position: absolute; left: 0; top: 0; transform-origin: 0 0; pointer-events: none; }
+.game-piece-sprite { position: absolute; left: 0; top: 0; transform-origin: 0 0; container-type: inline-size; pointer-events: none; }
+.game-piece-sprite[hidden], .game-piece-badge[hidden] { display: none; }
+.game-piece-sprite > img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.game-piece-badge { position: absolute; left: 50%; top: 50%; display: grid; place-items: center; width: 32%; height: 32%; transform: translate(-50%, -50%); border-radius: 50%; background: #000b; color: white; font: bold 20cqw/1 Arial, sans-serif; }
+.game-piece-badge--top { top: 0; transform: translate(-50%, 0); }
+.game-piece-badge--urgent { color: red; }
+.game-piece-badge--castle { left: auto; right: 0; top: 0; transform: none; background: #f59e0bf2; border: 1px solid white; }
 #gameSidePanel {
   display: flex;
   grid-area: side;
@@ -133,7 +142,7 @@ body.in-game .container.consumer-mode#mainContainer {
   inset: 0;
   content: "";
   border-radius: inherit;
-  background: url("/assets/images/game/stats-background.webp") 33.16% 37.77% / 170.6% 227.75% no-repeat;
+  background: url("/assets/images/game/game-background.webp") 33.16% 37.77% / 170.6% 227.75% no-repeat;
 }
 .game-stats-shield {
   position: absolute;
