@@ -220,7 +220,7 @@ export function register(game) {
       return;
     }
     game.autoRestartScheduled = false;
-    game.loadPuzzle(game.currentPuzzleData, { preserveHint: true });
+    game.loadPuzzle(game.currentPuzzleData, { preserveHint: true, preserveAntigravity: true });
   };
   game.initializeCanvas = // Initialize the canvas size on load
   function () {

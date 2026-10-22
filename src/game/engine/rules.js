@@ -2,7 +2,7 @@ import { session } from '../../services/session.js';
 import { ensurePlayerSelected } from '../playerSelection.js';
 export function register(game) {
   game.loadPuzzle = // --- Load puzzle from JSON file ---
-  function (puzzleData, { preserveHint = false } = {}) {
+  function (puzzleData, { preserveHint = false, preserveAntigravity = false } = {}) {
     game.cancelPieceMoveAnimation?.();
     game.currentPuzzleData = JSON.parse(JSON.stringify(puzzleData)); // Deep copy
     game.moveHistorySnapshots = [];
@@ -164,7 +164,7 @@ export function register(game) {
       game.mode = "play";
       game.gameWon = false;
       game.antigravityEnabled = false;
-      game.antigravityUnlockedThisRun = false;
+      if (!preserveAntigravity) game.antigravityUnlockedThisRun = false;
       game.resetHintForRun({ preserve: preserveHint });
       game.frameCount = 0;
       game.levelMoveCount = 0;
