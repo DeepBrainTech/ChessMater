@@ -23,7 +23,6 @@ export function installPieceMovementAnimation(game, host = window) {
   };
   const start = (destinations, commit) => {
     if (game.pieceMoveAnimation) return true;
-    if (host.matchMedia('(prefers-reduced-motion: reduce)').matches) return false;
     const moves = destinations.map(({ player, row, col }) => ({ player,
       fromRow: player.row, fromCol: player.col, toRow: row, toCol: col }));
     const distance = Math.max(...moves.map(move => Math.hypot(move.toRow - move.fromRow, move.toCol - move.fromCol)));

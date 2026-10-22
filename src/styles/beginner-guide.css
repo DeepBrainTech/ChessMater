@@ -65,9 +65,6 @@
   .beginner-board-stage:has(.beginner-antigravity) .beginner-step { top: calc(50% + 32px); }
   .beginner-antigravity { left: auto; right: 0; top: 0; bottom: auto; }
 }
-@media (prefers-reduced-motion: reduce) {
-  .beginner-screen *, .beginner-screen *::before, .beginner-screen *::after { animation: none !important; transition: none !important; }
-}
 @media (max-height: 500px) and (orientation: landscape) {
   .beginner-content:has(.beginner-piece-picker) { width: min(90vw, 700px); display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
   .beginner-content:has(.beginner-piece-picker) .beginner-title { grid-column: 1 / -1; height: 36px; font-size: 18px; line-height: 22px; }

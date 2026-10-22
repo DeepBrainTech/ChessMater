@@ -42,10 +42,8 @@ export default function GuideBoard({ page, pieceType, onPieceChange, description
     if (!completed) return;
     const lifecycle = createLifecycle();
     setCelebrating(true);
-    if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      game.triggerConfetti?.({ target: boardRef.current, lifecycle, count: 40, duration: 1500,
-        contained: true, silent: true, origin: { x: (goal % 5 + .5) / 5, y: (Math.floor(goal / 5) + .5) / 4 } });
-    }
+    game.triggerConfetti?.({ target: boardRef.current, lifecycle, count: 40, duration: 1500,
+      contained: true, silent: true, origin: { x: (goal % 5 + .5) / 5, y: (Math.floor(goal / 5) + .5) / 4 } });
     lifecycle.setTimeout(() => setCelebrating(false), 2200);
     return () => lifecycle.dispose();
   }, [completed]);
@@ -59,7 +57,7 @@ export default function GuideBoard({ page, pieceType, onPieceChange, description
       if (reachedGoal) setCompleted(true);
       motionTimers.current = [];
     };
-    if (matchMedia('(prefers-reduced-motion: reduce)').matches || (physicsOnly && landing.row === destination.row)) { finish(); return; }
+    if (physicsOnly && landing.row === destination.row) { finish(); return; }
     moving.current = true;
     if (physicsOnly) {
       setMotion(physicsMotion); setSelected(false); setPlayer(landing);

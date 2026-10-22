@@ -35,16 +35,27 @@ test('movement finishes before applying movement rules and physics', () => {
   assert.deepEqual(committed, [[0, 0, 4, { animate: false }]]);
 });
 
-test('restarting cancels movement and reduced motion skips animation', () => {
+test('restarting cancels movement', () => {
   const { game, timers, committed } = fixture();
   game.startPlayerMoveAnimation(0, 0, 4);
   game.cancelPieceMoveAnimation();
   assert.equal(timers.size, 0);
   assert.equal(game.pieceMoveAnimation, null);
   assert.equal(committed.length, 0);
-  const reduced = fixture(true);
-  assert.equal(reduced.game.startPlayerMoveAnimation(0, 0, 4), false);
-  assert.equal(reduced.timers.size, 0);
+});
+
+test('system reduced motion keeps gameplay movement and castling animated', () => {
+  for (const castle of [false, true]) {
+    const { game, timers, committed, setTime } = fixture(true);
+    assert.equal(castle ? game.startCastleAnimation(0, 1) : game.startPlayerMoveAnimation(0, 0, 4), true);
+    assert.equal(timers.size, 1);
+    assert.equal(committed.length, 0);
+    setTime(game.pieceMoveAnimation.duration / 2);
+    assert.deepEqual(playerDrawPosition(game, game.players[0]), castle ? { x: 150, y: 100 } : { x: 150, y: 50 });
+    [...timers.values()][0]();
+    assert.equal(game.pieceMoveAnimation, null);
+    assert.deepEqual(committed, castle ? [[0, 1, { animate: false }]] : [[0, 0, 4, { animate: false }]]);
+  }
 });
 
 test('castling animates king and rook together', () => {
