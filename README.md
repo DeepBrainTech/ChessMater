@@ -31,6 +31,8 @@ npm --prefix backend start
 
 API 服务需要数据库和 Portal JWT 环境变量，具体读取位置见 `backend/db.js` 和 `backend/server.js`。
 
+后端通过 `ALLOWED_ORIGINS` 配置 CORS 白名单，多个来源用英文逗号分隔，填写完整的协议、域名及端口，不带路径或结尾斜杠；普通请求和 OPTIONS 预检都精确匹配。未配置时不允许带 Origin 的跨域请求，无 Origin 的服务端请求仍可通过 CORS 检查，接口认证保持有效。使用上述 npm 命令启动后端时，dotenv 读取 `backend/.env`；从其他目录直接运行 Node 时，默认读取当前工作目录的 `.env`。修改后重启后端。
+
 ## Docker 开发环境与主站联调
 
 `docker-compose.dev.yml` 用于开发联调，`docker-compose.yml` 用于生产部署。两份配置独立使用，不需要合并。
@@ -38,6 +40,8 @@ API 服务需要数据库和 Portal JWT 环境变量，具体读取位置见 `ba
 需要 Docker Desktop（Linux containers），并先启动现有主站。开发配置仅启动 ChessMater 的前端、API 和游戏数据库，统一连接现有主站，不创建主站服务、主站数据库或 Redis。
 
 根目录 `.env` 中设置 `PORTAL_URL=http://localhost:3000`、`PORTAL_API_URL=http://localhost:8000`，并将 `LOCAL_CHESSMATER_JWT_SECRET`（或 `CHESSMATER_JWT_SECRET`）设置为现有主站签发 ChessMater 令牌使用的密钥。
+
+开发容器的白名单使用根目录 `.env` 的 `LOCAL_ALLOWED_ORIGINS`，默认允许 `http://localhost:5173,http://127.0.0.1:5173`。使用局域网地址访问时，需要显式添加对应来源。
 
 ```powershell
 cd D:\DeepBrainTech\ChessMater
@@ -92,6 +96,7 @@ Copy-Item .env.example .env
 - `CHESSMATER_JWT_SECRET`：与主站签发 ChessMater 令牌使用的密钥一致。
 - `CHESSMATER_SESSION_JWT_SECRET`：独立的游戏会话签名密钥。
 - `CHESSMATER_API_URL`：浏览器可访问的游戏 API HTTPS 地址。
+- `ALLOWED_ORIGINS`：允许访问游戏 API 的前端来源，多个地址用英文逗号分隔，只填写实际使用的来源。
 - `PORTAL_URL`、`PORTAL_API_URL`：生产主站及其 API 地址，默认使用当前线上域名。
 
 ```powershell
@@ -100,7 +105,7 @@ docker compose ps
 docker compose logs -f game-web game-api
 ```
 
-通过服务器的 HTTPS 反向代理将游戏域名指向 `127.0.0.1:8080`，将游戏 API 域名指向 `127.0.0.1:3002`。代理需要传递原始 `Host` 和 `X-Forwarded-Proto: https`，以正确设置登录 Cookie。生产主站的 `NEXT_PUBLIC_CHESSMATER_URL` 应指向游戏域名。游戏页面与 API 使用项目允许的 `deepbraintechnology.com` 子域名。
+通过服务器的 HTTPS 反向代理将游戏域名指向 `127.0.0.1:8080`，将游戏 API 域名指向 `127.0.0.1:3002`。代理需要传递原始 `Host` 和 `X-Forwarded-Proto: https`，以正确设置登录 Cookie。生产主站的 `NEXT_PUBLIC_CHESSMATER_URL` 应指向游戏域名，并将该游戏来源加入 `ALLOWED_ORIGINS`。修改白名单后执行 `docker compose up -d game-api` 更新后端容器。
 
 前端 URL 配置在镜像构建时写入，修改后需要重新执行带 `--build` 的启动命令。签名密钥和数据库密码仅传入后端运行环境；`.env` 已被 Git 和 Docker 构建上下文忽略。
 

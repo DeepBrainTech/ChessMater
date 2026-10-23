@@ -22,6 +22,7 @@ services:
       target: backend-production
     environment:
       NODE_ENV: production
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:?Set allowed frontend origins in .env}
       PORT: "3000"
       PGHOST: game-db
       PGPORT: "5432"

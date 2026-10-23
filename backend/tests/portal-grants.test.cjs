@@ -6,6 +6,7 @@ process.env.CHESSMATER_JWT_SECRET = 'isolated-commerce-test-secret';
 process.env.CHESSMATER_JWT_AUD = 'chessmater';
 process.env.CHESSMATER_JWT_ISS = 'main-portal';
 process.env.CHESSMATER_JWT_ALG = 'HS256';
+process.env.ALLOWED_ORIGINS = 'https://freefall-chess.deepbraintechnology.com,https://chessmater.deepbraintechnology.com,https://chessmaster.deepbraintechnology.com';
 const jwt = require('jsonwebtoken');
 const { app, verifyPortalToken } = require('../server');
 const pool = require('../db');
@@ -71,8 +72,12 @@ test('retired permanent unlock endpoints return 404 without database writes', as
 });
 
 test('CORS allows the canonical paid-grant header', async () => {
-  const response = await fetch(base + '/replay-unlocks/activate', { method: 'OPTIONS',
-    headers: { Origin: 'https://chessmaster.deepbraintechnology.com',
-      'Access-Control-Request-Method': 'POST', 'Access-Control-Request-Headers': 'x-grant-token' } });
-  assert.match(response.headers.get('access-control-allow-headers'), /X-Grant-Token/i);
+  for (const origin of ['https://freefall-chess.deepbraintechnology.com', 'https://chessmater.deepbraintechnology.com', 'https://chessmaster.deepbraintechnology.com']) {
+    const response = await fetch(base + '/replay-unlocks/activate', { method: 'OPTIONS',
+      headers: { Origin: origin,
+        'Access-Control-Request-Method': 'POST', 'Access-Control-Request-Headers': 'x-grant-token' } });
+    assert.equal(response.headers.get('access-control-allow-origin'), origin);
+    assert.equal(response.headers.get('access-control-allow-credentials'), 'true');
+    assert.match(response.headers.get('access-control-allow-headers'), /X-Grant-Token/i);
+  }
 });

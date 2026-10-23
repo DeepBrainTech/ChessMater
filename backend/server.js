@@ -16,66 +16,23 @@ const CHESSMATER_SESSION_AUD = process.env.CHESSMATER_SESSION_JWT_AUD || 'chessm
 const CHESSMATER_SESSION_ISS = process.env.CHESSMATER_SESSION_JWT_ISS || 'chessmater-backend';
 const CHESSMATER_SESSION_EXPIRE_SECONDS = Number(process.env.CHESSMATER_SESSION_EXPIRE_SECONDS || 86400);
 const SESSION_COOKIE_NAME = 'cm_session';
-const ALLOWED_ORIGINS = ['https://chessmater.pages.dev', 'https://chessmater-production.up.railway.app', 'https://chessmaster.deepbraintechnology.com', 'http://localhost:3000', 'http://127.0.0.1:3000', 'http://localhost:5500', 'http://127.0.0.1:5500'];
-function isPrivateLanHost(hostname) {
-  if (!hostname) return false;
-  if (/^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname)) return true;
-  if (/^192\.168\.\d{1,3}\.\d{1,3}$/.test(hostname)) return true;
-  const match172 = hostname.match(/^172\.(\d{1,3})\.\d{1,3}\.\d{1,3}$/);
-  if (match172) {
-    const second = Number(match172[1]);
-    return second >= 16 && second <= 31;
-  }
-  return false;
-}
-function parseHostname(input) {
-  if (!input) return '';
-  const value = String(input).trim().toLowerCase();
-  if (!value) return '';
-  if (value.includes('://')) {
-    try {
-      return new URL(value).hostname.toLowerCase();
-    } catch {
-      return '';
-    }
-  }
-  return value.split(':')[0];
-}
-function isLocalDevHost(hostLike) {
-  const hostname = parseHostname(hostLike);
-  return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '0.0.0.0' || isPrivateLanHost(hostname);
-}
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '')
+  .split(',')
+  .map(origin => origin.trim())
+  .filter(Boolean);
 function isOriginAllowed(origin) {
   if (!origin) return true;
-  if (ALLOWED_ORIGINS.includes(origin)) return true;
-  if (isLocalDevHost(origin)) return true;
-  if (origin.includes('pages.dev') || origin.includes('deepbraintechnology.com')) return true;
-  return false;
+  return ALLOWED_ORIGINS.includes(origin);
 }
 
-// Handle preflight first: OPTIONS returns CORS headers without auth
-app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  const allowed = origin && isOriginAllowed(origin);
-  // For OPTIONS preflight, echo Origin back so browser always gets Allow-Origin (avoids CORS block)
-  if (req.method === 'OPTIONS' && origin) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-  } else if (allowed) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-  }
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Grant-Token');
-  if (req.method === 'OPTIONS') {
-    return res.status(204).end();
-  }
-  next();
-});
+// CORS handles preflight before authentication, using the same allowlist as other requests.
 const corsOptions = {
   origin: function (origin, callback) {
     if (isOriginAllowed(origin)) return callback(null, true);
     console.warn('CORS blocked origin:', origin);
-    return callback(new Error('Not allowed by CORS'));
+    const error = new Error('Not allowed by CORS');
+    error.status = 403;
+    return callback(error);
   },
   credentials: true,
   methods: ['GET', 'POST', 'OPTIONS'],
@@ -236,7 +193,6 @@ require("./routes/auth")({
 }); // Restore user session from httpOnly cookie (for hard refresh / direct open without hash token)
 // Health check (no DB, no auth) - use to verify server and CORS
 app.get('/health', (req, res) => {
-  res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
   res.json({
     ok: true
   });

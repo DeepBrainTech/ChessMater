@@ -27,6 +27,7 @@ services:
       CHESSMATER_JWT_AUD: chessmater
       CHESSMATER_JWT_ISS: main-portal
       NODE_ENV: development
+      ALLOWED_ORIGINS: ${LOCAL_ALLOWED_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
       PORT: "3001"
       DATABASE_URL: postgresql://postgres:postgres@game-db:5432/chessmater
       DATABASE_SSL: "false"
