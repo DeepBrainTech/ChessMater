@@ -193,16 +193,16 @@ body.in-game #gameTopRightControls button {
 .home-logo-frame {
   position: relative;
   width: 100%;
-  aspect-ratio: 631 / 97;
+  aspect-ratio: 633 / 143;
   overflow: hidden;
 }
 
 .home-logo-frame img {
   position: absolute;
-  top: -69.66%;
-  left: -6.66%;
-  width: 111.75%;
-  height: 244.83%;
+  top: -134.97%;
+  left: -16.48%;
+  width: 130.46%;
+  height: 445.8%;
   max-width: none;
 }
 

@@ -28,7 +28,7 @@ export default function StartScreen() {
       />
       <main className="home-scene" aria-labelledby="homeTitle">
         <div className="home-content">
-          <h1 className="visually-hidden" id="homeTitle">ChessMater</h1>
+          <h1 className="visually-hidden" id="homeTitle">FreefallChess</h1>
 
           <div className="home-emblems" aria-hidden="true">
             <div className="home-emblem home-emblem--primary">
@@ -38,7 +38,7 @@ export default function StartScreen() {
 
           <div className="home-brand">
             <div className="home-logo-frame">
-              <img src={`${HOME_ASSETS}chessmater-logo.png`} alt="ChessMater" />
+              <img src={`${HOME_ASSETS}freefall-chess-figma-logo.png`} alt="FreefallChess" />
             </div>
             <p id="startScreenUserName" className="current-user-name" />
             <p id="loginPrompt" className="login-prompt" style={{ display: "none" }}>
